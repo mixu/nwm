@@ -15,9 +15,7 @@ console.log(obj.XMapWindow());
 console.log(obj.hello());
 */
 
-var a = obj.getWindow();
-console.log(a);
-console.log(a.test());
+obj.setManage(function(text) { console.log("Return value: "+text); });
 
 
 setTimeout(function() {}, 10000);

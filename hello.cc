@@ -91,6 +91,8 @@ private:
   Display *dpy;
   Window wnd;
   GC gc;
+  int screen, screen_width, screen_height;
+  Window root;
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -111,15 +113,15 @@ public:
 
     // set the static Hello function as prototype.hello
     NODE_SET_PROTOTYPE_METHOD(s_ct, "hello", Hello);
-    // set the static Hello function as prototype.hello
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "XOpenDisplay", X11_XOpenDisplay);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "XCreateSimpleWindow", X11_XCreateSimpleWindow);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "XSelectInput", X11_XSelectInput);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "XMapWindow", X11_XMapWindow);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "XSetForeground", X11_XSetForeground);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "XDrawLine", X11_XDrawLine);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "XFlush", X11_XFlush);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "XMapWindow", X11_XMapWindow);
+
+    // test storing a callback to a function
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "setManage", SetManage);
+
+    // pseudocode stuff, dont call, it will break shit
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "Setup", Setup);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "Scan", Scan);
+//    NODE_SET_PROTOTYPE_METHOD(s_ct, "OnManage", OnManage);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "Loop", Loop);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "getWindow", GetWindow);
 
     // FINALLY: export the current function template
@@ -137,6 +139,11 @@ public:
   {
   }
 
+  struct hello_baton_t {
+    HelloWorld *hw;
+    Persistent<Function> cb;
+  };
+
   // New method for v8
   static Handle<Value> New(const Arguments& args)
   {
@@ -148,75 +155,243 @@ public:
     return args.This();
   }
 
-  static Handle<Value> X11_XOpenDisplay(const Arguments& args) {
+  static Handle<Value> SetManage(const Arguments& args) {
     HandleScope scope;
     // extract helloworld from args.this
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
 
-    hw->dpy = XOpenDisplay(NIL);
+    Local<Function> cb = Local<Function>::Cast(args[0]);
+    hello_baton_t *baton = new hello_baton_t();
+    baton->hw = hw;
+    baton->cb = Persistent<Function>::New(cb);
 
-    Local<String> result = String::New("XOpenDisplay");
-    return scope.Close(result);
+    hw->Ref();
+    eio_custom(EIO_Hello, EIO_PRI_DEFAULT, EIO_AfterHello, baton);
+    ev_ref(EV_DEFAULT_UC);
+
+    return Undefined();
   }
 
-  static Handle<Value> X11_XCreateSimpleWindow(const Arguments& args) {
-    HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    int blackColor = BlackPixel(hw->dpy, DefaultScreen(hw->dpy));
-    hw->wnd = XCreateSimpleWindow(hw->dpy,
-                          DefaultRootWindow(hw->dpy), 0, 0, 
-                 WIDTH, HEIGHT, 0, 
-                 blackColor, blackColor);
-
-    Local<String> result = String::New("XCreateSimpleWindow");
-    return scope.Close(result);
+  static int EIO_Hello(eio_req *req)
+  {
+    hello_baton_t *baton = static_cast<hello_baton_t *>(req->data);
+    sleep(10);
+    return 0;
   }
 
-  static Handle<Value> X11_XSelectInput(const Arguments& args) {
+  static int EIO_AfterHello(eio_req *req)
+  {
     HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    hello_baton_t *baton = static_cast<hello_baton_t *>(req->data);
+    ev_unref(EV_DEFAULT_UC);
+    baton->hw->Unref();
 
-    // We want to get MapNotify events
-    XSelectInput(hw->dpy, hw->wnd, StructureNotifyMask);
+    Local<Value> argv[1];
 
-    Local<String> result = String::New("XSelectInput");
-    return scope.Close(result);
+    argv[0] = String::New("Hello World");
+
+    TryCatch try_catch;
+
+    baton->cb->Call(Context::GetCurrent()->Global(), 1, argv);
+
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
+
+    baton->cb.Dispose();
+
+    delete baton;
+    return 0;
   }
 
-  static Handle<Value> X11_XMapWindow(const Arguments& args) {
+
+  static Handle<Value> Setup(const Arguments& args) {
     HandleScope scope;
     // extract helloworld from args.this
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
 
-    XMapWindow(hw->dpy, hw->wnd);
+    // initialize resources
 
+    // open the display
+    if ( ( hw->dpy = XOpenDisplay(NIL) ) == NULL ) {
+      (void) fprintf( stderr, "winman: cannot connect to X server %s\n", XDisplayName(NULL));
+      exit( -1 );
+    }
 
-    Local<String> result = String::New("XSelectInput");
+    // take the default screen
+    hw->screen = DefaultScreen(hw->dpy);
+    // get the root window
+    hw->root = RootWindow(hw->dpy, hw->screen);
+
+    // get screen geometry
+    hw->screen_width = DisplayWidth(hw->dpy, hw->screen);
+    hw->screen_height = DisplayHeight(hw->dpy, hw->screen);
+
+    XSetWindowAttributes wa;
+    // subscribe to root window events e.g. SubstructureRedirectMask
+    wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
+                    |EnterWindowMask|LeaveWindowMask|StructureNotifyMask
+                    |PropertyChangeMask;
+    XSelectInput(hw->dpy, hw->root, wa.event_mask);
+
+    // this is where you would grab the key inputs
+
+    Local<String> result = String::New("Setup done");
     return scope.Close(result);
   }
-
-  static Handle<Value> X11_XSetForeground(const Arguments& args) {
+  /**
+   * Scan and layout current windows
+   */
+  static Handle<Value> Scan(const Arguments& args) {
     HandleScope scope;
     // extract helloworld from args.this
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
 
-    hw->gc = XCreateGC(hw->dpy, hw->wnd, 0, NIL);
-    int whiteColor = WhitePixel(hw->dpy, DefaultScreen(hw->dpy));
-    XSetForeground(hw->dpy, hw->gc, whiteColor);
-        // Wait for the MapNotify event
-        for(;;) {
-         XEvent e;
-         XNextEvent(hw->dpy, &e);
-         if (e.type == MapNotify)
-          break;
+    unsigned int i, num;
+    Window d1, d2, *wins = NULL;
+    XWindowAttributes wa;
+    // XQueryTree() function returns the root ID, the parent window ID, a pointer to 
+    // the list of children windows (NULL when there are no children), and 
+    // the number of children in the list for the specified window. 
+    if(XQueryTree(hw->dpy, hw->root, &d1, &d2, &wins, &num)) {
+      for(i = 0; i < num; i++) {
+        // if we can't read the window attributes, 
+        // or the window is a popup (transient or override_redirect), skip it
+        if(!XGetWindowAttributes(hw->dpy, wins[i], &wa)
+        || wa.override_redirect || XGetTransientForHint(hw->dpy, wins[i], &d1)) {
+          continue;          
         }
+        // visible or minimized window ("Iconic state")
+        if(wa.map_state == IsViewable )//|| getstate(wins[i]) == IconicState)
+          HelloWorld::OnManage(wins[i], &wa);
+      }
+      for(i = 0; i < num; i++) { /* now the transients */
+        if(!XGetWindowAttributes(hw->dpy, wins[i], &wa))
+          continue;
+        if(XGetTransientForHint(hw->dpy, wins[i], &d1)
+        && (wa.map_state == IsViewable )) //|| getstate(wins[i]) == IconicState))
+          HelloWorld::OnManage(wins[i], &wa);
+      }
+      if(wins) {
+        // To free a non-NULL children list when it is no longer needed, use XFree()
+        XFree(wins);
+      }
+    }
 
-    Local<String> result = String::New("XSelectInput");
+    Local<String> result = String::New("Scan done");
     return scope.Close(result);
   }
+
+  /**
+   * Prepare the window object and call the Node.js callback.
+   */
+  static void OnManage(Window win, XWindowAttributes *wa) {
+
+    // window object to return
+    Local<Object> result = Object::New();
+
+    // read and set the window geometry
+    result->Set(String::NewSymbol("x"), Integer::New(wa->x));
+    result->Set(String::NewSymbol("y"), Integer::New(wa->y));
+    result->Set(String::NewSymbol("height"), Integer::New(wa->height));
+    result->Set(String::NewSymbol("width"), Integer::New(wa->width));
+    result->Set(String::NewSymbol("border_width"), Integer::New(wa->border_width));
+    // read and set the monitor (not important)
+//    result->Set(String::NewSymbol("monitor"), Integer::New(hw->selected_monitor));
+
+    // call the callback in Node.js, passing the window object...
+/*
+    // now apply the changes
+    XWindowChanges wc;
+
+    // set the location
+//    c->x = RETURNED_OBJECT.x;
+//    c->y = RETURNED_OBJECT.y;
+
+    // set window border width
+//    wc.border_width = RETURNED_OBJECT.border_width;
+    XConfigureWindow(hw->dpy, win, CWBorderWidth, &wc);
+    // set border color 
+    // XSetWindowBorder(dpy, win, dc.norm[ColBorder]);
+
+    // configure the window
+    XConfigureEvent ce;
+
+    ce.type = ConfigureNotify;
+    ce.display = hw->dpy;
+    ce.event = win;
+    ce.window = win;
+    ce.x = wa->x;
+    ce.y = wa->y;
+    ce.width = wa->width;
+    ce.height = wa->height;
+    ce.border_width = wa->border_width;
+    ce.above = None;
+    ce.override_redirect = False;
+    XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
+
+//    c->w = RETURNED_OBJECT.width;
+//    c->h = RETURNED_OBJECT.height;
+
+    // get the window size hints (e.g. what size it wants to be)
+
+    // (later) get the XGetWMHints to control whether the window should ever be focused...
+
+    // subscribe to window events
+    XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
+
+    // move and map the window
+    XMoveResizeWindow(hw->dpy, win, wa->x + 2 * hw->screen_width, wa->y, wa->width, wa->height);    
+    XMapWindow(hw->dpy, win);
+*/
+  }  
+
+
+  static Handle<Value> Loop(const Arguments& args) {
+    HandleScope scope;
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    XEvent event;
+    /* main event loop */
+    XSync(hw->dpy, False);
+    while(!XNextEvent(hw->dpy, &event)) {
+      // handle event internally --> calls Node if necessary 
+        switch (event.type) {
+        case ButtonPress:
+            break;
+        case ConfigureRequest:
+            break;
+        case ConfigureNotify:
+            break;
+        case DestroyNotify:
+            break;
+        case EnterNotify:
+            break;
+        case Expose:
+            break;
+        case FocusIn:
+            break;
+        case KeyPress:
+            break;
+        case MappingNotify:
+            break;
+        case MapRequest:
+            break;
+        case PropertyNotify:
+            break;
+        case UnmapNotify:
+            break;
+        default:
+            fprintf(stderr, "got unexpected %d event.\n", event.type);
+            break;
+      }
+      fprintf(stderr, "got event %d.\n", event.type);
+    }
+    Local<String> result = String::New("Loop");
+    return scope.Close(result);
+  }
+
 
   static Handle<Value> X11_XDrawLine(const Arguments& args) {
     HandleScope scope;
@@ -231,18 +406,6 @@ public:
     XDrawLine(hw->dpy, hw->wnd, hw->gc, x1, y1, x2, y2);
 
     Local<String> result = String::New("XSelectInput");
-    return scope.Close(result);
-  }
-
-     
-  static Handle<Value> X11_XFlush(const Arguments& args) {
-    HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    XFlush(hw->dpy);
-
-    Local<String> result = String::New("XFlush");
     return scope.Close(result);
   }
 

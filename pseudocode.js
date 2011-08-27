@@ -25,6 +25,9 @@ var NVM = function() {
 
 };
 
+/**
+ * Set up resources and grab events
+ */
 NVM.prototype.setup = function() {
   // initialize resources
 
@@ -39,6 +42,9 @@ NVM.prototype.setup = function() {
 
 };
 
+/**
+ * Scan and layout current windows
+ */
 NVM.prototype.scan = function() {
   // XQueryTree for windows
   // call the manage callback for each window
