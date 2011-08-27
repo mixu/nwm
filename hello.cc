@@ -93,6 +93,8 @@ private:
   GC gc;
   int screen, screen_width, screen_height;
   Window root;
+  // callbacks
+  Persistent<Function> cbManage, cbButtonPress, cbConfigureRequest, cbKeyPress;
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -116,6 +118,13 @@ public:
 
     // test storing a callback to a function
     NODE_SET_PROTOTYPE_METHOD(s_ct, "setManage", SetManage);
+
+    // callbacks
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "onManage", OnManage);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "onButtonPress", OnButtonPress);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "onConfigureRequest", OnConfigureRequest);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "onKeyPress", OnKeyPress);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "allCallbacks", AllCallbacks);
 
     // pseudocode stuff, dont call, it will break shit
     NODE_SET_PROTOTYPE_METHOD(s_ct, "Setup", Setup);
@@ -155,6 +164,81 @@ public:
     return args.This();
   }
 
+  static Handle<Value> OnManage(const Arguments& args) {
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    // store function
+    Local<Function> cb = Local<Function>::Cast(args[0]);
+    hw->cbManage = Persistent<Function>::New(cb);
+
+    return Undefined();
+  }
+
+  static Handle<Value> OnButtonPress(const Arguments& args) {
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    // store function
+    Local<Function> cb = Local<Function>::Cast(args[0]);
+    hw->cbButtonPress = Persistent<Function>::New(cb);
+
+    return Undefined();
+  }
+
+  static Handle<Value> OnConfigureRequest(const Arguments& args) {
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    // store function
+    Local<Function> cb = Local<Function>::Cast(args[0]);
+    hw->cbConfigureRequest = Persistent<Function>::New(cb);
+
+    return Undefined();
+  }
+
+  static Handle<Value> OnKeyPress(const Arguments& args) {
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    // store function
+    Local<Function> cb = Local<Function>::Cast(args[0]);
+    hw->cbKeyPress = Persistent<Function>::New(cb);
+
+    return Undefined();
+  }
+
+  static Handle<Value> AllCallbacks(const Arguments& args) {
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    Local<Value> argv[1];
+    argv[0] = String::New("Hello World");
+
+    TryCatch try_catch;
+    hw->cbManage->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
+    hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
+    hw->cbConfigureRequest->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
+    hw->cbKeyPress->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
+
+    return Undefined();
+  }
+
+
+
+
   static Handle<Value> SetManage(const Arguments& args) {
     HandleScope scope;
     // extract helloworld from args.this
@@ -187,7 +271,6 @@ public:
     baton->hw->Unref();
 
     Local<Value> argv[1];
-
     argv[0] = String::New("Hello World");
 
     TryCatch try_catch;

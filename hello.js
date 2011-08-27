@@ -15,7 +15,13 @@ console.log(obj.XMapWindow());
 console.log(obj.hello());
 */
 
-obj.setManage(function(text) { console.log("Return value: "+text); });
+//obj.setManage(function(text) { console.log("Return value: "+text); });
+
+obj.onManage(function(text) { console.log('onManage: ', text); });
+obj.onButtonPress(function(text) { console.log('onButtonPress: ', text); });
+obj.onConfigureRequest(function(text) { console.log('onConfigureRequest: ', text); });
+obj.onKeyPress(function(text) { console.log('onKeyPress: ', text); });
+obj.allCallbacks();
 
 
-setTimeout(function() {}, 10000);
+// setTimeout(function() {}, 10000);
