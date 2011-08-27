@@ -276,7 +276,7 @@ public:
     // how to return a new function
     Local<Object> result = Object::New();
     result->Set(String::NewSymbol("test"), 
-      v8::FunctionTemplate::New(HelloWorld::Sample)->GetFunction());
+      v8::FunctionTemplate::New(WindowObject::Test)->GetFunction());
 
     return scope.Close(result);
   }
