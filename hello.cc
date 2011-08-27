@@ -34,6 +34,56 @@
 using namespace node;
 using namespace v8;
 
+class WindowObject: ObjectWrap {
+  private:
+  public:
+  
+  static Persistent<FunctionTemplate> s_ct;
+  static void Init(Handle<Object> target) {
+    HandleScope scope;
+    // create a local FunctionTemplate
+    Local<FunctionTemplate> t = FunctionTemplate::New(New);
+
+    // initialize our template
+    s_ct = Persistent<FunctionTemplate>::New(t);
+    // set the field count
+    s_ct->InstanceTemplate()->SetInternalFieldCount(0);
+    // set the symbol for this function
+    s_ct->SetClassName(String::NewSymbol("WindowObject"));
+    
+    // FUNCTIONS
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "test", Test);
+
+    // FINALLY: export the current function template
+    target->Set(String::NewSymbol("HelloWorld"),
+                s_ct->GetFunction());
+
+  }
+
+  // C++ constructor
+  WindowObject() { }
+
+  ~WindowObject() { }
+
+  // New method for v8
+  static Handle<Value> New(const Arguments& args) {
+    HandleScope scope;
+    WindowObject* obj = new WindowObject();
+    // use ObjectWrap.Wrap to store hw in this
+    obj->Wrap(args.This());
+    // return this
+    return args.This();
+  }
+
+  static Handle<Value> Test(const Arguments& args) {
+    HandleScope scope;
+    // create and return a new string
+    Local<String> result = String::New("Hello from Test object");
+    return scope.Close(result);
+  }
+};
+
+
 class HelloWorld: ObjectWrap
 {
 private:
@@ -70,6 +120,7 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "XDrawLine", X11_XDrawLine);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "XFlush", X11_XFlush);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "XMapWindow", X11_XMapWindow);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "getWindow", GetWindow);
 
     // FINALLY: export the current function template
     target->Set(String::NewSymbol("HelloWorld"),
@@ -208,6 +259,28 @@ public:
     return scope.Close(result);
   }
 
+  static Handle<Value> Sample(const Arguments& args) {
+    HandleScope scope;
+    Local<String> result = String::New("No this required");
+    return scope.Close(result);
+  }
+
+  static Handle<Value> GetWindow(const Arguments& args) {
+    HandleScope scope;
+    
+    // how to return a new object
+//    Local<Object> result = Object::New();
+//    result->Set(String::NewSymbol("test"), Integer::New(123));
+//    return scope.Close(result);
+
+    // how to return a new function
+    Local<Object> result = Object::New();
+    result->Set(String::NewSymbol("test"), 
+      v8::FunctionTemplate::New(HelloWorld::Sample)->GetFunction());
+
+    return scope.Close(result);
+  }
+
 };
 
 Persistent<FunctionTemplate> HelloWorld::s_ct;
@@ -222,3 +295,7 @@ extern "C" {
   // macro to export helloworld
   NODE_MODULE(helloworld, init);
 }
+
+
+// could also store symbols like this:
+//    Persistent<String> port_symbol = NODE_PSYMBOL("port");
