@@ -6,7 +6,24 @@
 #include <v8.h>
 #include <node.h>
 
+#include <errno.h>
+#include <locale.h>
+#include <stdarg.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <X11/cursorfont.h>
+#include <X11/keysym.h>
+#include <X11/Xatom.h>
 #include <X11/Xlib.h>
+#include <X11/Xproto.h>
+#include <X11/Xutil.h>
+#include <X11/extensions/Xinerama.h>
+
 #include <assert.h>   // I include this to test return values the lazy way
 #include <unistd.h>   // So we got the profile for 10 seconds
 #define NIL (0)       // A name for the void pointer
@@ -21,6 +38,9 @@ class HelloWorld: ObjectWrap
 {
 private:
   int m_count;
+  Display *dpy;
+  Window wnd;
+  GC gc;
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -36,9 +56,22 @@ public:
     s_ct->InstanceTemplate()->SetInternalFieldCount(1);
     // set the symbol for this function
     s_ct->SetClassName(String::NewSymbol("HelloWorld"));
+
+    // FUNCTIONS
+
     // set the static Hello function as prototype.hello
     NODE_SET_PROTOTYPE_METHOD(s_ct, "hello", Hello);
-    // export the current function template
+    // set the static Hello function as prototype.hello
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "XOpenDisplay", X11_XOpenDisplay);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "XCreateSimpleWindow", X11_XCreateSimpleWindow);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "XSelectInput", X11_XSelectInput);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "XMapWindow", X11_XMapWindow);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "XSetForeground", X11_XSetForeground);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "XDrawLine", X11_XDrawLine);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "XFlush", X11_XFlush);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "XMapWindow", X11_XMapWindow);
+
+    // FINALLY: export the current function template
     target->Set(String::NewSymbol("HelloWorld"),
                 s_ct->GetFunction());
   }
@@ -64,6 +97,104 @@ public:
     return args.This();
   }
 
+  static Handle<Value> X11_XOpenDisplay(const Arguments& args) {
+    HandleScope scope;
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    hw->dpy = XOpenDisplay(NIL);
+
+    Local<String> result = String::New("XOpenDisplay");
+    return scope.Close(result);
+  }
+
+  static Handle<Value> X11_XCreateSimpleWindow(const Arguments& args) {
+    HandleScope scope;
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    int blackColor = BlackPixel(hw->dpy, DefaultScreen(hw->dpy));
+    hw->wnd = XCreateSimpleWindow(hw->dpy,
+                          DefaultRootWindow(hw->dpy), 0, 0, 
+                 WIDTH, HEIGHT, 0, 
+                 blackColor, blackColor);
+
+    Local<String> result = String::New("XCreateSimpleWindow");
+    return scope.Close(result);
+  }
+
+  static Handle<Value> X11_XSelectInput(const Arguments& args) {
+    HandleScope scope;
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    // We want to get MapNotify events
+    XSelectInput(hw->dpy, hw->wnd, StructureNotifyMask);
+
+    Local<String> result = String::New("XSelectInput");
+    return scope.Close(result);
+  }
+
+  static Handle<Value> X11_XMapWindow(const Arguments& args) {
+    HandleScope scope;
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    XMapWindow(hw->dpy, hw->wnd);
+
+
+    Local<String> result = String::New("XSelectInput");
+    return scope.Close(result);
+  }
+
+  static Handle<Value> X11_XSetForeground(const Arguments& args) {
+    HandleScope scope;
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    hw->gc = XCreateGC(hw->dpy, hw->wnd, 0, NIL);
+    int whiteColor = WhitePixel(hw->dpy, DefaultScreen(hw->dpy));
+    XSetForeground(hw->dpy, hw->gc, whiteColor);
+        // Wait for the MapNotify event
+        for(;;) {
+         XEvent e;
+         XNextEvent(hw->dpy, &e);
+         if (e.type == MapNotify)
+          break;
+        }
+
+    Local<String> result = String::New("XSelectInput");
+    return scope.Close(result);
+  }
+
+  static Handle<Value> X11_XDrawLine(const Arguments& args) {
+    HandleScope scope;
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    int x1 = args[0]->IntegerValue();
+    int y1 = args[1]->IntegerValue();
+    int x2 = args[2]->IntegerValue();
+    int y2 = args[3]->IntegerValue();
+  
+    XDrawLine(hw->dpy, hw->wnd, hw->gc, x1, y1, x2, y2);
+
+    Local<String> result = String::New("XSelectInput");
+    return scope.Close(result);
+  }
+
+     
+  static Handle<Value> X11_XFlush(const Arguments& args) {
+    HandleScope scope;
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    XFlush(hw->dpy);
+
+    Local<String> result = String::New("XFlush");
+    return scope.Close(result);
+  }
+
   static Handle<Value> Hello(const Arguments& args)
   {
     HandleScope scope;
@@ -71,43 +202,6 @@ public:
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
     // use hello world
     hw->m_count++;
-
-
-     Display *dpy;
-     Window wnd;
-
-     dpy = XOpenDisplay(NIL);
-
-     int blackColor = BlackPixel(dpy, DefaultScreen(dpy));
-     int whiteColor = WhitePixel(dpy, DefaultScreen(dpy));
-
-     wnd = XCreateSimpleWindow(dpy,
-                          DefaultRootWindow(dpy), 0, 0, 
-                 WIDTH, HEIGHT, 0, 
-                 blackColor, blackColor);
-     // We want to get MapNotify events
-
-     XSelectInput(dpy, wnd, StructureNotifyMask);
-     XMapWindow(dpy, wnd);
-     
-     GC gc = XCreateGC(dpy, wnd, 0, NIL);
-     XSetForeground(dpy, gc, whiteColor);
-
-     
-        // Wait for the MapNotify event
-
-        for(;;) {
-         XEvent e;
-         XNextEvent(dpy, &e);
-         if (e.type == MapNotify)
-          break;
-        }
-        XDrawLine(dpy, wnd, gc, 10, 60, 180, 20);
-     
-     
-     XFlush(dpy);
-        sleep(10);
-
 
     // create and return a new string
     Local<String> result = String::New("Hello World");
