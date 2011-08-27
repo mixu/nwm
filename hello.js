@@ -19,7 +19,10 @@ console.log(obj.hello());
 
 obj.onManage(function(window) { 
   console.log('onManage: ', window); 
-  return "Whats up";
+  if(window.x) {
+    window.x += 100;
+  }
+  return window;
 });
 obj.onButtonPress(function(text) { console.log('onButtonPress: ', text); });
 obj.onConfigureRequest(function(text) { console.log('onConfigureRequest: ', text); });

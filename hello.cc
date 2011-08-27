@@ -237,10 +237,16 @@ public:
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
     }
+    
+    // cast to object
+    Handle<Object> obj = Handle<Object>::Cast(result); 
+    // cast to int
+    v8::Handle<v8::Value> h = obj->Get(String::NewSymbol("x"));
+    int x = h->Int32Value();
 
+    windowObj[0] = HelloWorld::makeWindow(x, 2, 3, 4, 5);
 
-
-    hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
+    hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, windowObj);
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
     }
