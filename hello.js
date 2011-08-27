@@ -17,11 +17,15 @@ console.log(obj.hello());
 
 //obj.setManage(function(text) { console.log("Return value: "+text); });
 
-obj.onManage(function(text) { console.log('onManage: ', text); });
+obj.onManage(function(window) { 
+  console.log('onManage: ', window); 
+  return "Whats up";
+});
 obj.onButtonPress(function(text) { console.log('onButtonPress: ', text); });
 obj.onConfigureRequest(function(text) { console.log('onConfigureRequest: ', text); });
 obj.onKeyPress(function(text) { console.log('onKeyPress: ', text); });
-obj.allCallbacks();
+var result = obj.allCallbacks();
 
+console.log('return value from onManage was', result);
 
 // setTimeout(function() {}, 10000);

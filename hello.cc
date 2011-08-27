@@ -208,6 +208,19 @@ public:
     return Undefined();
   }
 
+  static Local<Object> makeWindow(int x, int y, int height, int width, int border_width) {
+    // window object to return
+    Local<Object> result = Object::New();
+
+    // read and set the window geometry
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("height"), Integer::New(height));
+    result->Set(String::NewSymbol("width"), Integer::New(width));
+    result->Set(String::NewSymbol("border_width"), Integer::New(border_width));
+    return result;
+  }
+
   static Handle<Value> AllCallbacks(const Arguments& args) {
     // extract helloworld from args.this
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
@@ -216,10 +229,17 @@ public:
     argv[0] = String::New("Hello World");
 
     TryCatch try_catch;
-    hw->cbManage->Call(Context::GetCurrent()->Global(), 1, argv);
+    // onManage receives a window object
+    Local<Value> windowObj[1];
+    windowObj[0] = HelloWorld::makeWindow(1, 2, 3, 4, 5);
+
+    Handle<Value> result = hw->cbManage->Call(Context::GetCurrent()->Global(), 1, windowObj);
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
     }
+
+
+
     hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
@@ -233,7 +253,7 @@ public:
       FatalException(try_catch);
     }
 
-    return Undefined();
+    return result;
   }
 
 
