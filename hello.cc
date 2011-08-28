@@ -5,6 +5,7 @@
 
 #include <v8.h>
 #include <node.h>
+#include <ev.h>
 
 #include <errno.h>
 #include <locale.h>
@@ -120,6 +121,12 @@ class WindowObject: ObjectWrap {
   }
 };
 
+typedef struct Client Client;
+struct Client {
+  unsigned int id;
+  Monitor *mon;
+  Window win;
+};
 
 class HelloWorld: ObjectWrap
 {
@@ -132,6 +139,8 @@ private:
   Window root;
   // callbacks
   Persistent<Function> cbManage, cbButtonPress, cbConfigureRequest, cbKeyPress;
+
+
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -180,11 +189,6 @@ public:
   ~HelloWorld()
   {
   }
-
-  struct hello_baton_t {
-    HelloWorld *hw;
-    Persistent<Function> cb;
-  };
 
   // New method for v8
   static Handle<Value> New(const Arguments& args)
@@ -340,7 +344,7 @@ public:
 
     // call the callback in Node.js, passing the window object...
     //Handle<Value> result = 
-//    hw->cbManage->Call(Context::GetCurrent()->Global(), 1, argv);
+    hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
     fprintf(stderr, "Call cbButtonPress\n");
     if (try_catch.HasCaught()) {
       fprintf(stderr, "try catch cbButtonPress\n");
@@ -503,21 +507,22 @@ public:
     // extract helloworld from args.this
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
 
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hello_baton_t *baton = new hello_baton_t();
-    baton->hw = hw;
-    baton->cb = Persistent<Function>::New(cb);
+    // use ev_io
 
-    hw->Ref();
-    eio_custom(EIO_RealLoop, EIO_PRI_DEFAULT, EIO_AfterLoop, baton);
-    ev_ref(EV_DEFAULT_UC);
+    // initiliaze and start 
+    ev_io_init(&hw->watcher, EIO_RealLoop, XConnectionNumber(hw->dpy), EV_READ);
+    hw->watcher.data = hw;
+    ev_io_start(EV_DEFAULT_ &hw->watcher);
+
+//    hw->Ref();
 
     return Undefined();
   }
 
-  static int EIO_RealLoop(eio_req *req) {
-    hello_baton_t *baton = static_cast<hello_baton_t *>(req->data);
-    HelloWorld* hw = baton->hw;
+  static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents) {
+    (void) fprintf( stderr, "In Loop\n");
+
+    HelloWorld* hw = static_cast<HelloWorld*>(watcher->data);    
 
     TryCatch try_catch;
     Local<Value> argv[1];
@@ -526,16 +531,18 @@ public:
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
     }
+    
 
     XEvent event;
-    /* main event loop */
+    // main event loop 
     XSync(hw->dpy, False);
     while(!XNextEvent(hw->dpy, &event)) {
       // handle event internally --> calls Node if necessary 
         switch (event.type) {
         case ButtonPress:
           {
-            HelloWorld::EmitButtonPress(hw, &event);
+          fprintf(stderr, "EmitButtonPress\n");
+          HelloWorld::EmitButtonPress(hw, &event);
           }
             break;
         case ConfigureRequest:
@@ -560,11 +567,12 @@ public:
             XWindowAttributes wa;
             XMapRequestEvent *ev = &event.xmaprequest;
             if(!XGetWindowAttributes(hw->dpy, ev->window, &wa))
-              return 0;
+              return;
             if(wa.override_redirect)
-              return 0;
+              return;
             // dwm actually does this only once per window (e.g. for unknown windows only...)
-            HelloWorld::EmitManage(hw, ev->window, &wa);
+            // that's because otherwise you'll cause a hang when you map a mapped window again...
+            // HelloWorld::EmitManage(hw, ev->window, &wa); 
           }
             break;
         case PropertyNotify:
@@ -577,17 +585,7 @@ public:
       }
       fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);
     }
-    return 0;
-  }
-
-  static int EIO_AfterLoop(eio_req *req) {
-    HandleScope scope;
-    hello_baton_t *baton = static_cast<hello_baton_t *>(req->data);
-    ev_unref(EV_DEFAULT_UC);
-    baton->hw->Unref();
-
-    delete baton;
-    return 0;
+    return;
   }
 
   static Handle<Value> X11_XDrawLine(const Arguments& args) {
@@ -641,6 +639,7 @@ public:
     return scope.Close(result);
   }
 
+  ev_io watcher;
 };
 
 Persistent<FunctionTemplate> HelloWorld::s_ct;

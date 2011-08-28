@@ -24,9 +24,8 @@ nwm.onManage(function(window) {
  * A mouse button has been clicked
  */
 nwm.onButtonPress(function(event) {
-  console.log('Button pressed');  
-//  console.log('Button pressed', event);
-//  return event;
+  console.log('Button pressed', event);
+  return event;
 });
 
 /**
@@ -50,3 +49,4 @@ nwm.scan();
 console.log('Scan done');
 nwm.loop();
 console.log('Loop started');
+
