@@ -72,7 +72,7 @@ NWM.prototype.start = function() {
   this.wm.scan();
   this.wm.loop();
 
-  repl.start().context.nvm = self;
+  repl.start().context.nwm = self;
 };
 
 NWM.prototype.hide = function(id) {
