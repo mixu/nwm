@@ -1,47 +1,46 @@
 var repl = require('repl');
 var X11wm = require('./build/default/helloworld.node').HelloWorld;
 
-/*
-var X11wm = function() {};
-// events
-X11wm.prototype.onAdd = function(window){};
-X11wm.prototype.onButtonPress = function(event){};
-X11wm.prototype.onConfigureRequest = function(event) {};
-X11wm.prototype.onKeyPress = function(event){};
-X11wm.prototype.onDrag = function(event){};
-// API
-X11wm.prototype.resizeWindow = function(id, width, height) {};
-X11wm.prototype.focusWindow = function(id) {};
-X11wm.prototype.moveWindow = function(id, x, y) {};
-X11wm.prototype.raiseWindow = function(id) {};
-*/
-
 var NWM = function() {
-  this.windows = [];
+  this.windows = {};
   this.screen = null;
   this.drag_window = null;
   this.wm = null;
+  this.workspace = 1;
 }
 
 NWM.prototype.start = function() {
   this.wm = new X11wm();
-  var self = this;
+  var self = this;  
+  this.workspace = 1;
+
   /**
    * A single window should be positioned
    */
   this.wm.onAdd(function(window) {
-    console.log('onAdd', window);
-    self.windows.push(window);  
+    if(window.id) {
+      window.visible = true;
+      window.workspace = self.workspace;
+      self.windows[window.id] = window;      
+      // windows might be placed outside the screen if the wm was terminated
+       console.log(window);
+      if(window.x > self.screen.width || window.y > self.screen.height) {
+        console.log('Moving window '+window.id+' on to screen');
+        self.move(window.id, 1, 1);
+      }
+      console.log('onAdd', self.windows[window.id]);
+    }
   });
 
   this.wm.onRemove(function(id) {
     console.log('onRemove', id);
-    self.tile();    
+    if(self.windows[id]) {
+      delete self.windows[id];
+    }
+    self.rearrange();    
   });
 
-  this.wm.onRearrange(function() {
-    self.tile();
-  });
+  this.wm.onRearrange(function() { self.rearrange(); }); 
 
   /**
    * A mouse button has been clicked
@@ -76,29 +75,120 @@ NWM.prototype.start = function() {
   repl.start().context.nvm = self;
 };
 
-NWM.prototype.tile = function() {
-  // the way DWM does it is to reserve half the screen for the first screen, 
-  // then split the other half among the rest of the screens
-  if(this.windows.length == 1) {
-    this.wm.moveWindow(this.windows[0].id, 0, 0);
-    this.wm.resizeWindow(this.windows[0].id, this.screen.width, this.screen.height);
-  } else {
-    var halfWidth = Math.floor(this.screen.width / 2);
-    var sliceHeight = Math.floor(this.screen.height / (this.windows.length-1) );
-    this.wm.moveWindow(this.windows[0].id, 0, 0);
-    this.wm.resizeWindow(this.windows[0].id, halfWidth, this.screen.height);
-    for(var i = 1; i < this.windows.length; i++) {
-      this.wm.moveWindow(this.windows[i].id, halfWidth, (i-1)*sliceHeight);
-      this.wm.resizeWindow(this.windows[i].id, halfWidth, sliceHeight);
-    }
+NWM.prototype.hide = function(id) {
+  var screen = this.screen;
+  if(this.windows[id] && this.windows[id].visible) {
+    this.windows[id].visible = false;
+    this.wm.moveWindow(id, this.windows[id].x + 2*screen.width, this.windows[id].y);    
+    this.rearrange();
   }
 };
 
-NWM.prototype.move = function() {
+NWM.prototype.show = function(id) {
+  var screen = this.screen;
+  if(this.windows[id] && !this.windows[id].visible) {
+    this.windows[id].visible = true;
+    this.wm.moveWindow(id, this.windows[id].x, this.windows[id].y);    
+    this.rearrange();
+  }
+};
+
+NWM.prototype.move = function(id, x, y) {
+  if(this.windows[id]) {
+    this.windows[id].x = x;
+    this.windows[id].y = y;
+    this.wm.moveWindow(id, x, y);
+  }
+};
+
+NWM.prototype.resize = function(id, width, height) {
+  if(this.windows[id]) {
+    this.windows[id].width = width;
+    this.windows[id].height = height;
+    this.wm.resizeWindow(id, width, height);
+  }
+};
+
+NWM.prototype.visible = function() {
   var self = this;
-  this.windows.forEach(function(window) {
-    self.wm.moveWindow(window.id, Math.floor(Math.random()*200), Math.floor(Math.random()*200), 100+Math.floor(Math.random()*100), 100+Math.floor(Math.random()*11));    
-  })  
+  var keys = Object.keys(this.windows);
+  keys = keys.filter(function(id) { return (self.windows[id].visible && self.windows[id].workspace == self.workspace); });
+  console.log('get visible', 'workspace = ', self.workspace, keys);
+  return keys;
+};
+
+NWM.prototype.go = function(workspace) {
+  var self = this;
+  var keys = Object.keys(this.windows);
+  keys.forEach(function(id) {
+    if(self.windows[id].workspace != workspace) {
+      self.hide(id); 
+    } else {
+      self.show(id);
+    }
+  });
+  if(workspace != this.workspace) {
+    this.workspace = workspace;
+    this.rearrange();
+  }
+};
+
+NWM.prototype.gimme = function(id){
+  this.windowTo(id, this.workspace);
+}
+
+NWM.prototype.windowTo = function(id, workspace) {
+  if(this.windows[id]) {
+    var old_workspace = this.windows[id].workspace;
+    this.windows[id].workspace = workspace;
+    if(workspace == this.workspace) {
+      this.show(id);
+    }
+    if(old_workspace == this.workspace && old_workspace != workspace) {
+      this.hide(id); 
+    } 
+    if(workspace == this.workspace || old_workspace == this.workspace) {
+      this.rearrange();
+    }
+  }    
+};
+
+NWM.prototype.rearrange = function() {
+  this.tile();
+};
+
+NWM.prototype.tile = function() {
+  // the way DWM does it is to reserve half the screen for the first screen, 
+  // then split the other half among the rest of the screens
+  var keys = this.visible();
+  var self = this;
+  var screen = this.screen;
+  if(keys.length < 1) {
+    return;
+  }
+  var firstId = keys.shift();  
+  if(keys.length == 0) {
+    this.move(firstId, 0, 0);
+    this.resize(firstId, screen.width, screen.height);
+  } else {
+    var halfWidth = Math.floor(screen.width / 2);
+    var sliceHeight = Math.floor(screen.height / (keys.length) );
+    this.move(firstId, 0, 0);
+    this.resize(firstId, halfWidth, screen.height);
+    keys.forEach(function(id, index) {
+      self.move(id, halfWidth, index*sliceHeight);
+      self.resize(id, halfWidth, sliceHeight);
+    });
+  }
+};
+
+NWM.prototype.random = function() {
+  var self = this;
+  var screen = this.screen;
+  var keys = Object.keys(this.windows);
+  keys.forEach(function(id, index) {
+    self.move(id, Math.floor(Math.random()*(screen.width-300)), Math.floor(Math.random()*(screen.height-300)));    
+  });
 };
 
 

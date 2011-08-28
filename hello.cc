@@ -116,7 +116,7 @@ public:
 
   // C++ constructor
   HelloWorld() :
-    next_index(0),
+    next_index(1),
     monit(NULL)
   {
   }
