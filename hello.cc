@@ -35,6 +35,28 @@
 using namespace node;
 using namespace v8;
 
+typedef struct Monitor Monitor;
+typedef struct Client Client;
+struct Client {
+  int id;
+  int x, y, width, height;
+  Client *next;
+  Client *snext;
+  Monitor *mon;
+  Window win;
+};
+
+struct Monitor {
+  int id;
+  int x, y, width, height;
+  Client *clients;
+//  Client *sel;
+//  Client *stack;
+  Monitor *next;
+  Window barwin;
+};
+
+
 
 class HelloWorld: ObjectWrap
 {
@@ -45,10 +67,10 @@ private:
   int screen, screen_width, screen_height;
   Window root;
   // callbacks
-  Persistent<Function> cbAdd, cbRearrange, cbButtonPress, cbConfigureRequest, cbKeyPress, cbEnterNotify;
-  Window windows[MAXWIN];
+  Persistent<Function> cbAdd, cbRearrange, cbButtonPress, cbConfigureRequest, cbKeyPress, cbEnterNotify, cbRemove;
   int next_index;
 
+  Monitor* monit;
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -69,6 +91,7 @@ public:
 
     // callbacks
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onAdd", OnAdd);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "onRemove", OnRemove);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onRearrange", OnRearrange);    
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onButtonPress", OnButtonPress);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onConfigureRequest", OnConfigureRequest);
@@ -92,7 +115,8 @@ public:
 
   // C++ constructor
   HelloWorld() :
-    next_index(0)
+    next_index(0),
+    monit(NULL)
   {
   }
 
@@ -110,6 +134,8 @@ public:
     return args.This();
   }
 
+  // EVENTS
+
   static Handle<Value> OnAdd(const Arguments& args) {
     // extract helloworld from args.this
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
@@ -117,6 +143,17 @@ public:
     // store function
     Local<Function> cb = Local<Function>::Cast(args[0]);
     hw->cbAdd = Persistent<Function>::New(cb);
+
+    return Undefined();
+  }
+
+  static Handle<Value> OnRemove(const Arguments& args) {
+    // extract helloworld from args.this
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    // store function
+    Local<Function> cb = Local<Function>::Cast(args[0]);
+    hw->cbRemove = Persistent<Function>::New(cb);
 
     return Undefined();
   }
@@ -176,6 +213,8 @@ public:
     return Undefined();
   }
 
+  // GET from Node.js
+
   static int getIntegerValue(Handle<Object> obj, Local<String> symbol) {
     v8::Handle<v8::Value> h = obj->Get(symbol);    
     int val = h->IntegerValue();
@@ -183,16 +222,71 @@ public:
     return val;
   }
 
-  static int getWindowId(HelloWorld* hw, Window win) {
-    int i;
-    for(i = 0; i < hw->next_index; i++) {
-      if(hw->windows[i] == win) {
-        return i;
-      }
-    }
-    return -1;
+  // Client management
+
+  static void attach(Client *c) {
+    c->next = c->mon->clients;
+    c->mon->clients = c;
   }
 
+  static void detach(Client *c) {
+    Client **tc;
+    for(tc = &c->mon->clients; *tc && *tc != c; tc = &(*tc)->next);
+    *tc = c->next;    
+  }
+
+  static Client* createClient(Window win, Monitor* monitor, int id, int x, int y, int width, int height) {
+    Client *c;
+    if(!(c = (Client *)calloc(1, sizeof(Client)))) {
+      fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(Client));
+      exit( -1 );      
+    }
+    c->win = win;
+    c->mon = monitor;
+    c->id = id;
+    c->x = x;
+    c->y = y;
+    c->width = width;
+    c->height = height;
+    return c;
+  }
+
+  static Monitor* createMonitor(void) {
+    Monitor *m;
+    if(!(m = (Monitor *)calloc(1, sizeof(Monitor)))) {
+      fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(Monitor));
+      exit( -1 );            
+    }
+   fprintf( stderr, "Create monitor\n");
+    return m;    
+  }
+
+  static Client* getByWindow(HelloWorld* hw, Window win) {
+    Client *c;
+//    Monitor *m;
+    for(c = hw->monit->clients; c; c = c->next)
+      if(c->win == win)
+        return c;
+    return NULL;
+  }
+
+  static Client* getById(HelloWorld* hw, int id) {
+    Client *c;
+    for(c = hw->monit->clients; c; c = c->next)
+      if(c->id == id)
+        return c;
+    return NULL;  
+  }
+
+  static void updateGeometry(HelloWorld* hw) {
+    if(!hw->monit)
+      hw->monit = createMonitor();
+    if(hw->monit->width != hw->screen_width || hw->monit->height != hw->screen_width){
+      hw->monit->width = hw->screen_width;
+      hw->monit->height = hw->screen_height;
+    }
+    return;
+  }
 
   /**
    * Prepare the window object and call the Node.js callback.
@@ -202,7 +296,8 @@ public:
     // onManage receives a window object
     Local<Value> argv[1];
     // temporarily store window to hw->wnd
-    hw->windows[hw->next_index] = win;  
+    Client* c = createClient(win, hw->monit, hw->next_index, wa->x, wa->y, wa->height, wa->width);
+    attach(c);
     argv[0] = HelloWorld::makeWindow(hw->next_index, wa->x, wa->y, wa->height, wa->width, wa->border_width);
     hw->next_index++;
 
@@ -241,24 +336,40 @@ public:
     XMapWindow(hw->dpy, win);
 
     // emit a rearrange
+    EmitRearrange(hw);
+  }
+
+  static void EmitRearrange(HelloWorld* hw) {
+    TryCatch try_catch;
     hw->cbRearrange->Call(Context::GetCurrent()->Global(), 0, 0);
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
+    }    
+  }
+
+
+  static void EmitRemove(HelloWorld* hw, Client *c, Bool destroyed) {
+//    Monitor *m = c->mon;
+//    XWindowChanges wc;
+    int id = c->id;
+    // emit a remove
+    TryCatch try_catch;
+    Local<Value> argv[1];
+    argv[0] = Integer::New(id);
+    hw->cbRemove->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
     }
-
-/*
-    XWindowChanges wc;
-    // set window border width
-    XConfigureWindow(hw->dpy, win, CWBorderWidth, &wc);
-    // set border color 
-    // XSetWindowBorder(dpy, win, dc.norm[ColBorder]);
-
-    // get the window size hints (e.g. what size it wants to be)
-
-    // (later) get the XGetWMHints to control whether the window should ever be focused...
-
-*/
-
+    detach(c);
+    if(!destroyed) {
+      XGrabServer(hw->dpy);
+      XUngrabButton(hw->dpy, AnyButton, AnyModifier, c->win);
+      XSync(hw->dpy, False);
+      XUngrabServer(hw->dpy);
+    }
+    free(c);
+    RealFocus(hw, -1);
+    EmitRearrange(hw);
   }
 
   static Handle<Value> ResizeWindow(const Arguments& args) {
@@ -269,10 +380,10 @@ public:
     int width = args[1]->IntegerValue();
     int height = args[2]->IntegerValue();
 
-    if(id > -1) {
-      Window win = hw->windows[id];
+    Client* c = getById(hw, id);
+    if(c && c->win) {
       fprintf( stderr, "ResizeWindow: id=%d width=%d height=%d \n", id, width, height);    
-      XResizeWindow(hw->dpy, win, width, height);    
+      XResizeWindow(hw->dpy, c->win, width, height);    
       XFlush(hw->dpy);
     }
     return Undefined();
@@ -286,10 +397,10 @@ public:
     int x = args[1]->IntegerValue();
     int y = args[2]->IntegerValue();
 
-    if(id > -1) {
-      Window win = hw->windows[id];
+    Client* c = getById(hw, id);
+    if(c && c->win) {
       fprintf( stderr, "MoveWindow: id=%d x=%d y=%d \n", id, x, y);    
-      XMoveWindow(hw->dpy, win, x, y);    
+      XMoveWindow(hw->dpy, c->win, x, y);    
       XFlush(hw->dpy);
     }
     return Undefined();
@@ -305,15 +416,20 @@ public:
   }
 
   static void RealFocus(HelloWorld* hw, int id) {
-    if(id > -1) {
-      Window win = hw->windows[id];
-      fprintf( stderr, "FocusWindow: id=%d\n", id);    
-      GrabButtons(hw->dpy, win, True);
-      XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);    
-      Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
-      SendEvent(hw, win, atom);
-      XFlush(hw->dpy);      
-    }    
+    Window win;
+    Client* c = getById(hw, id);
+    if(c && c->win) {
+      win = c->win;
+    } else {
+      win = hw->root;
+    }
+    fprintf( stderr, "FocusWindow: id=%d\n", id);    
+    GrabButtons(hw->dpy, win, True);
+    XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);    
+    Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
+    SendEvent(hw, win, atom);
+    XFlush(hw->dpy);      
+
   }
 
   static Bool SendEvent(HelloWorld* hw, Window wnd, Atom proto) {
@@ -346,7 +462,6 @@ public:
    */
   static void GrabButtons(Display* dpy, Window wnd, Bool focused) {
     XUngrabButton(dpy, AnyButton, AnyModifier, wnd);
-
     if(focused) {
       XGrabButton(dpy, Button3,
                         Mod4Mask,
@@ -394,16 +509,19 @@ public:
 
     // fetch window: ev->window --> to window id
     // fetch root_x,root_y
-    int id = getWindowId(hw, ev->window);
-    argv[0] = HelloWorld::makeButtonPress(id, ev->x, ev->y, ev->button);
-    fprintf(stderr, "makeButtonPress\n");
+    Client* c = getByWindow(hw, ev->window);
+    if(c) {
+      int id = c->id;
+      argv[0] = HelloWorld::makeButtonPress(id, ev->x, ev->y, ev->button);
+      fprintf(stderr, "makeButtonPress\n");
 
-    // call the callback in Node.js, passing the window object...
-    hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
-    fprintf(stderr, "Call cbButtonPress\n");
-    if (try_catch.HasCaught()) {
-      fprintf(stderr, "try catch cbButtonPress\n");
-      FatalException(try_catch);
+      // call the callback in Node.js, passing the window object...
+      hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
+      fprintf(stderr, "Call cbButtonPress\n");
+      if (try_catch.HasCaught()) {
+        fprintf(stderr, "try catch cbButtonPress\n");
+        FatalException(try_catch);
+      }      
     }
   }
 
@@ -438,7 +556,7 @@ public:
   }
 
   static void EmitKeyPress(HelloWorld* hw, XEvent *e) {
-    KeySym keysym;
+//    KeySym keysym;
     XKeyEvent *ev;
 
     ev = &e->xkey;
@@ -478,21 +596,26 @@ public:
 
     fprintf(stderr, "EmitEnterNotify\n");
 
-    int id = getWindowId(hw, ev->window);
-    argv[0] = HelloWorld::makeEvent(id);
+    Client* c = getByWindow(hw, ev->window);
+    if(c) {
+      int id = c->id;
+      argv[0] = HelloWorld::makeEvent(id);
 
-    // call the callback in Node.js, passing the window object...
-    hw->cbEnterNotify->Call(Context::GetCurrent()->Global(), 1, argv);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
+      // call the callback in Node.js, passing the window object...
+      hw->cbEnterNotify->Call(Context::GetCurrent()->Global(), 1, argv);
+      if (try_catch.HasCaught()) {
+        FatalException(try_catch);
+      }
     }
   }
 
   static void EmitFocusIn(HelloWorld* hw, XEvent *e) {
-    int id;
     XFocusChangeEvent *ev = &e->xfocus;
-    id = getWindowId(hw, ev->window);
-    RealFocus(hw, id);
+    Client* c = getByWindow(hw, ev->window);
+    if(c) {
+      int id = c->id;
+      RealFocus(hw, id);
+    }
   }
 
 
@@ -526,6 +649,8 @@ public:
     // get screen geometry
     hw->screen_width = DisplayWidth(hw->dpy, hw->screen);
     hw->screen_height = DisplayHeight(hw->dpy, hw->screen);
+    // update monitor geometry (and create hw->monitor)
+    updateGeometry(hw);
 
     XSetWindowAttributes wa;
     // subscribe to root window events e.g. SubstructureRedirectMask
@@ -655,17 +780,21 @@ public:
             if(wa.override_redirect)
               return;
             fprintf(stderr, "MapRequest\n");
-            if(HelloWorld::getWindowId(hw, ev->window) == -1) {
+            Client* c = HelloWorld::getByWindow(hw, ev->window);
+            if(c == NULL) {
               fprintf(stderr, "Emit manage!\n");
               // dwm actually does this only once per window (e.g. for unknown windows only...)
               // that's because otherwise you'll cause a hang when you map a mapped window again...
               HelloWorld::EmitAdd(hw, ev->window, &wa);
+            } else {
+              fprintf(stderr, "Window is known\n");              
             }
           }
             break;
         case PropertyNotify:
             break;
         case UnmapNotify:
+//            HelloWorld::EmitUnmapNotify(hw, &event);
             break;
         default:
             fprintf(stderr, "got unexpected %s (%d) event.\n", event_names[event.type], event.type);
