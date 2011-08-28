@@ -6,7 +6,9 @@ This repo will not receive any updates and will go out of date, as I will keep i
 
 # nwm - node window manager
 
-nwm is a dynamic window manager for X based on dwm. It uses libev to interface with X11, and allows you to lay out windows in Node.
+nwm is a dynamic window manager for X written at NodeKO 2011. 
+
+It uses libev to interface with X11, and allows you to lay out windows in Node.
 
 I wrote the code in this repo during Node Knockout 2011. Unfortunately I'm not in the competition since I forgot to confirm my initial team registration (click accept). Not a big deal, my reward is shipping.
 
@@ -33,6 +35,9 @@ The default nwm.js starts a REPL, so you can issue commands to it interactively.
 
 
 # Using
+
+The default nwm.js starts a REPL, so you can issue commands to it interactively:
+
 
 To list windows:
 
