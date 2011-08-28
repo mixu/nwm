@@ -1,4 +1,8 @@
-*NOTE: YOU WANT to download or fork https://github.com/mixu/nwm as that repo will have the latest code in the future. The "mixu/nodeko" repo will remain untouched for historical reasons.*
+# NOTE: This is the code as it was at Node Knockout 
+
+**Go to https://github.com/mixu/nwm , that repo will have the latest code in the future.**
+
+This repo will not receive any updates and will go out of date, as I will keep it around for historical reasons only.
 
 # nwm - node window manager
 
@@ -8,6 +12,8 @@ I wrote the code in this repo during Node Knockout 2011. Unfortunately I'm not i
 
 The underlying X11 bindings are written as a Node native extension in c. I apologize for the ugliness of the code - if you look at the first commit, I started on Friday with [this tutorial](https://www.cloudkick.com/blog/2010/aug/23/writing-nodejs-native-extensions/), a vague knowledge of X11 and a lot of enthusiasm.
 
+My plan is to dogfood this in the near future to bring it to a more useful state. Right now, I recommend you run it in a secondary X server using Xephyr.
+
 # Features
 
 nwm supports all kinds of layouts - you can write your own, or use the default (tiling) layout. It's like dwm, but layouts are enforced in JS rather than in C.
@@ -16,8 +22,14 @@ The default nwm.js starts a REPL, so you can issue commands to it interactively.
 
 # Installing
 
-node-waf configure build
-node nwm.js
+    node-waf configure build
+    # start Xephyr
+    Xephyr -screen 1024x768 -br :1 &
+    # export gedit to the X server on display 1
+    DISPLAY=:1 gedit
+    DISPLAY=:1 gnome-terminal
+    # now start nwm.js on display 1
+    DISPLAY=:1 node nwm.js
 
 
 # Using
