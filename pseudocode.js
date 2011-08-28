@@ -131,7 +131,5 @@ nvm.on('KeyPress', function(key) {
 
 nvm.setup();
 nvm.scan();
-while(true) {
-  nvm.loop();
-}
+nvm.loop();
 

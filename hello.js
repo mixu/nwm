@@ -18,7 +18,7 @@ console.log(obj.hello());
 //obj.setManage(function(text) { console.log("Return value: "+text); });
 
 obj.onManage(function(window) { 
-  console.log('onManage: ', window); 
+  console.log('onManage: ', window);
   if(window.x) {
     window.x += 100;
   }

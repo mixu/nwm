@@ -28,6 +28,43 @@
 #include <unistd.h>   // So we got the profile for 10 seconds
 #define NIL (0)       // A name for the void pointer
 
+static const char *event_names[] = {
+"",
+"",
+"KeyPress",
+"KeyRelease",
+"ButtonPress",
+"ButtonRelease",
+"MotionNotify",
+"EnterNotify",
+"LeaveNotify",
+"FocusIn",
+"FocusOut",
+"KeymapNotify",
+"Expose",
+"GraphicsExpose",
+"NoExpose",
+"VisibilityNotify",
+"CreateNotify",
+"DestroyNotify",
+"UnmapNotify",
+"MapNotify",
+"MapRequest",
+"ReparentNotify",
+"ConfigureNotify",
+"ConfigureRequest",
+"GravityNotify",
+"ResizeRequest",
+"CirculateNotify",
+"CirculateRequest",
+"PropertyNotify",
+"SelectionClear",
+"SelectionRequest",
+"SelectionNotify",
+"ColormapNotify",
+"ClientMessage",
+"MappingNotify" };
+
 #define WIDTH 800
 #define HEIGHT 600
 
@@ -116,9 +153,6 @@ public:
     // set the static Hello function as prototype.hello
     NODE_SET_PROTOTYPE_METHOD(s_ct, "hello", Hello);
 
-    // test storing a callback to a function
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "setManage", SetManage);
-
     // callbacks
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onManage", OnManage);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onButtonPress", OnButtonPress);
@@ -127,10 +161,9 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "allCallbacks", AllCallbacks);
 
     // pseudocode stuff, dont call, it will break shit
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "Setup", Setup);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "Scan", Scan);
-//    NODE_SET_PROTOTYPE_METHOD(s_ct, "OnManage", OnManage);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "Loop", Loop);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "setup", Setup);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "scan", Scan);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "loop", Loop);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "getWindow", GetWindow);
 
     // FINALLY: export the current function template
@@ -208,6 +241,75 @@ public:
     return Undefined();
   }
 
+  static int getIntegerValue(Handle<Object> obj, Local<String> symbol) {
+    v8::Handle<v8::Value> h = obj->Get(symbol);    
+    int val = h->IntegerValue();
+    (void) fprintf( stderr, "getIntegerValue: %d \n", val);
+    return val;
+  }
+
+  /**
+   * Prepare the window object and call the Node.js callback.
+   */
+  static void EmitManage(HelloWorld* hw, Window win, XWindowAttributes *wa) {
+    TryCatch try_catch;
+    // onManage receives a window object
+    Local<Value> argv[1];
+    argv[0] = HelloWorld::makeWindow(wa->x, wa->y, wa->height, wa->width, wa->border_width);
+
+    // call the callback in Node.js, passing the window object...
+    Handle<Value> result = hw->cbManage->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
+      
+    // get the return value
+    // cast to object
+    Handle<Object> obj = Handle<Object>::Cast(result); 
+    // now apply the changes
+    // configure the window
+    XConfigureEvent ce;
+
+    ce.type = ConfigureNotify;
+    ce.display = hw->dpy;
+    ce.event = win;
+    ce.window = win;
+    ce.x = getIntegerValue(obj, String::NewSymbol("x"));
+    ce.y = getIntegerValue(obj, String::NewSymbol("y"));
+    ce.width = getIntegerValue(obj, String::NewSymbol("width"));
+    ce.height = getIntegerValue(obj, String::NewSymbol("height"));
+    ce.border_width = getIntegerValue(obj, String::NewSymbol("border_width"));
+    ce.above = None;
+    ce.override_redirect = False;
+
+    (void) fprintf( stderr, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
+
+    XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
+
+  
+    // move and map the window
+    XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);    
+    XMapWindow(hw->dpy, win);
+
+    // subscribe to window events
+    XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
+
+/*
+    XWindowChanges wc;
+
+    // set window border width
+    XConfigureWindow(hw->dpy, win, CWBorderWidth, &wc);
+    // set border color 
+    // XSetWindowBorder(dpy, win, dc.norm[ColBorder]);
+
+    // get the window size hints (e.g. what size it wants to be)
+
+    // (later) get the XGetWMHints to control whether the window should ever be focused...
+
+*/
+
+  }
+
   static Local<Object> makeWindow(int x, int y, int height, int width, int border_width) {
     // window object to return
     Local<Object> result = Object::New();
@@ -218,8 +320,63 @@ public:
     result->Set(String::NewSymbol("height"), Integer::New(height));
     result->Set(String::NewSymbol("width"), Integer::New(width));
     result->Set(String::NewSymbol("border_width"), Integer::New(border_width));
+    // read and set the monitor (not important)
+//    result->Set(String::NewSymbol("monitor"), Integer::New(hw->selected_monitor));
     return result;
   }
+
+  static void EmitButtonPress(HelloWorld* hw, XEvent *e) {
+    XButtonPressedEvent *ev = &e->xbutton;
+    TryCatch try_catch;
+    // onManage receives a window object
+    Local<Value> argv[1];
+
+    fprintf(stderr, "EmitButtonPress\n");
+
+    // fetch window: ev->window --> to window id
+    // fetch root_x,root_y
+    argv[0] = HelloWorld::makeButtonPress(ev->x, ev->y, ev->button);
+    fprintf(stderr, "makeButtonPress\n");
+
+    // call the callback in Node.js, passing the window object...
+    //Handle<Value> result = 
+//    hw->cbManage->Call(Context::GetCurrent()->Global(), 1, argv);
+    fprintf(stderr, "Call cbButtonPress\n");
+    if (try_catch.HasCaught()) {
+      fprintf(stderr, "try catch cbButtonPress\n");
+      FatalException(try_catch);
+    }
+  }
+
+  static Local<Object> makeButtonPress(int x, int y, unsigned int button) {
+    // window object to return
+    Local<Object> result = Object::New();
+
+    // read and set the window geometry
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    // resolve the button
+    switch(button) {
+      case Button1:
+        result->Set(String::NewSymbol("button"), Integer::New(1));
+        break;
+      case Button2:
+        result->Set(String::NewSymbol("button"), Integer::New(2));
+        break;
+      case Button3:
+        result->Set(String::NewSymbol("button"), Integer::New(3));
+        break;
+      case Button4:
+        result->Set(String::NewSymbol("button"), Integer::New(4));
+        break;
+      case Button5:
+      default:
+        result->Set(String::NewSymbol("button"), Integer::New(5));
+        break;
+    }
+    return result;
+  }
+
 
   static Handle<Value> AllCallbacks(const Arguments& args) {
     // extract helloworld from args.this
@@ -262,58 +419,6 @@ public:
     return result;
   }
 
-
-
-
-  static Handle<Value> SetManage(const Arguments& args) {
-    HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hello_baton_t *baton = new hello_baton_t();
-    baton->hw = hw;
-    baton->cb = Persistent<Function>::New(cb);
-
-    hw->Ref();
-    eio_custom(EIO_Hello, EIO_PRI_DEFAULT, EIO_AfterHello, baton);
-    ev_ref(EV_DEFAULT_UC);
-
-    return Undefined();
-  }
-
-  static int EIO_Hello(eio_req *req)
-  {
-    hello_baton_t *baton = static_cast<hello_baton_t *>(req->data);
-    sleep(10);
-    return 0;
-  }
-
-  static int EIO_AfterHello(eio_req *req)
-  {
-    HandleScope scope;
-    hello_baton_t *baton = static_cast<hello_baton_t *>(req->data);
-    ev_unref(EV_DEFAULT_UC);
-    baton->hw->Unref();
-
-    Local<Value> argv[1];
-    argv[0] = String::New("Hello World");
-
-    TryCatch try_catch;
-
-    baton->cb->Call(Context::GetCurrent()->Global(), 1, argv);
-
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
-
-    baton->cb.Dispose();
-
-    delete baton;
-    return 0;
-  }
-
-
   static Handle<Value> Setup(const Arguments& args) {
     HandleScope scope;
     // extract helloworld from args.this
@@ -323,7 +428,7 @@ public:
 
     // open the display
     if ( ( hw->dpy = XOpenDisplay(NIL) ) == NULL ) {
-      (void) fprintf( stderr, "winman: cannot connect to X server %s\n", XDisplayName(NULL));
+      (void) fprintf( stderr, "cannot connect to X server %s\n", XDisplayName(NULL));
       exit( -1 );
     }
 
@@ -345,7 +450,9 @@ public:
 
     // this is where you would grab the key inputs
 
-    Local<String> result = String::New("Setup done");
+    Local<Object> result = Object::New();
+    result->Set(String::NewSymbol("width"), Integer::New(hw->screen_width));
+    result->Set(String::NewSymbol("height"), Integer::New(hw->screen_height));
     return scope.Close(result);
   }
   /**
@@ -372,14 +479,14 @@ public:
         }
         // visible or minimized window ("Iconic state")
         if(wa.map_state == IsViewable )//|| getstate(wins[i]) == IconicState)
-          HelloWorld::OnManage(wins[i], &wa);
+          HelloWorld::EmitManage(hw, wins[i], &wa);
       }
       for(i = 0; i < num; i++) { /* now the transients */
         if(!XGetWindowAttributes(hw->dpy, wins[i], &wa))
           continue;
         if(XGetTransientForHint(hw->dpy, wins[i], &d1)
         && (wa.map_state == IsViewable )) //|| getstate(wins[i]) == IconicState))
-          HelloWorld::OnManage(wins[i], &wa);
+          HelloWorld::EmitManage(hw, wins[i], &wa);
       }
       if(wins) {
         // To free a non-NULL children list when it is no longer needed, use XFree()
@@ -391,75 +498,34 @@ public:
     return scope.Close(result);
   }
 
-  /**
-   * Prepare the window object and call the Node.js callback.
-   */
-  static void OnManage(Window win, XWindowAttributes *wa) {
-
-    // window object to return
-    Local<Object> result = Object::New();
-
-    // read and set the window geometry
-    result->Set(String::NewSymbol("x"), Integer::New(wa->x));
-    result->Set(String::NewSymbol("y"), Integer::New(wa->y));
-    result->Set(String::NewSymbol("height"), Integer::New(wa->height));
-    result->Set(String::NewSymbol("width"), Integer::New(wa->width));
-    result->Set(String::NewSymbol("border_width"), Integer::New(wa->border_width));
-    // read and set the monitor (not important)
-//    result->Set(String::NewSymbol("monitor"), Integer::New(hw->selected_monitor));
-
-    // call the callback in Node.js, passing the window object...
-/*
-    // now apply the changes
-    XWindowChanges wc;
-
-    // set the location
-//    c->x = RETURNED_OBJECT.x;
-//    c->y = RETURNED_OBJECT.y;
-
-    // set window border width
-//    wc.border_width = RETURNED_OBJECT.border_width;
-    XConfigureWindow(hw->dpy, win, CWBorderWidth, &wc);
-    // set border color 
-    // XSetWindowBorder(dpy, win, dc.norm[ColBorder]);
-
-    // configure the window
-    XConfigureEvent ce;
-
-    ce.type = ConfigureNotify;
-    ce.display = hw->dpy;
-    ce.event = win;
-    ce.window = win;
-    ce.x = wa->x;
-    ce.y = wa->y;
-    ce.width = wa->width;
-    ce.height = wa->height;
-    ce.border_width = wa->border_width;
-    ce.above = None;
-    ce.override_redirect = False;
-    XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
-
-//    c->w = RETURNED_OBJECT.width;
-//    c->h = RETURNED_OBJECT.height;
-
-    // get the window size hints (e.g. what size it wants to be)
-
-    // (later) get the XGetWMHints to control whether the window should ever be focused...
-
-    // subscribe to window events
-    XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
-
-    // move and map the window
-    XMoveResizeWindow(hw->dpy, win, wa->x + 2 * hw->screen_width, wa->y, wa->width, wa->height);    
-    XMapWindow(hw->dpy, win);
-*/
-  }  
-
-
   static Handle<Value> Loop(const Arguments& args) {
     HandleScope scope;
     // extract helloworld from args.this
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    Local<Function> cb = Local<Function>::Cast(args[0]);
+    hello_baton_t *baton = new hello_baton_t();
+    baton->hw = hw;
+    baton->cb = Persistent<Function>::New(cb);
+
+    hw->Ref();
+    eio_custom(EIO_RealLoop, EIO_PRI_DEFAULT, EIO_AfterLoop, baton);
+    ev_ref(EV_DEFAULT_UC);
+
+    return Undefined();
+  }
+
+  static int EIO_RealLoop(eio_req *req) {
+    hello_baton_t *baton = static_cast<hello_baton_t *>(req->data);
+    HelloWorld* hw = baton->hw;
+
+    TryCatch try_catch;
+    Local<Value> argv[1];
+    argv[0] = String::New("Hello World");
+    hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
 
     XEvent event;
     /* main event loop */
@@ -468,6 +534,9 @@ public:
       // handle event internally --> calls Node if necessary 
         switch (event.type) {
         case ButtonPress:
+          {
+            HelloWorld::EmitButtonPress(hw, &event);
+          }
             break;
         case ConfigureRequest:
             break;
@@ -486,21 +555,40 @@ public:
         case MappingNotify:
             break;
         case MapRequest:
+          {
+            // read the window attrs, then add it to the managed windows...
+            XWindowAttributes wa;
+            XMapRequestEvent *ev = &event.xmaprequest;
+            if(!XGetWindowAttributes(hw->dpy, ev->window, &wa))
+              return 0;
+            if(wa.override_redirect)
+              return 0;
+            // dwm actually does this only once per window (e.g. for unknown windows only...)
+            HelloWorld::EmitManage(hw, ev->window, &wa);
+          }
             break;
         case PropertyNotify:
             break;
         case UnmapNotify:
             break;
         default:
-            fprintf(stderr, "got unexpected %d event.\n", event.type);
+            fprintf(stderr, "got unexpected %s (%d) event.\n", event_names[event.type], event.type);
             break;
       }
-      fprintf(stderr, "got event %d.\n", event.type);
+      fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);
     }
-    Local<String> result = String::New("Loop");
-    return scope.Close(result);
+    return 0;
   }
 
+  static int EIO_AfterLoop(eio_req *req) {
+    HandleScope scope;
+    hello_baton_t *baton = static_cast<hello_baton_t *>(req->data);
+    ev_unref(EV_DEFAULT_UC);
+    baton->hw->Unref();
+
+    delete baton;
+    return 0;
+  }
 
   static Handle<Value> X11_XDrawLine(const Arguments& args) {
     HandleScope scope;
