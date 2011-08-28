@@ -32,24 +32,22 @@ NWM.prototype.start = function() {
   this.wm.onAdd(function(window) {
     console.log('onAdd', window);
     self.windows.push(window);  
-
-    window.height = 300;
-    window.width = 500;
-
-    // this is called once for each window
-    // so the window should be added somewhere 
-    // and the layout should be recalculated based on all the currently known windows
-    // and only then should the window be returned..
-
-    return window;
   });
+
+  this.wm.onRearrange(function() {
+    self.tile();
+  });
+
   /**
    * A mouse button has been clicked
    */
   this.wm.onButtonPress(function(event) {
     console.log('Button pressed', event);
+    self.wm.focusWindow(event.id);
+  });
 
-    return event;
+  this.wm.onEnterNotify(function(event){
+    self.wm.focusWindow(event.id);    
   });
 
   /**
