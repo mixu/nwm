@@ -28,110 +28,15 @@
 #include <assert.h>   // I include this to test return values the lazy way
 #include <unistd.h>   // So we got the profile for 10 seconds
 #define NIL (0)       // A name for the void pointer
-
-static const char *event_names[] = {
-"",
-"",
-"KeyPress",
-"KeyRelease",
-"ButtonPress",
-"ButtonRelease",
-"MotionNotify",
-"EnterNotify",
-"LeaveNotify",
-"FocusIn",
-"FocusOut",
-"KeymapNotify",
-"Expose",
-"GraphicsExpose",
-"NoExpose",
-"VisibilityNotify",
-"CreateNotify",
-"DestroyNotify",
-"UnmapNotify",
-"MapNotify",
-"MapRequest",
-"ReparentNotify",
-"ConfigureNotify",
-"ConfigureRequest",
-"GravityNotify",
-"ResizeRequest",
-"CirculateNotify",
-"CirculateRequest",
-"PropertyNotify",
-"SelectionClear",
-"SelectionRequest",
-"SelectionNotify",
-"ColormapNotify",
-"ClientMessage",
-"MappingNotify" };
-
-#define WIDTH 800
-#define HEIGHT 600
+#define MAXWIN 512
+#include "event_names.h"
 
 using namespace node;
 using namespace v8;
 
-class WindowObject: ObjectWrap {
-  private:
-  public:
-  
-  static Persistent<FunctionTemplate> s_ct;
-  static void Init(Handle<Object> target) {
-    HandleScope scope;
-    // create a local FunctionTemplate
-    Local<FunctionTemplate> t = FunctionTemplate::New(New);
-
-    // initialize our template
-    s_ct = Persistent<FunctionTemplate>::New(t);
-    // set the field count
-    s_ct->InstanceTemplate()->SetInternalFieldCount(0);
-    // set the symbol for this function
-    s_ct->SetClassName(String::NewSymbol("WindowObject"));
-    
-    // FUNCTIONS
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "test", Test);
-
-    // FINALLY: export the current function template
-    target->Set(String::NewSymbol("HelloWorld"),
-                s_ct->GetFunction());
-
-  }
-
-  // C++ constructor
-  WindowObject() { }
-
-  ~WindowObject() { }
-
-  // New method for v8
-  static Handle<Value> New(const Arguments& args) {
-    HandleScope scope;
-    WindowObject* obj = new WindowObject();
-    // use ObjectWrap.Wrap to store hw in this
-    obj->Wrap(args.This());
-    // return this
-    return args.This();
-  }
-
-  static Handle<Value> Test(const Arguments& args) {
-    HandleScope scope;
-    // create and return a new string
-    Local<String> result = String::New("Hello from Test object");
-    return scope.Close(result);
-  }
-};
-
-typedef struct Client Client;
-struct Client {
-  unsigned int id;
-  Monitor *mon;
-  Window win;
-};
-
 class HelloWorld: ObjectWrap
 {
 private:
-  int m_count;
   Display *dpy;
   Window wnd;
   GC gc;
@@ -139,7 +44,8 @@ private:
   Window root;
   // callbacks
   Persistent<Function> cbManage, cbButtonPress, cbConfigureRequest, cbKeyPress;
-
+  Window windows[MAXWIN];
+  int next_index;
 
 public:
 
@@ -159,21 +65,20 @@ public:
 
     // FUNCTIONS
 
-    // set the static Hello function as prototype.hello
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "hello", Hello);
-
     // callbacks
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "onManage", OnManage);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "onAdd", OnManage);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onButtonPress", OnButtonPress);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onConfigureRequest", OnConfigureRequest);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "onKeyPress", OnKeyPress);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "allCallbacks", AllCallbacks);
+    // API
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "moveWindow", MoveWindow);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "resizeWindow", ResizeWindow);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "focusWindow", FocusWindow);
 
-    // pseudocode stuff, dont call, it will break shit
+    // Setting up
     NODE_SET_PROTOTYPE_METHOD(s_ct, "setup", Setup);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "scan", Scan);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "loop", Loop);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "getWindow", GetWindow);
 
     // FINALLY: export the current function template
     target->Set(String::NewSymbol("HelloWorld"),
@@ -182,7 +87,7 @@ public:
 
   // C++ constructor
   HelloWorld() :
-    m_count(0)
+    next_index(0)
   {
   }
 
@@ -191,8 +96,7 @@ public:
   }
 
   // New method for v8
-  static Handle<Value> New(const Arguments& args)
-  {
+  static Handle<Value> New(const Arguments& args) {
     HandleScope scope;
     HelloWorld* hw = new HelloWorld();
     // use ObjectWrap.Wrap to store hw in this
@@ -252,6 +156,17 @@ public:
     return val;
   }
 
+  static int getWindowId(HelloWorld* hw, Window win) {
+    int i;
+    for(i = 0; i < hw->next_index; i++) {
+      if(hw->windows[i] == win) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+
   /**
    * Prepare the window object and call the Node.js callback.
    */
@@ -259,7 +174,10 @@ public:
     TryCatch try_catch;
     // onManage receives a window object
     Local<Value> argv[1];
-    argv[0] = HelloWorld::makeWindow(wa->x, wa->y, wa->height, wa->width, wa->border_width);
+    // temporarily store window to hw->wnd
+    hw->windows[hw->next_index] = win;  
+    argv[0] = HelloWorld::makeWindow(hw->next_index, wa->x, wa->y, wa->height, wa->width, wa->border_width);
+    hw->next_index++;
 
     // call the callback in Node.js, passing the window object...
     Handle<Value> result = hw->cbManage->Call(Context::GetCurrent()->Global(), 1, argv);
@@ -291,16 +209,18 @@ public:
     XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
 
   
-    // move and map the window
+    // subscribe to window events
+    XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
+    GrabButtons(hw->dpy, win, False);
+
+    // move and (finally) map the window
     XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);    
     XMapWindow(hw->dpy, win);
 
-    // subscribe to window events
-    XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
+
 
 /*
     XWindowChanges wc;
-
     // set window border width
     XConfigureWindow(hw->dpy, win, CWBorderWidth, &wc);
     // set border color 
@@ -314,11 +234,74 @@ public:
 
   }
 
-  static Local<Object> makeWindow(int x, int y, int height, int width, int border_width) {
+  static Handle<Value> ResizeWindow(const Arguments& args) {
+    HandleScope scope;
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    int id = args[0]->IntegerValue();
+    int width = args[1]->IntegerValue();
+    int height = args[2]->IntegerValue();
+
+    Window win = hw->windows[id];
+    fprintf( stderr, "ResizeWindow: id=%d width=%d height=%d \n", id, width, height);    
+    XResizeWindow(hw->dpy, win, width, height);    
+    XFlush(hw->dpy);
+    return Undefined();
+  } 
+
+  static Handle<Value> MoveWindow(const Arguments& args) {
+    HandleScope scope;
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    int id = args[0]->IntegerValue();
+    int x = args[1]->IntegerValue();
+    int y = args[2]->IntegerValue();
+
+    Window win = hw->windows[id];
+    fprintf( stderr, "MoveWindow: id=%d x=%d y=%d \n", id, x, y);    
+    XMoveWindow(hw->dpy, win, x, y);    
+    XFlush(hw->dpy);
+    return Undefined();
+  }
+
+  static Handle<Value> FocusWindow(const Arguments& args) {
+    HandleScope scope;
+    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+
+    int id = args[0]->IntegerValue();
+
+    Window win = hw->windows[id];
+    fprintf( stderr, "FocusWindow: id=%d\n", id);    
+    XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);    
+    XFlush(hw->dpy);
+    return Undefined();
+  }
+
+  /**
+   * If focused, then we only grab the modifier keys.
+   * Otherwise, we grab all buttons..
+   */
+  static void GrabButtons(Display* dpy, Window wnd, Bool focused) {
+    XUngrabButton(dpy, AnyButton, AnyModifier, wnd);
+
+    if(focused) {
+      XGrabButton(dpy, Button3,
+                        Mod4Mask,
+                        wnd, False, (ButtonPressMask|ButtonReleaseMask),
+                        GrabModeAsync, GrabModeSync, None, None);
+    } else {
+      XGrabButton(dpy, AnyButton, AnyModifier, wnd, False,
+                  (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
+      
+    }
+  }
+
+  static Local<Object> makeWindow(int id, int x, int y, int height, int width, int border_width) {
     // window object to return
     Local<Object> result = Object::New();
 
     // read and set the window geometry
+    result->Set(String::NewSymbol("id"), Integer::New(id));
     result->Set(String::NewSymbol("x"), Integer::New(x));
     result->Set(String::NewSymbol("y"), Integer::New(y));
     result->Set(String::NewSymbol("height"), Integer::New(height));
@@ -343,7 +326,6 @@ public:
     fprintf(stderr, "makeButtonPress\n");
 
     // call the callback in Node.js, passing the window object...
-    //Handle<Value> result = 
     hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
     fprintf(stderr, "Call cbButtonPress\n");
     if (try_catch.HasCaught()) {
@@ -381,45 +363,36 @@ public:
     return result;
   }
 
+  static void EmitKeyPress(HelloWorld* hw, XEvent *e) {
+    KeySym keysym;
+    XKeyEvent *ev;
 
-  static Handle<Value> AllCallbacks(const Arguments& args) {
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    ev = &e->xkey;
+//    keysym = XKeycodeToKeysym(hw->dpy, (KeyCode)ev->keycode, 0);
 
-    Local<Value> argv[1];
-    argv[0] = String::New("Hello World");
+    fprintf(stderr, "EmitKeyPress\n");
 
     TryCatch try_catch;
-    // onManage receives a window object
-    Local<Value> windowObj[1];
-    windowObj[0] = HelloWorld::makeWindow(1, 2, 3, 4, 5);
+    Local<Value> argv[1];
+    argv[0] = HelloWorld::makeKeyPress(ev->x, ev->y, ev->keycode, ev->state);
 
-    Handle<Value> result = hw->cbManage->Call(Context::GetCurrent()->Global(), 1, windowObj);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
-    
-    // cast to object
-    Handle<Object> obj = Handle<Object>::Cast(result); 
-    // cast to int
-    v8::Handle<v8::Value> h = obj->Get(String::NewSymbol("x"));
-    int x = h->Int32Value();
-
-    windowObj[0] = HelloWorld::makeWindow(x, 2, 3, 4, 5);
-
-    hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, windowObj);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
-    hw->cbConfigureRequest->Call(Context::GetCurrent()->Global(), 1, argv);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
+    // call the callback in Node.js, passing the window object...
     hw->cbKeyPress->Call(Context::GetCurrent()->Global(), 1, argv);
     if (try_catch.HasCaught()) {
+      fprintf(stderr, "try catch EmitKeyPress\n");
       FatalException(try_catch);
     }
+  }
 
+  static Local<Object> makeKeyPress(int x, int y, unsigned int keycode, unsigned int mod) {
+    // window object to return
+    Local<Object> result = Object::New();
+
+    // read and set the window geometry
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("keycode"), Integer::New(keycode));
+    result->Set(String::NewSymbol("mod"), Integer::New(mod));
     return result;
   }
 
@@ -523,22 +496,14 @@ public:
     (void) fprintf( stderr, "In Loop\n");
 
     HelloWorld* hw = static_cast<HelloWorld*>(watcher->data);    
-
-    TryCatch try_catch;
-    Local<Value> argv[1];
-    argv[0] = String::New("Hello World");
-    hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
     
-
     XEvent event;
     // main event loop 
     XSync(hw->dpy, False);
-    while(!XNextEvent(hw->dpy, &event)) {
+    while(XPending(hw->dpy)) {
+      XNextEvent(hw->dpy, &event);
       // handle event internally --> calls Node if necessary 
-        switch (event.type) {
+      switch (event.type) {
         case ButtonPress:
           {
           fprintf(stderr, "EmitButtonPress\n");
@@ -558,6 +523,10 @@ public:
         case FocusIn:
             break;
         case KeyPress:
+          {
+            fprintf(stderr, "EmitKeyPress\n");
+            HelloWorld::EmitKeyPress(hw, &event);
+          }
             break;
         case MappingNotify:
             break;
@@ -566,13 +535,19 @@ public:
             // read the window attrs, then add it to the managed windows...
             XWindowAttributes wa;
             XMapRequestEvent *ev = &event.xmaprequest;
-            if(!XGetWindowAttributes(hw->dpy, ev->window, &wa))
+            if(!XGetWindowAttributes(hw->dpy, ev->window, &wa)) {
+              fprintf(stderr, "XGetWindowAttributes failed\n");              
               return;
+            }
             if(wa.override_redirect)
               return;
-            // dwm actually does this only once per window (e.g. for unknown windows only...)
-            // that's because otherwise you'll cause a hang when you map a mapped window again...
-            // HelloWorld::EmitManage(hw, ev->window, &wa); 
+            fprintf(stderr, "MapRequest\n");
+            if(HelloWorld::getWindowId(hw, ev->window) == -1) {
+              fprintf(stderr, "Emit manage!\n");
+              // dwm actually does this only once per window (e.g. for unknown windows only...)
+              // that's because otherwise you'll cause a hang when you map a mapped window again...
+              HelloWorld::EmitManage(hw, ev->window, &wa);
+            }
           }
             break;
         case PropertyNotify:
@@ -588,41 +563,7 @@ public:
     return;
   }
 
-  static Handle<Value> X11_XDrawLine(const Arguments& args) {
-    HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    int x1 = args[0]->IntegerValue();
-    int y1 = args[1]->IntegerValue();
-    int x2 = args[2]->IntegerValue();
-    int y2 = args[3]->IntegerValue();
-  
-    XDrawLine(hw->dpy, hw->wnd, hw->gc, x1, y1, x2, y2);
-
-    Local<String> result = String::New("XSelectInput");
-    return scope.Close(result);
-  }
-
-  static Handle<Value> Hello(const Arguments& args)
-  {
-    HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-    // use hello world
-    hw->m_count++;
-
-    // create and return a new string
-    Local<String> result = String::New("Hello World");
-    return scope.Close(result);
-  }
-
-  static Handle<Value> Sample(const Arguments& args) {
-    HandleScope scope;
-    Local<String> result = String::New("No this required");
-    return scope.Close(result);
-  }
-
+/*
   static Handle<Value> GetWindow(const Arguments& args) {
     HandleScope scope;
     
@@ -638,7 +579,7 @@ public:
 
     return scope.Close(result);
   }
-
+*/
   ev_io watcher;
 };
 
