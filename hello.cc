@@ -66,6 +66,7 @@ private:
   GC gc;
   int screen, screen_width, screen_height;
   Window root;
+  Window selected;
   // callbacks
   Persistent<Function> cbAdd, cbRearrange, cbButtonPress, cbConfigureRequest, cbKeyPress, cbEnterNotify, cbRemove;
   int next_index;
@@ -348,30 +349,6 @@ public:
   }
 
 
-  static void EmitRemove(HelloWorld* hw, Client *c, Bool destroyed) {
-//    Monitor *m = c->mon;
-//    XWindowChanges wc;
-    int id = c->id;
-    // emit a remove
-    TryCatch try_catch;
-    Local<Value> argv[1];
-    argv[0] = Integer::New(id);
-    hw->cbRemove->Call(Context::GetCurrent()->Global(), 1, argv);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
-    detach(c);
-    if(!destroyed) {
-      XGrabServer(hw->dpy);
-      XUngrabButton(hw->dpy, AnyButton, AnyModifier, c->win);
-      XSync(hw->dpy, False);
-      XUngrabServer(hw->dpy);
-    }
-    free(c);
-    RealFocus(hw, -1);
-    EmitRearrange(hw);
-  }
-
   static Handle<Value> ResizeWindow(const Arguments& args) {
     HandleScope scope;
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
@@ -424,12 +401,15 @@ public:
       win = hw->root;
     }
     fprintf( stderr, "FocusWindow: id=%d\n", id);    
-    GrabButtons(hw->dpy, win, True);
-    XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);    
-    Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
-    SendEvent(hw, win, atom);
-    XFlush(hw->dpy);      
-
+    // do not focus on the same window... it'll cause a flurry of events...
+    if(hw->selected && hw->selected != win) {
+      GrabButtons(hw->dpy, win, True);
+      XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);    
+      Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
+      SendEvent(hw, win, atom);
+      XFlush(hw->dpy);      
+      hw->selected = win;
+    }
   }
 
   static Bool SendEvent(HelloWorld* hw, Window wnd, Atom proto) {
@@ -618,6 +598,45 @@ public:
     }
   }
 
+  static void EmitUnmapNotify(HelloWorld* hw, XEvent *e) {
+    Client *c;
+    XUnmapEvent *ev = &e->xunmap;
+    if((c = getByWindow(hw, ev->window)))
+      EmitRemove(hw, c, False);
+  }
+
+  static void EmitDestroyNotify(HelloWorld* hw, XEvent *e) {
+    Client *c;
+    XDestroyWindowEvent *ev = &e->xdestroywindow;
+
+    if((c = getByWindow(hw, ev->window)))
+      EmitRemove(hw, c, True);    
+  }
+
+  static void EmitRemove(HelloWorld* hw, Client *c, Bool destroyed) {
+//    Monitor *m = c->mon;
+//    XWindowChanges wc;
+    fprintf( stderr, "EmitRemove\n");
+    int id = c->id;
+    // emit a remove
+    TryCatch try_catch;
+    Local<Value> argv[1];
+    argv[0] = Integer::New(id);
+    hw->cbRemove->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
+    detach(c);
+    if(!destroyed) {
+      XGrabServer(hw->dpy);
+      XUngrabButton(hw->dpy, AnyButton, AnyModifier, c->win);
+      XSync(hw->dpy, False);
+      XUngrabServer(hw->dpy);
+    }
+    free(c);
+    RealFocus(hw, -1);
+    EmitRearrange(hw);
+  }
 
   static Local<Object> makeEvent(int id) {
     // window object to return
@@ -640,6 +659,9 @@ public:
       (void) fprintf( stderr, "cannot connect to X server %s\n", XDisplayName(NULL));
       exit( -1 );
     }
+    // set error handler
+    XSetErrorHandler(xerror);
+    XSync(hw->dpy, False);
 
     // take the default screen
     hw->screen = DefaultScreen(hw->dpy);
@@ -738,19 +760,21 @@ public:
     XSync(hw->dpy, False);
     while(XPending(hw->dpy)) {
       XNextEvent(hw->dpy, &event);
+      fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);      
       // handle event internally --> calls Node if necessary 
       switch (event.type) {
         case ButtonPress:
           {
-          fprintf(stderr, "EmitButtonPress\n");
-          HelloWorld::EmitButtonPress(hw, &event);
+            fprintf(stderr, "EmitButtonPress\n");
+            HelloWorld::EmitButtonPress(hw, &event);
           }
-            break;
+          break;
         case ConfigureRequest:
             break;
         case ConfigureNotify:
             break;
         case DestroyNotify:
+            HelloWorld::EmitDestroyNotify(hw, &event);        
             break;
         case EnterNotify:
             HelloWorld::EmitEnterNotify(hw, &event);
@@ -758,7 +782,7 @@ public:
         case Expose:
             break;
         case FocusIn:
-            HelloWorld::EmitFocusIn(hw, &event);
+         //   HelloWorld::EmitFocusIn(hw, &event);
             break;
         case KeyPress:
           {
@@ -794,15 +818,31 @@ public:
         case PropertyNotify:
             break;
         case UnmapNotify:
-//            HelloWorld::EmitUnmapNotify(hw, &event);
+            HelloWorld::EmitUnmapNotify(hw, &event);
             break;
         default:
-            fprintf(stderr, "got unexpected %s (%d) event.\n", event_names[event.type], event.type);
             break;
       }
-      fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);
     }
     return;
+  }
+
+  static int xerror(Display *dpy, XErrorEvent *ee) {
+    if(ee->error_code == BadWindow
+    || (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch)
+    || (ee->request_code == X_PolyText8 && ee->error_code == BadDrawable)
+    || (ee->request_code == X_PolyFillRectangle && ee->error_code == BadDrawable)
+    || (ee->request_code == X_PolySegment && ee->error_code == BadDrawable)
+    || (ee->request_code == X_ConfigureWindow && ee->error_code == BadMatch)
+    || (ee->request_code == X_GrabButton && ee->error_code == BadAccess)
+    || (ee->request_code == X_GrabKey && ee->error_code == BadAccess)
+    || (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
+      return 0;
+    fprintf(stderr, "dwm: fatal error: request code=%d, error code=%d\n",
+        ee->request_code, ee->error_code);
+//    return xerrorxlib(dpy, ee); /* may call exit */    
+    exit(-1);
+    return 0;
   }
 
 /*

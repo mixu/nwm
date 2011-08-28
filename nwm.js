@@ -34,6 +34,11 @@ NWM.prototype.start = function() {
     self.windows.push(window);  
   });
 
+  this.wm.onRemove(function(id) {
+    console.log('onRemove', id);
+    self.tile();    
+  });
+
   this.wm.onRearrange(function() {
     self.tile();
   });
