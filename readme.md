@@ -29,6 +29,10 @@ The default nwm.js starts a REPL, so you can issue commands to it interactively.
     # now start nwm.js on display 1
     DISPLAY=:1 node nwm.js
 
+Some notes:
+
+- Xephyr errors out under VirtualBox. You may need to start Xephyr with -nodri if you use VirtualBox with guest additions.
+- ev.h: No such file or directory. You need the developer package for libev (e.g. libev-devel on Fedora) and specify its location explicitly (e.g. change #include <ev.h> to #include "path_to_ev.h"). 
 
 # Using
 
