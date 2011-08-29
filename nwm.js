@@ -204,8 +204,8 @@ var tweens = [];
 NWM.prototype.tween = function(id) {
   var self = this;
   var radius = 200;
-  var circle_x = Math.floor(Math.random()*(self.screen.width));
-  var circle_y = Math.floor(Math.random()*(self.screen.height));
+  var circle_x = Math.floor(self.screen.width / 2[s]);
+  var circle_y = Math.floor(self.screen.height / 2);
   if(circle_x+radius*2 > self.screen.width) {
     circle_x -= radius*2;
   }
