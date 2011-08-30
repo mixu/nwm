@@ -17,7 +17,7 @@ NWM.prototype.start = function() {
   /**
    * A single window should be positioned
    */
-  this.wm.onAdd(function(window) {
+  this.wm.on('add', function(window) {
     if(window.id) {
       window.visible = true;
       window.workspace = self.workspace;
@@ -32,7 +32,7 @@ NWM.prototype.start = function() {
     }
   });
 
-  this.wm.onRemove(function(id) {
+  this.wm.on('remove', function(id) {
     console.log('onRemove', id);
     if(self.windows[id]) {
       delete self.windows[id];
@@ -40,31 +40,31 @@ NWM.prototype.start = function() {
     self.rearrange();    
   });
 
-  this.wm.onRearrange(function() { self.rearrange(); }); 
+  this.wm.on('rearrange', function() { self.rearrange(); }); 
 
   /**
    * A mouse button has been clicked
    */
-  this.wm.onButtonPress(function(event) {
+  this.wm.on('buttonPress', function(event) {
     console.log('Button pressed', event);
     self.wm.focusWindow(event.id);
   });
 
-  this.wm.onEnterNotify(function(event){
+  this.wm.on('enterNotify',function(event){
     self.wm.focusWindow(event.id);    
   });
 
   /**
    * A window is requesting to be configured to particular dimensions
    */
-  this.wm.onConfigureRequest(function(event){
+  this.wm.on('configureRequest', function(event){
     return event;
   });
 
   /**
    * A key has been pressed
    */
-  this.wm.onKeyPress(function(key) {
+  this.wm.on('keyPress', function(key) {
     // do something, e.g. launch a command
     return key;
   });  

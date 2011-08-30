@@ -5,7 +5,7 @@
 
 #include <v8.h>
 #include <node.h>
-#include <ev.h>
+#include "/usr/local/node/include/node/ev/ev.h"
 
 #include <errno.h>
 #include <locale.h>
@@ -56,6 +56,18 @@ struct Monitor {
   Window barwin;
 };
 
+// make these classes of their own
+
+enum callback_map { 
+  onAdd, 
+  onRemove,
+  onRearrange,
+  onButtonPress,
+  onConfigureRequest,
+  onKeyPress,
+  onEnterNotify,
+  onLast
+};
 
 
 class HelloWorld: ObjectWrap
@@ -68,15 +80,15 @@ private:
   Window root;
   Window selected;
   // callbacks
-  Persistent<Function> cbAdd, cbRearrange, cbButtonPress, cbConfigureRequest, cbKeyPress, cbEnterNotify, cbRemove;
+  Persistent<Function>* callbacks[onLast];
+
   int next_index;
 
   Monitor* monit;
 public:
 
   static Persistent<FunctionTemplate> s_ct;
-  static void Init(Handle<Object> target)
-  {
+  static void Init(Handle<Object> target) {
     HandleScope scope;
     // create a local FunctionTemplate
     Local<FunctionTemplate> t = FunctionTemplate::New(New);
@@ -91,13 +103,7 @@ public:
     // FUNCTIONS
 
     // callbacks
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "onAdd", OnAdd);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "onRemove", OnRemove);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "onRearrange", OnRearrange);    
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "onButtonPress", OnButtonPress);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "onConfigureRequest", OnConfigureRequest);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "onKeyPress", OnKeyPress);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "onEnterNotify", OnEnterNotify);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "on", OnCallback);
 
     // API
     NODE_SET_PROTOTYPE_METHOD(s_ct, "moveWindow", MoveWindow);
@@ -129,6 +135,9 @@ public:
   static Handle<Value> New(const Arguments& args) {
     HandleScope scope;
     HelloWorld* hw = new HelloWorld();
+    for(int i = 0; i < onLast; i++) {
+      hw->callbacks[i] = NULL;
+    }
     // use ObjectWrap.Wrap to store hw in this
     hw->Wrap(args.This());
     // return this
@@ -137,81 +146,49 @@ public:
 
   // EVENTS
 
-  static Handle<Value> OnAdd(const Arguments& args) {
+  static Handle<Value> OnCallback(const Arguments& args) {
+    HandleScope scope;
     // extract helloworld from args.this
     HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
 
-    // store function
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hw->cbAdd = Persistent<Function>::New(cb);
+    v8::Local<v8::String> map[onLast+1] = {
+        v8::String::New("add"),
+        v8::String::New("remove"), 
+        v8::String::New("rearrange"),
+        v8::String::New("buttonPress"),
+        v8::String::New("configureRequest"),
+        v8::String::New("keyPress"),
+        v8::String::New("enterNotify"),
+      };
 
-    return Undefined();
+    v8::Local<v8::String> value  = Local<v8::String>::Cast(args[0]);
+    int selected = -1;
+    for(int i = 0; i < onLast; i++) {
+      if( strcmp(*v8::String::AsciiValue(value),  *v8::String::AsciiValue(map[i])) == 0 ) {
+        selected = i;
+        break;        
+      }
+    }
+    if(selected == -1) {
+      return Undefined();
+    }
+    // store function
+    hw->callbacks[selected] = cb_persist(args[1]);
+
+    Local<Object> result = Object::New();
+    result->Set(String::NewSymbol("test"), Integer::New(selected));
+    return scope.Close(result);
   }
 
-  static Handle<Value> OnRemove(const Arguments& args) {
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    // store function
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hw->cbRemove = Persistent<Function>::New(cb);
-
-    return Undefined();
-  }
-
-  static Handle<Value> OnRearrange(const Arguments& args) {
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    // store function
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hw->cbRearrange = Persistent<Function>::New(cb);
-
-    return Undefined();
-  }  
-
-  static Handle<Value> OnButtonPress(const Arguments& args) {
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    // store function
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hw->cbButtonPress = Persistent<Function>::New(cb);
-
-    return Undefined();
-  }
-
-  static Handle<Value> OnConfigureRequest(const Arguments& args) {
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    // store function
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hw->cbConfigureRequest = Persistent<Function>::New(cb);
-
-    return Undefined();
-  }
-
-  static Handle<Value> OnEnterNotify(const Arguments& args) {
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    // store function
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hw->cbEnterNotify = Persistent<Function>::New(cb);
-
-    return Undefined();
-  }
-
-  static Handle<Value> OnKeyPress(const Arguments& args) {
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
-
-    // store function
-    Local<Function> cb = Local<Function>::Cast(args[0]);
-    hw->cbKeyPress = Persistent<Function>::New(cb);
-
-    return Undefined();
+  void Emit(callback_map event, int argc, Handle<Value> argv[]) {
+    TryCatch try_catch;
+    if(this->callbacks[event] != NULL) {
+      Handle<Function> *callback = cb_unwrap(this->callbacks[event]);
+      (*callback)->Call(Context::GetCurrent()->Global(), argc, argv);                
+      if (try_catch.HasCaught()) {
+        FatalException(try_catch);
+      }
+    }
   }
 
   // GET from Node.js
@@ -219,7 +196,7 @@ public:
   static int getIntegerValue(Handle<Object> obj, Local<String> symbol) {
     v8::Handle<v8::Value> h = obj->Get(symbol);    
     int val = h->IntegerValue();
-    (void) fprintf( stderr, "getIntegerValue: %d \n", val);
+    fprintf( stderr, "getIntegerValue: %d \n", val);
     return val;
   }
 
@@ -303,10 +280,7 @@ public:
     hw->next_index++;
 
     // call the callback in Node.js, passing the window object...
-    hw->cbAdd->Call(Context::GetCurrent()->Global(), 1, argv);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
+    hw->Emit(onAdd, 1, argv);
       
     // configure the window
     XConfigureEvent ce;
@@ -341,11 +315,12 @@ public:
   }
 
   static void EmitRearrange(HelloWorld* hw) {
-    TryCatch try_catch;
-    hw->cbRearrange->Call(Context::GetCurrent()->Global(), 0, 0);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }    
+//    TryCatch try_catch;
+      hw->Emit(onRearrange, 0, 0);
+//    hw->cbRearrange->Call(Context::GetCurrent()->Global(), 0, 0);
+//    if (try_catch.HasCaught()) {
+//      FatalException(try_catch);
+//    }    
   }
 
 
@@ -481,7 +456,6 @@ public:
 
   static void EmitButtonPress(HelloWorld* hw, XEvent *e) {
     XButtonPressedEvent *ev = &e->xbutton;
-    TryCatch try_catch;
     // onManage receives a window object
     Local<Value> argv[1];
 
@@ -496,12 +470,8 @@ public:
       fprintf(stderr, "makeButtonPress\n");
 
       // call the callback in Node.js, passing the window object...
-      hw->cbButtonPress->Call(Context::GetCurrent()->Global(), 1, argv);
+      hw->Emit(onButtonPress, 1, argv);
       fprintf(stderr, "Call cbButtonPress\n");
-      if (try_catch.HasCaught()) {
-        fprintf(stderr, "try catch cbButtonPress\n");
-        FatalException(try_catch);
-      }      
     }
   }
 
@@ -543,17 +513,10 @@ public:
 //    keysym = XKeycodeToKeysym(hw->dpy, (KeyCode)ev->keycode, 0);
 
     fprintf(stderr, "EmitKeyPress\n");
-
-    TryCatch try_catch;
     Local<Value> argv[1];
     argv[0] = HelloWorld::makeKeyPress(ev->x, ev->y, ev->keycode, ev->state);
-
     // call the callback in Node.js, passing the window object...
-    hw->cbKeyPress->Call(Context::GetCurrent()->Global(), 1, argv);
-    if (try_catch.HasCaught()) {
-      fprintf(stderr, "try catch EmitKeyPress\n");
-      FatalException(try_catch);
-    }
+    hw->Emit(onKeyPress, 1, argv);
   }
 
   static Local<Object> makeKeyPress(int x, int y, unsigned int keycode, unsigned int mod) {
@@ -570,7 +533,6 @@ public:
 
   static void EmitEnterNotify(HelloWorld* hw, XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
-    TryCatch try_catch;
     // onManage receives a window object
     Local<Value> argv[1];
 
@@ -580,12 +542,8 @@ public:
     if(c) {
       int id = c->id;
       argv[0] = HelloWorld::makeEvent(id);
-
       // call the callback in Node.js, passing the window object...
-      hw->cbEnterNotify->Call(Context::GetCurrent()->Global(), 1, argv);
-      if (try_catch.HasCaught()) {
-        FatalException(try_catch);
-      }
+      hw->Emit(onEnterNotify, 1, argv);
     }
   }
 
@@ -619,13 +577,9 @@ public:
     fprintf( stderr, "EmitRemove\n");
     int id = c->id;
     // emit a remove
-    TryCatch try_catch;
     Local<Value> argv[1];
     argv[0] = Integer::New(id);
-    hw->cbRemove->Call(Context::GetCurrent()->Global(), 1, argv);
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
+    hw->Emit(onRemove, 1, argv);
     detach(c);
     if(!destroyed) {
       XGrabServer(hw->dpy);
