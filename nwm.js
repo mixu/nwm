@@ -1,5 +1,5 @@
 var repl = require('repl');
-var X11wm = require('./build/default/helloworld.node').HelloWorld;
+var X11wm = require('./build/default/nwm.node').NodeWM;
 
 var NWM = function() {
   this.windows = {};

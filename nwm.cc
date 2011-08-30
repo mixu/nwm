@@ -98,7 +98,7 @@ public:
     // set the field count
     s_ct->InstanceTemplate()->SetInternalFieldCount(1);
     // set the symbol for this function
-    s_ct->SetClassName(String::NewSymbol("HelloWorld"));
+    s_ct->SetClassName(String::NewSymbol("NodeWM"));
 
     // FUNCTIONS
 
@@ -116,7 +116,7 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "loop", Loop);
 
     // FINALLY: export the current function template
-    target->Set(String::NewSymbol("HelloWorld"),
+    target->Set(String::NewSymbol("NodeWM"),
                 s_ct->GetFunction());
   }
 
@@ -829,7 +829,7 @@ extern "C" {
   }
 
   // macro to export helloworld
-  NODE_MODULE(helloworld, init);
+  NODE_MODULE(nwm, init);
 }
 
 

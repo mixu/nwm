@@ -10,5 +10,5 @@ def build(bld):
   obj.lib=['X11', 'Xinerama']
   obj.uselib=['X11', 'Xinerama']
   obj.cxxflags = ["-g", "-static", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
-  obj.target = "helloworld"
-  obj.source = "hello.cc"
+  obj.target = "nwm"
+  obj.source = "nwm.cc"
