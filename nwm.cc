@@ -5,7 +5,7 @@
 
 #include <v8.h>
 #include <node.h>
-#include "/usr/local/node/include/node/ev/ev.h"
+#include <ev.h>
 
 #include <errno.h>
 #include <locale.h>
@@ -70,7 +70,7 @@ enum callback_map {
 };
 
 
-class HelloWorld: ObjectWrap
+class NodeWM: ObjectWrap
 {
 private:
   Display *dpy;
@@ -121,20 +121,20 @@ public:
   }
 
   // C++ constructor
-  HelloWorld() :
+  NodeWM() :
     next_index(1),
     monit(NULL)
   {
   }
 
-  ~HelloWorld()
+  ~NodeWM()
   {
   }
 
   // New method for v8
   static Handle<Value> New(const Arguments& args) {
     HandleScope scope;
-    HelloWorld* hw = new HelloWorld();
+    NodeWM* hw = new NodeWM();
     for(int i = 0; i < onLast; i++) {
       hw->callbacks[i] = NULL;
     }
@@ -148,8 +148,8 @@ public:
 
   static Handle<Value> OnCallback(const Arguments& args) {
     HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    // extract from args.this
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     v8::Local<v8::String> map[onLast+1] = {
         v8::String::New("add"),
@@ -239,7 +239,7 @@ public:
     return m;    
   }
 
-  static Client* getByWindow(HelloWorld* hw, Window win) {
+  static Client* getByWindow(NodeWM* hw, Window win) {
     Client *c;
 //    Monitor *m;
     for(c = hw->monit->clients; c; c = c->next)
@@ -248,7 +248,7 @@ public:
     return NULL;
   }
 
-  static Client* getById(HelloWorld* hw, int id) {
+  static Client* getById(NodeWM* hw, int id) {
     Client *c;
     for(c = hw->monit->clients; c; c = c->next)
       if(c->id == id)
@@ -256,7 +256,7 @@ public:
     return NULL;  
   }
 
-  static void updateGeometry(HelloWorld* hw) {
+  static void updateGeometry(NodeWM* hw) {
     if(!hw->monit)
       hw->monit = createMonitor();
     if(hw->monit->width != hw->screen_width || hw->monit->height != hw->screen_width){
@@ -269,14 +269,14 @@ public:
   /**
    * Prepare the window object and call the Node.js callback.
    */
-  static void EmitAdd(HelloWorld* hw, Window win, XWindowAttributes *wa) {
+  static void EmitAdd(NodeWM* hw, Window win, XWindowAttributes *wa) {
     TryCatch try_catch;
     // onManage receives a window object
     Local<Value> argv[1];
     // temporarily store window to hw->wnd
     Client* c = createClient(win, hw->monit, hw->next_index, wa->x, wa->y, wa->height, wa->width);
     attach(c);
-    argv[0] = HelloWorld::makeWindow(hw->next_index, wa->x, wa->y, wa->height, wa->width, wa->border_width);
+    argv[0] = NodeWM::makeWindow(hw->next_index, wa->x, wa->y, wa->height, wa->width, wa->border_width);
     hw->next_index++;
 
     // call the callback in Node.js, passing the window object...
@@ -314,7 +314,7 @@ public:
     EmitRearrange(hw);
   }
 
-  static void EmitRearrange(HelloWorld* hw) {
+  static void EmitRearrange(NodeWM* hw) {
 //    TryCatch try_catch;
       hw->Emit(onRearrange, 0, 0);
 //    hw->cbRearrange->Call(Context::GetCurrent()->Global(), 0, 0);
@@ -326,7 +326,7 @@ public:
 
   static Handle<Value> ResizeWindow(const Arguments& args) {
     HandleScope scope;
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     int id = args[0]->IntegerValue();
     int width = args[1]->IntegerValue();
@@ -343,7 +343,7 @@ public:
 
   static Handle<Value> MoveWindow(const Arguments& args) {
     HandleScope scope;
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     int id = args[0]->IntegerValue();
     int x = args[1]->IntegerValue();
@@ -360,14 +360,14 @@ public:
 
   static Handle<Value> FocusWindow(const Arguments& args) {
     HandleScope scope;
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     int id = args[0]->IntegerValue();
     RealFocus(hw, id);
     return Undefined();
   }
 
-  static void RealFocus(HelloWorld* hw, int id) {
+  static void RealFocus(NodeWM* hw, int id) {
     Window win;
     Client* c = getById(hw, id);
     if(c && c->win) {
@@ -387,7 +387,7 @@ public:
     }
   }
 
-  static Bool SendEvent(HelloWorld* hw, Window wnd, Atom proto) {
+  static Bool SendEvent(NodeWM* hw, Window wnd, Atom proto) {
     int n;
     Atom *protocols;
     Bool exists = False;
@@ -454,7 +454,7 @@ public:
     return result;
   }
 
-  static void EmitButtonPress(HelloWorld* hw, XEvent *e) {
+  static void EmitButtonPress(NodeWM* hw, XEvent *e) {
     XButtonPressedEvent *ev = &e->xbutton;
     // onManage receives a window object
     Local<Value> argv[1];
@@ -466,7 +466,7 @@ public:
     Client* c = getByWindow(hw, ev->window);
     if(c) {
       int id = c->id;
-      argv[0] = HelloWorld::makeButtonPress(id, ev->x, ev->y, ev->button);
+      argv[0] = NodeWM::makeButtonPress(id, ev->x, ev->y, ev->button);
       fprintf(stderr, "makeButtonPress\n");
 
       // call the callback in Node.js, passing the window object...
@@ -505,7 +505,7 @@ public:
     return result;
   }
 
-  static void EmitKeyPress(HelloWorld* hw, XEvent *e) {
+  static void EmitKeyPress(NodeWM* hw, XEvent *e) {
 //    KeySym keysym;
     XKeyEvent *ev;
 
@@ -514,7 +514,7 @@ public:
 
     fprintf(stderr, "EmitKeyPress\n");
     Local<Value> argv[1];
-    argv[0] = HelloWorld::makeKeyPress(ev->x, ev->y, ev->keycode, ev->state);
+    argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, ev->state);
     // call the callback in Node.js, passing the window object...
     hw->Emit(onKeyPress, 1, argv);
   }
@@ -531,7 +531,7 @@ public:
     return result;
   }
 
-  static void EmitEnterNotify(HelloWorld* hw, XEvent *e) {
+  static void EmitEnterNotify(NodeWM* hw, XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
     // onManage receives a window object
     Local<Value> argv[1];
@@ -541,13 +541,13 @@ public:
     Client* c = getByWindow(hw, ev->window);
     if(c) {
       int id = c->id;
-      argv[0] = HelloWorld::makeEvent(id);
+      argv[0] = NodeWM::makeEvent(id);
       // call the callback in Node.js, passing the window object...
       hw->Emit(onEnterNotify, 1, argv);
     }
   }
 
-  static void EmitFocusIn(HelloWorld* hw, XEvent *e) {
+  static void EmitFocusIn(NodeWM* hw, XEvent *e) {
     XFocusChangeEvent *ev = &e->xfocus;
     Client* c = getByWindow(hw, ev->window);
     if(c) {
@@ -556,14 +556,14 @@ public:
     }
   }
 
-  static void EmitUnmapNotify(HelloWorld* hw, XEvent *e) {
+  static void EmitUnmapNotify(NodeWM* hw, XEvent *e) {
     Client *c;
     XUnmapEvent *ev = &e->xunmap;
     if((c = getByWindow(hw, ev->window)))
       EmitRemove(hw, c, False);
   }
 
-  static void EmitDestroyNotify(HelloWorld* hw, XEvent *e) {
+  static void EmitDestroyNotify(NodeWM* hw, XEvent *e) {
     Client *c;
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
@@ -571,7 +571,7 @@ public:
       EmitRemove(hw, c, True);    
   }
 
-  static void EmitRemove(HelloWorld* hw, Client *c, Bool destroyed) {
+  static void EmitRemove(NodeWM* hw, Client *c, Bool destroyed) {
 //    Monitor *m = c->mon;
 //    XWindowChanges wc;
     fprintf( stderr, "EmitRemove\n");
@@ -602,8 +602,8 @@ public:
 
   static Handle<Value> Setup(const Arguments& args) {
     HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    // extract from args.this
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     // initialize resources
     // atoms
@@ -650,8 +650,8 @@ public:
    */
   static Handle<Value> Scan(const Arguments& args) {
     HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    // extract from args.this
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     unsigned int i, num;
     Window d1, d2, *wins = NULL;
@@ -669,14 +669,14 @@ public:
         }
         // visible or minimized window ("Iconic state")
         if(wa.map_state == IsViewable )//|| getstate(wins[i]) == IconicState)
-          HelloWorld::EmitAdd(hw, wins[i], &wa);
+          NodeWM::EmitAdd(hw, wins[i], &wa);
       }
       for(i = 0; i < num; i++) { /* now the transients */
         if(!XGetWindowAttributes(hw->dpy, wins[i], &wa))
           continue;
         if(XGetTransientForHint(hw->dpy, wins[i], &d1)
         && (wa.map_state == IsViewable )) //|| getstate(wins[i]) == IconicState))
-          HelloWorld::EmitAdd(hw, wins[i], &wa);
+          NodeWM::EmitAdd(hw, wins[i], &wa);
       }
       if(wins) {
         // To free a non-NULL children list when it is no longer needed, use XFree()
@@ -690,8 +690,8 @@ public:
 
   static Handle<Value> Loop(const Arguments& args) {
     HandleScope scope;
-    // extract helloworld from args.this
-    HelloWorld* hw = ObjectWrap::Unwrap<HelloWorld>(args.This());
+    // extract from args.this
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     // use ev_io
 
@@ -707,7 +707,7 @@ public:
 
   static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents) {
 
-    HelloWorld* hw = static_cast<HelloWorld*>(watcher->data);    
+    NodeWM* hw = static_cast<NodeWM*>(watcher->data);    
     
     XEvent event;
     // main event loop 
@@ -720,7 +720,7 @@ public:
         case ButtonPress:
           {
             fprintf(stderr, "EmitButtonPress\n");
-            HelloWorld::EmitButtonPress(hw, &event);
+            NodeWM::EmitButtonPress(hw, &event);
           }
           break;
         case ConfigureRequest:
@@ -728,20 +728,20 @@ public:
         case ConfigureNotify:
             break;
         case DestroyNotify:
-            HelloWorld::EmitDestroyNotify(hw, &event);        
+            NodeWM::EmitDestroyNotify(hw, &event);        
             break;
         case EnterNotify:
-            HelloWorld::EmitEnterNotify(hw, &event);
+            NodeWM::EmitEnterNotify(hw, &event);
             break;
         case Expose:
             break;
         case FocusIn:
-         //   HelloWorld::EmitFocusIn(hw, &event);
+         //   NodeWM::EmitFocusIn(hw, &event);
             break;
         case KeyPress:
           {
             fprintf(stderr, "EmitKeyPress\n");
-            HelloWorld::EmitKeyPress(hw, &event);
+            NodeWM::EmitKeyPress(hw, &event);
           }
             break;
         case MappingNotify:
@@ -758,12 +758,12 @@ public:
             if(wa.override_redirect)
               return;
             fprintf(stderr, "MapRequest\n");
-            Client* c = HelloWorld::getByWindow(hw, ev->window);
+            Client* c = NodeWM::getByWindow(hw, ev->window);
             if(c == NULL) {
               fprintf(stderr, "Emit manage!\n");
               // dwm actually does this only once per window (e.g. for unknown windows only...)
               // that's because otherwise you'll cause a hang when you map a mapped window again...
-              HelloWorld::EmitAdd(hw, ev->window, &wa);
+              NodeWM::EmitAdd(hw, ev->window, &wa);
             } else {
               fprintf(stderr, "Window is known\n");              
             }
@@ -772,7 +772,7 @@ public:
         case PropertyNotify:
             break;
         case UnmapNotify:
-            HelloWorld::EmitUnmapNotify(hw, &event);
+            NodeWM::EmitUnmapNotify(hw, &event);
             break;
         default:
             break;
@@ -819,16 +819,16 @@ public:
   ev_io watcher;
 };
 
-Persistent<FunctionTemplate> HelloWorld::s_ct;
+Persistent<FunctionTemplate> NodeWM::s_ct;
 
 extern "C" {
   // target for export
   static void init (Handle<Object> target)
   {
-    HelloWorld::Init(target);
+    NodeWM::Init(target);
   }
 
-  // macro to export helloworld
+  // macro to export
   NODE_MODULE(nwm, init);
 }
 
