@@ -311,18 +311,8 @@ public:
     XMapWindow(hw->dpy, win);
 
     // emit a rearrange
-    EmitRearrange(hw);
+    hw->Emit(onRearrange, 0, 0);
   }
-
-  static void EmitRearrange(NodeWM* hw) {
-//    TryCatch try_catch;
-      hw->Emit(onRearrange, 0, 0);
-//    hw->cbRearrange->Call(Context::GetCurrent()->Global(), 0, 0);
-//    if (try_catch.HasCaught()) {
-//      FatalException(try_catch);
-//    }    
-  }
-
 
   static Handle<Value> ResizeWindow(const Arguments& args) {
     HandleScope scope;
@@ -430,10 +420,28 @@ public:
 
   static void GrabKeys(Display* dpy, Window root) {
     XUngrabKey(dpy, AnyKey, AnyModifier, root);
-    // windows Z
-    XGrabKey(dpy, XK_z, Mod4Mask, root, True, GrabModeAsync, GrabModeAsync);
-    // windows X
-    XGrabKey(dpy, XK_x, Mod4Mask, root, True, GrabModeAsync, GrabModeAsync);
+    // Valid keymap bits are: ShiftMask, LockMask, ControlMask, Mod1Mask, Mod2Mask, Mod3Mask, Mod4Mask, and Mod5Mask
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_1), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_2), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_3), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_4), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_5), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_6), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_7), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_8), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_9), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
+
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_1), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_2), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_3), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_4), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_5), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_6), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_7), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_8), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_9), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
+
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_Return), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
 
   }
 
@@ -506,26 +514,24 @@ public:
   }
 
   static void EmitKeyPress(NodeWM* hw, XEvent *e) {
-//    KeySym keysym;
+    KeySym keysym;
     XKeyEvent *ev;
 
     ev = &e->xkey;
-//    keysym = XKeycodeToKeysym(hw->dpy, (KeyCode)ev->keycode, 0);
-
-    fprintf(stderr, "EmitKeyPress\n");
+    keysym = XKeycodeToKeysym(hw->dpy, (KeyCode)ev->keycode, 0);
     Local<Value> argv[1];
-    argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, ev->state);
+    argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, keysym, ev->state);
     // call the callback in Node.js, passing the window object...
     hw->Emit(onKeyPress, 1, argv);
   }
 
-  static Local<Object> makeKeyPress(int x, int y, unsigned int keycode, unsigned int mod) {
+  static Local<Object> makeKeyPress(int x, int y, unsigned int keycode, KeySym keysym, unsigned int mod) {
     // window object to return
     Local<Object> result = Object::New();
-
     // read and set the window geometry
     result->Set(String::NewSymbol("x"), Integer::New(x));
     result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("keysym"), Integer::New(keysym));
     result->Set(String::NewSymbol("keycode"), Integer::New(keycode));
     result->Set(String::NewSymbol("mod"), Integer::New(mod));
     return result;
@@ -589,7 +595,7 @@ public:
     }
     free(c);
     RealFocus(hw, -1);
-    EmitRearrange(hw);
+    hw->Emit(onRearrange, 0, 0);
   }
 
   static Local<Object> makeEvent(int id) {

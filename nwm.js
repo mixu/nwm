@@ -1,5 +1,7 @@
 var repl = require('repl');
 var X11wm = require('./build/default/nwm.node').NodeWM;
+var child_process = require('child_process');
+
 
 var NWM = function() {
   this.windows = {};
@@ -37,7 +39,7 @@ NWM.prototype.start = function() {
     if(self.windows[id]) {
       delete self.windows[id];
     }
-    self.rearrange();    
+    self.rearrange();
   });
 
   this.wm.on('rearrange', function() { self.rearrange(); }); 
@@ -66,6 +68,16 @@ NWM.prototype.start = function() {
    */
   this.wm.on('keyPress', function(key) {
     // do something, e.g. launch a command
+    var chr = String.fromCharCode(key.keysym);
+    console.log('keyPress', key, chr, '0'.charCodeAt(0), '9'.charCodeAt(0));
+    if( key.keysym > '0'.charCodeAt(0) && key.keysym < '9'.charCodeAt(0)) {
+      self.go(chr); // jump to workspace
+    }
+    if(key.keysym == 0xFF0D) {
+      // enter pressed ...
+      console.log('Enter key, start xterm');
+      child_process.spawn('xterm', ['-lc'], { env: { 'DISPLAY': ':1' } });
+    }
     return key;
   });  
   this.screen = this.wm.setup();
