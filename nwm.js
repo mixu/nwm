@@ -1,7 +1,8 @@
 var repl = require('repl');
 var X11wm = require('./build/default/nwm.node').NodeWM;
 var child_process = require('child_process');
-var X11keysym = require('./keysymdef.js');
+var XK = require('./keysymdef.js');
+var Xh = require('./x.js');
 
 var NWM = function() {
   this.windows = {};
@@ -78,17 +79,44 @@ NWM.prototype.start = function() {
       return true;
     });
     console.log('keyPress', key, chr, keysym_name);
-    if( key.keysym > X11keysym.XK_KP_0 && key.keysym < X11keysym.XK_KP_9) {
+    if( key.keysym > XK.XK_KP_0 && key.keysym < XK.XK_KP_9) {
       self.go(chr); // jump to workspace
     }
-    if(key.keysym == X11keysym.XK_Return) {
+    if(key.keysym == XK.XK_Return) {
       // enter pressed ...
       console.log('Enter key, start xterm');
       child_process.spawn('xterm', ['-lc'], { env: { 'DISPLAY': ':1' } });
     }
     return key;
   });  
-  this.screen = this.wm.setup();
+  this.screen = this.wm.setup({
+    keys: [ 
+      { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_4, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_5, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_6, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_7, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_8, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask },
+
+      { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_4, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_5, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_6, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_7, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_8, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+
+      { key: XK.XK_Return, modifier: Xh.Mod4Mask|Xh.ControlMask }
+
+    ]
+  });
   this.wm.scan();
   this.wm.loop();
 
