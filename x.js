@@ -9,6 +9,17 @@ module.exports = {
   Mod2Mask:    (1<<4),
   Mod3Mask:    (1<<5),
   Mod4Mask:    (1<<6),
-  Mod5Mask:    (1<<7)
+  Mod5Mask:    (1<<7),
+
+/* button names. Used as arguments to GrabButton and as detail in ButtonPress
+   and ButtonRelease events.  Not to be confused with button masks above.
+   Note that 0 is already defined above as "AnyButton".  */
+  Button1: 1,
+  Button2: 2,
+  Button3: 3,
+  Button4: 4,
+  Button5: 5
+  
+    
 };
 

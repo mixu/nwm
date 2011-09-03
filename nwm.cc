@@ -35,6 +35,11 @@
 using namespace node;
 using namespace v8;
 
+typedef struct {
+  unsigned int mod;
+  KeySym keysym;
+} Key;
+
 typedef struct Monitor Monitor;
 typedef struct Client Client;
 struct Client {
@@ -62,7 +67,8 @@ enum callback_map {
   onAdd, 
   onRemove,
   onRearrange,
-  onButtonPress,
+  onMouseDown,
+  onMouseDrag,
   onConfigureRequest,
   onKeyPress,
   onEnterNotify,
@@ -73,18 +79,21 @@ enum callback_map {
 class NodeWM: ObjectWrap
 {
 private:
+  // X11
   Display *dpy;
-  Window wnd;
   GC gc;
-  int screen, screen_width, screen_height;
+  Window wnd;
   Window root;
   Window selected;
-  // callbacks
-  Persistent<Function>* callbacks[onLast];
-
-  int next_index;
-
   Monitor* monit;
+  // screen dimensions
+  int screen, screen_width, screen_height;
+  // window id
+  int next_index;
+  // callback storage
+  Persistent<Function>* callbacks[onLast];
+  // grabbed keys
+  Key keys[];
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -175,9 +184,7 @@ public:
     // store function
     hw->callbacks[selected] = cb_persist(args[1]);
 
-    Local<Object> result = Object::New();
-    result->Set(String::NewSymbol("test"), Integer::New(selected));
-    return scope.Close(result);
+    return Undefined();
   }
 
   void Emit(callback_map event, int argc, Handle<Value> argv[]) {
@@ -189,15 +196,6 @@ public:
         FatalException(try_catch);
       }
     }
-  }
-
-  // GET from Node.js
-
-  static int getIntegerValue(Handle<Object> obj, Local<String> symbol) {
-    v8::Handle<v8::Value> h = obj->Get(symbol);    
-    int val = h->IntegerValue();
-    fprintf( stderr, "getIntegerValue: %d \n", val);
-    return val;
   }
 
   // Client management
@@ -418,8 +416,36 @@ public:
     }
   }
 
+  /**
+   * Set the keys to grab
+   */
+  static Handle<Value> GrabKeys(const Arguments& args) {
+    HandleScope scope;
+    int i;
+    Key k;
+    v8::Handle<v8::Value> val;
+    // extract from args.this
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
+    v8::Local<v8::Object> obj = Local<v8::Object>::Cast(args[0]);
+
+    for(i = 0; i < obj.length; i++) {
+      val = obj->Get(String::NewSymbol("key"));    
+      k.keysym = val->IntegerValue();
+      val = obj->Get(String::NewSymbol("modifier"));
+      k.mod = val->IntegerValue();
+      hw->keys[i] = k;
+    }
+    return Undefined();
+  }
+
   static void GrabKeys(Display* dpy, Window root) {
     XUngrabKey(dpy, AnyKey, AnyModifier, root);
+
+    for(int i = 0; i < hw->keys.length; i++) {
+      XGrabKey(dpy, XKeysymToKeycode(dpy, keys[i].keysym), keys[i].mod, root, True, GrabModeAsync, GrabModeAsync);
+    }
+
+    /*
     // Valid keymap bits are: ShiftMask, LockMask, ControlMask, Mod1Mask, Mod2Mask, Mod3Mask, Mod4Mask, and Mod5Mask
     XGrabKey(dpy, XKeysymToKeycode(dpy, XK_1), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
     XGrabKey(dpy, XKeysymToKeycode(dpy, XK_2), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
@@ -442,9 +468,8 @@ public:
     XGrabKey(dpy, XKeysymToKeycode(dpy, XK_9), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
 
     XGrabKey(dpy, XKeysymToKeycode(dpy, XK_Return), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-
+    */
   }
-
 
   static Local<Object> makeWindow(int id, int x, int y, int height, int width, int border_width) {
     // window object to return
@@ -464,7 +489,6 @@ public:
 
   static void EmitButtonPress(NodeWM* hw, XEvent *e) {
     XButtonPressedEvent *ev = &e->xbutton;
-    // onManage receives a window object
     Local<Value> argv[1];
 
     fprintf(stderr, "EmitButtonPress\n");
@@ -474,16 +498,75 @@ public:
     Client* c = getByWindow(hw, ev->window);
     if(c) {
       int id = c->id;
-      argv[0] = NodeWM::makeButtonPress(id, ev->x, ev->y, ev->button);
+      argv[0] = NodeWM::makeButtonPress(id, ev->x, ev->y, ev->button, ev->state);
       fprintf(stderr, "makeButtonPress\n");
-
       // call the callback in Node.js, passing the window object...
-      hw->Emit(onButtonPress, 1, argv);
+      hw->Emit(onMouseDown, 1, argv);
       fprintf(stderr, "Call cbButtonPress\n");
     }
   }
 
-  static Local<Object> makeButtonPress(int id, int x, int y, unsigned int button) {
+  Bool getrootptr(int *x, int *y) {
+    int di;
+    unsigned int dui;
+    Window dummy;
+
+    return XQueryPointer(dpy, root, &dummy, &dummy, x, y, &di, &di, &dui);
+  }
+
+  static Handle<Value> GrabMouseRelease(const Arguments& args) {
+    XEvent ev;
+    int x, y;
+    Local<Value> argv[1];
+
+    if(XGrabPointer(dpy, root, False, 
+      ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, 
+      GrabModeAsync, None, XCreateFontCursor(dpy, XC_fleur), CurrentTime) != GrabSuccess) {
+      return Undefined();
+    }
+    if(!getrootptr(&x, &y)) {
+      return Undefined();
+    }
+    do{
+      XMaskEvent(dpy, ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|SubstructureRedirectMask, &ev);
+      switch(ev.type) {
+        case ConfigureRequest:
+          // handle normally
+          break;
+        case Expose:
+          // handle normally
+          break;
+        case MapRequest:
+          // handle normally
+          break;
+        case MotionNotify:
+          {          
+            argv[0] = NodeWM::makeMouseDrag(x, y, ev.xmotion.x, ev.xmotion.y, ev.state);
+            hw->Emit(onMouseDrag, 1, argv);
+          }
+          break;
+      }
+    } while(ev.type != ButtonRelease);
+
+    XUngrabPointer(dpy, CurrentTime);
+  }
+
+
+  static Local<Object> makeMouseDrag(int x, int y, int movex, int movey, unsigned int state) {
+    // window object to return
+    Local<Object> result = Object::New();
+
+    // read and set the window geometry
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("move_x"), Integer::New(movex));
+    result->Set(String::NewSymbol("move_y"), Integer::New(movey));
+    result->Set(String::NewSymbol("state"), Integer::New(state));
+    return result;
+  }
+
+
+  static Local<Object> makeButtonPress(int id, int x, int y, unsigned int button, unsigned int state) {
     // window object to return
     Local<Object> result = Object::New();
 
@@ -491,25 +574,8 @@ public:
     result->Set(String::NewSymbol("id"), Integer::New(id));
     result->Set(String::NewSymbol("x"), Integer::New(x));
     result->Set(String::NewSymbol("y"), Integer::New(y));
-    // resolve the button
-    switch(button) {
-      case Button1:
-        result->Set(String::NewSymbol("button"), Integer::New(1));
-        break;
-      case Button2:
-        result->Set(String::NewSymbol("button"), Integer::New(2));
-        break;
-      case Button3:
-        result->Set(String::NewSymbol("button"), Integer::New(3));
-        break;
-      case Button4:
-        result->Set(String::NewSymbol("button"), Integer::New(4));
-        break;
-      case Button5:
-      default:
-        result->Set(String::NewSymbol("button"), Integer::New(5));
-        break;
-    }
+    result->Set(String::NewSymbol("button"), Integer::New(button));
+    result->Set(String::NewSymbol("state"), Integer::New(state));
     return result;
   }
 
@@ -837,7 +903,3 @@ extern "C" {
   // macro to export
   NODE_MODULE(nwm, init);
 }
-
-
-// could also store symbols like this:
-//    Persistent<String> port_symbol = NODE_PSYMBOL("port");
