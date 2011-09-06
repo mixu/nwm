@@ -79,6 +79,8 @@ enum callback_map {
 class NodeWM: ObjectWrap
 {
 private:
+  // window id
+  int next_index;
   // X11
   Display *dpy;
   GC gc;
@@ -88,8 +90,6 @@ private:
   Monitor* monit;
   // screen dimensions
   int screen, screen_width, screen_height;
-  // window id
-  int next_index;
   // callback storage
   Persistent<Function>* callbacks[onLast];
   // grabbed keys
@@ -123,6 +123,9 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "setup", Setup);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "scan", Scan);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "loop", Loop);
+
+    // Testing
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "testing", TestGrabKeys);
 
     // FINALLY: export the current function template
     target->Set(String::NewSymbol("NodeWM"),
@@ -419,30 +422,32 @@ public:
   /**
    * Set the keys to grab
    */
-  static Handle<Value> GrabKeys(const Arguments& args) {
+  static Handle<Value> TestGrabKeys(const Arguments& args) {
     HandleScope scope;
-    int i;
+    unsigned int i;
     Key k;
     v8::Handle<v8::Value> val;
     // extract from args.this
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
-    v8::Local<v8::Object> obj = Local<v8::Object>::Cast(args[0]);
+    v8::Local<v8::Array> arr = Local<v8::Array>::Cast(args[0]);
 
-    for(i = 0; i < obj.length; i++) {
+    for(i = 0; i < arr->Length(); i++) {
+      v8::Local<v8::Object> obj = Local<v8::Object>::Cast(arr->Get(i));
       val = obj->Get(String::NewSymbol("key"));    
       k.keysym = val->IntegerValue();
       val = obj->Get(String::NewSymbol("modifier"));
       k.mod = val->IntegerValue();
+      fprintf( stderr, "key: %d modifier %d \n", k.keysym, k.mod);
       hw->keys[i] = k;
     }
     return Undefined();
   }
 
-  static void GrabKeys(Display* dpy, Window root) {
-    XUngrabKey(dpy, AnyKey, AnyModifier, root);
-
+  static void GrabKeys(NodeWM* hw, Display* dpy, Window root) {
+    XUngrabKey(hw->dpy, AnyKey, AnyModifier, hw->root);
+/*
     for(int i = 0; i < hw->keys.length; i++) {
-      XGrabKey(dpy, XKeysymToKeycode(dpy, keys[i].keysym), keys[i].mod, root, True, GrabModeAsync, GrabModeAsync);
+      XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, keys[i].keysym), keys[i].mod, hw->root, True, GrabModeAsync, GrabModeAsync);
     }
 
     /*
@@ -518,17 +523,19 @@ public:
     XEvent ev;
     int x, y;
     Local<Value> argv[1];
+    HandleScope scope;
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
-    if(XGrabPointer(dpy, root, False, 
+    if(XGrabPointer(hw->dpy, hw->root, False, 
       ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, 
-      GrabModeAsync, None, XCreateFontCursor(dpy, XC_fleur), CurrentTime) != GrabSuccess) {
+      GrabModeAsync, None, XCreateFontCursor(hw->dpy, XC_fleur), CurrentTime) != GrabSuccess) {
       return Undefined();
     }
-    if(!getrootptr(&x, &y)) {
+    if(!hw->getrootptr(&x, &y)) {
       return Undefined();
     }
     do{
-      XMaskEvent(dpy, ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|SubstructureRedirectMask, &ev);
+      XMaskEvent(hw->dpy, ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|SubstructureRedirectMask, &ev);
       switch(ev.type) {
         case ConfigureRequest:
           // handle normally
@@ -541,18 +548,19 @@ public:
           break;
         case MotionNotify:
           {          
-            argv[0] = NodeWM::makeMouseDrag(x, y, ev.xmotion.x, ev.xmotion.y, ev.state);
+            argv[0] = NodeWM::makeMouseDrag(x, y, ev.xmotion.x, ev.xmotion.y); // , ev.state);
             hw->Emit(onMouseDrag, 1, argv);
           }
           break;
       }
     } while(ev.type != ButtonRelease);
 
-    XUngrabPointer(dpy, CurrentTime);
+    XUngrabPointer(hw->dpy, CurrentTime);
   }
 
 
-  static Local<Object> makeMouseDrag(int x, int y, int movex, int movey, unsigned int state) {
+  static Local<Object> makeMouseDrag(int x, int y, int movex, int movey //, unsigned int state
+  ) {
     // window object to return
     Local<Object> result = Object::New();
 
@@ -561,7 +569,7 @@ public:
     result->Set(String::NewSymbol("y"), Integer::New(y));
     result->Set(String::NewSymbol("move_x"), Integer::New(movex));
     result->Set(String::NewSymbol("move_y"), Integer::New(movey));
-    result->Set(String::NewSymbol("state"), Integer::New(state));
+//    result->Set(String::NewSymbol("state"), Integer::New(state));
     return result;
   }
 
@@ -682,7 +690,7 @@ public:
 
     // open the display
     if ( ( hw->dpy = XOpenDisplay(NIL) ) == NULL ) {
-      (void) fprintf( stderr, "cannot connect to X server %s\n", XDisplayName(NULL));
+      fprintf( stderr, "cannot connect to X server %s\n", XDisplayName(NULL));
       exit( -1 );
     }
     // set error handler
@@ -707,7 +715,7 @@ public:
                     |PropertyChangeMask;
     XSelectInput(hw->dpy, hw->root, wa.event_mask);
 
-    GrabKeys(hw->dpy, hw->root);
+    GrabKeys(hw, hw->dpy, hw->root);
 
     Local<Object> result = Object::New();
     result->Set(String::NewSymbol("width"), Integer::New(hw->screen_width));

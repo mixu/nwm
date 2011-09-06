@@ -1,18 +1,33 @@
-var HelloWorld = require('./build/default/helloworld.node').HelloWorld;
+var X11wm = require('./build/default/nwm.node').NodeWM;
+var XK = require('./keysymdef.js');
+var Xh = require('./x.js');
 
-var obj = new HelloWorld();
+var obj = new X11wm();
 
-obj.on("enterNotify", function(aaa) { console.log(' hi mom ', aaa); } );
+console.log('enterNotify', obj.testing(
+  [
+      { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_4, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_5, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_6, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_7, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_8, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask },
 
-console.log('enterNotify', obj.test1("enterNotify"));
-console.log('enterNotify', obj.test1("enterNotify"));
-console.log('add', obj.test2("add"));
+      { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_4, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_5, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_6, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_7, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_8, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
+      { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
 
-
-
-/*
-console.log('rearrange', obj.on("rearrange", function() {} ));
-console.log('configureRequest', obj.on("configureRequest", function() {} ));
-console.log('enterNotify', obj.on("enterNotify", function() {} ));
-*/
-// setTimeout(function() {}, 10000);
+      { key: XK.XK_Return, modifier: Xh.Mod4Mask|Xh.ControlMask }
+  ]
+));
