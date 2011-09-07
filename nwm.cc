@@ -35,10 +35,12 @@
 using namespace node;
 using namespace v8;
 
-typedef struct {
+typedef struct Key Key;
+struct Key {
   unsigned int mod;
   KeySym keysym;
-} Key;
+  Key* next;
+};
 
 typedef struct Monitor Monitor;
 typedef struct Client Client;
@@ -93,7 +95,7 @@ private:
   // callback storage
   Persistent<Function>* callbacks[onLast];
   // grabbed keys
-  Key keys[];
+  Key* keys;
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -135,7 +137,8 @@ public:
   // C++ constructor
   NodeWM() :
     next_index(1),
-    monit(NULL)
+    monit(NULL),
+    keys(NULL)
   {
   }
 
@@ -425,55 +428,47 @@ public:
   static Handle<Value> TestGrabKeys(const Arguments& args) {
     HandleScope scope;
     unsigned int i;
-    Key k;
-    v8::Handle<v8::Value> val;
+    v8::Handle<v8::Value> keysym, modifier;
     // extract from args.this
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
     v8::Local<v8::Array> arr = Local<v8::Array>::Cast(args[0]);
 
+    // empty keys
+    Key* curr = hw->keys;
+    Key* next;
+    while(curr != NULL) {
+      next = curr->next;
+      free(curr);
+      curr = next;
+    }
+    // set keys
     for(i = 0; i < arr->Length(); i++) {
       v8::Local<v8::Object> obj = Local<v8::Object>::Cast(arr->Get(i));
-      val = obj->Get(String::NewSymbol("key"));    
-      k.keysym = val->IntegerValue();
-      val = obj->Get(String::NewSymbol("modifier"));
-      k.mod = val->IntegerValue();
-      fprintf( stderr, "key: %d modifier %d \n", k.keysym, k.mod);
-      hw->keys[i] = k;
+      keysym = obj->Get(String::NewSymbol("key"));
+      modifier = obj->Get(String::NewSymbol("modifier"));
+      pushKey(&hw->keys, keysym->IntegerValue(), modifier->IntegerValue());
     }
     return Undefined();
   }
 
+  static void pushKey(Key** keys, KeySym keysym, unsigned int mod) {
+    Key* curr;
+    if(!(curr = (Key*)calloc(1, sizeof(Key)))) {
+      fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
+      exit( -1 );         
+    }
+    curr->keysym = keysym;
+    curr->mod = mod;
+    curr->next = *keys;
+    *keys = curr;
+    fprintf( stderr, "key: %d modifier %d \n", curr->keysym, curr->mod);
+  }
+
   static void GrabKeys(NodeWM* hw, Display* dpy, Window root) {
     XUngrabKey(hw->dpy, AnyKey, AnyModifier, hw->root);
-/*
-    for(int i = 0; i < hw->keys.length; i++) {
-      XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, keys[i].keysym), keys[i].mod, hw->root, True, GrabModeAsync, GrabModeAsync);
+    for(Key* curr = hw->keys; curr != NULL; curr = curr->next) {
+      XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod, hw->root, True, GrabModeAsync, GrabModeAsync);
     }
-
-    /*
-    // Valid keymap bits are: ShiftMask, LockMask, ControlMask, Mod1Mask, Mod2Mask, Mod3Mask, Mod4Mask, and Mod5Mask
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_1), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_2), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_3), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_4), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_5), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_6), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_7), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_8), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_9), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_1), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_2), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_3), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_4), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_5), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_6), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_7), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_8), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_9), Mod4Mask|ControlMask|ShiftMask, root, True, GrabModeAsync, GrabModeAsync);
-
-    XGrabKey(dpy, XKeysymToKeycode(dpy, XK_Return), Mod4Mask|ControlMask, root, True, GrabModeAsync, GrabModeAsync);
-    */
   }
 
   static Local<Object> makeWindow(int id, int x, int y, int height, int width, int border_width) {

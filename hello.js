@@ -31,3 +31,8 @@ console.log('enterNotify', obj.testing(
       { key: XK.XK_Return, modifier: Xh.Mod4Mask|Xh.ControlMask }
   ]
 ));
+
+console.log('enterNotify', obj.testing(
+  [
+      { key: XK.XK_A, modifier: Xh.Mod4Mask|Xh.ControlMask }  ]
+));

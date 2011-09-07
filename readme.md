@@ -6,7 +6,7 @@ It uses libev to interface with X11, and allows you to lay out windows in Node.
 
 I wrote the code in this repo during Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)). Unfortunately I'm not in the competition since I forgot to confirm my initial team registration (click accept). Not a big deal, my reward is shipping.
 
-**This is the repo you should watch/fork for future updates. Updates coming, need rest now!**
+**This is the repo you should watch/fork for future updates. **
 
 The underlying X11 bindings are written as a Node native extension in c. I apologize for the ugliness of the code - if you look at the first commit, I started on Friday with [this tutorial](https://www.cloudkick.com/blog/2010/aug/23/writing-nodejs-native-extensions/), a vague knowledge of X11 and a lot of enthusiasm.
 
