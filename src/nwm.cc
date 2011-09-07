@@ -532,7 +532,7 @@ public:
     result->Set(String::NewSymbol("y"), Integer::New(y));
     result->Set(String::NewSymbol("keysym"), Integer::New(keysym));
     result->Set(String::NewSymbol("keycode"), Integer::New(keycode));
-    result->Set(String::NewSymbol("mod"), Integer::New(mod));
+    result->Set(String::NewSymbol("modifier"), Integer::New(mod));
     return result;
   }
 

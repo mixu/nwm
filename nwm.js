@@ -10,6 +10,7 @@ var NWM = function() {
   this.drag_window = null;
   this.wm = null;
   this.workspace = 1;
+  this.focused_window = null;
 }
 
 NWM.prototype.start = function() {
@@ -57,6 +58,8 @@ NWM.prototype.start = function() {
   });
 
   this.wm.on('enterNotify',function(event){
+    console.log('focusing to window', event.id);
+    self.focused_window = event.id;
     self.wm.focusWindow(event.id);    
   });
 
@@ -83,8 +86,17 @@ NWM.prototype.start = function() {
     });
     console.log('keyPress', key, chr, keysym_name);
     if( key.keysym > XK.XK_0 && key.keysym <= XK.XK_9) {
-      console.log('go to workspace',  chr);      
-      self.go(chr); // jump to workspace
+      // check the modifier
+      if(key.modifier == (Xh.Mod4Mask|Xh.ControlMask)) {
+        console.log('go to workspace',  chr);      
+        self.go(chr); // jump to workspace        
+      }
+      if(key.modifier == (Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask)) {
+        console.log('move focused window to workspace', chr);
+        if(self.focused_window) {
+          self.windowTo(self.focused_window, chr);
+        }
+      }
     }
     if(key.keysym == XK.XK_Return) {
       // enter pressed ...
@@ -123,7 +135,9 @@ NWM.prototype.start = function() {
   this.wm.scan();
   this.wm.loop();
 
-  repl.start().context.nwm = self;
+  var re = repl.start();
+  re.context.nwm = self;
+  re.context.Xh = Xh;
 };
 
 NWM.prototype.hide = function(id) {

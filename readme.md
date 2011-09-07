@@ -4,7 +4,7 @@ nwm is a dynamic window manager for X written at NodeKO 2011.
 
 It uses libev to interface with X11, and allows you to lay out windows in Node.
 
-I wrote the code in this repo during Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)). Unfortunately I'm not in the competition since I forgot to confirm my initial team registration (click accept). Not a big deal, my reward is shipping.
+I wrote the code in this repo during Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)). Unfortunately I'm not in the competition since I forgot to confirm my initial team registration (click accept). Not a big deal.
 
 **This is the repo you should watch/fork for future updates. **
 
@@ -36,7 +36,7 @@ Some notes:
 
 # Keyboard shortcuts
 
-Keyboard shortcuts are now working. The binding is Ctrl+Win (which is free in my dev env as it is hellahard to press).
+Keyboard shortcuts are now working. The binding is Ctrl+Win which happens to be free in my dev env.
 
     Ctrl+Win 1 # Switch to workspace 1
     Ctrl+Win 2 # Switch to workspace 2
