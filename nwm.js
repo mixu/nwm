@@ -48,9 +48,12 @@ NWM.prototype.start = function() {
   /**
    * A mouse button has been clicked
    */
-  this.wm.on('buttonPress', function(event) {
-    console.log('Button pressed', event);
+  this.wm.on('mouseDown', function(event) {
+    console.log('Mouse button pressed', event);
     self.wm.focusWindow(event.id);
+  });
+  this.wm.on('mouseDrag', function(event) {
+    console.log('Mouse drag event', event);
   });
 
   this.wm.on('enterNotify',function(event){
@@ -71,15 +74,16 @@ NWM.prototype.start = function() {
     // do something, e.g. launch a command
     var chr = String.fromCharCode(key.keysym);
     var keysym_name = '';
-    Object.keys(X11keysym).every(function(name) {
-      if(X11keysym[name] == key.keysym) {
+    Object.keys(XK).every(function(name) {
+      if(XK[name] == key.keysym) {
         keysym_name = name;
         return false; // stop iteration
       }
       return true;
     });
     console.log('keyPress', key, chr, keysym_name);
-    if( key.keysym > XK.XK_KP_0 && key.keysym < XK.XK_KP_9) {
+    if( key.keysym > XK.XK_0 && key.keysym <= XK.XK_9) {
+      console.log('go to workspace',  chr);      
       self.go(chr); // jump to workspace
     }
     if(key.keysym == XK.XK_Return) {
@@ -89,8 +93,7 @@ NWM.prototype.start = function() {
     }
     return key;
   });  
-  this.screen = this.wm.setup({
-    keys: [ 
+  this.wm.keys([ 
       { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask },
@@ -115,8 +118,8 @@ NWM.prototype.start = function() {
 
       { key: XK.XK_Return, modifier: Xh.Mod4Mask|Xh.ControlMask }
 
-    ]
-  });
+    ]);
+  this.screen = this.wm.setup();  
   this.wm.scan();
   this.wm.loop();
 

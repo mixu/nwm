@@ -16,10 +16,9 @@ module.exports = {
    Note that 0 is already defined above as "AnyButton".  */
   Button1: 1,
   Button2: 2,
-  Button3: 3,
+  Button3: 3, // right click
   Button4: 4,
   Button5: 5
-  
     
 };
 

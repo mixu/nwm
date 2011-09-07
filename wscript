@@ -11,4 +11,4 @@ def build(bld):
   obj.uselib=['X11', 'Xinerama']
   obj.cxxflags = ["-g", "-static", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
   obj.target = "nwm"
-  obj.source = "nwm.cc"
+  obj.source = "./src/nwm.cc"
