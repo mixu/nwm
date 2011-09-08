@@ -1,8 +1,8 @@
 var repl = require('repl');
 var X11wm = require('./build/default/nwm.node').NodeWM;
 var child_process = require('child_process');
-var XK = require('./keysymdef.js');
-var Xh = require('./x.js');
+var XK = require('./lib/keysymdef.js');
+var Xh = require('./lib/x.js');
 
 var NWM = function() {
   this.windows = {};
@@ -13,7 +13,7 @@ var NWM = function() {
   this.focused_window = null;
 }
 
-NWM.prototype.start = function() {
+NWM.prototype.start = function(callback) {
   this.wm = new X11wm();
   var self = this;  
   this.workspace = 1;
@@ -159,10 +159,9 @@ NWM.prototype.start = function() {
   this.screen = this.wm.setup();  
   this.wm.scan();
   this.wm.loop();
-
-  var re = repl.start();
-  re.context.nwm = self;
-  re.context.Xh = Xh;
+  if(callback) {
+    callback();
+  }
 };
 
 NWM.prototype.hide = function(id) {
@@ -339,5 +338,15 @@ NWM.prototype.stop = function() {
 };
 
 
-var nwm = new NWM();
-nwm.start();
+
+// if this module is the script being run, then run the window manager
+if (module == require.main) {
+  var nwm = new NWM();
+  nwm.start(function() {
+    var re = repl.start();
+    re.context.nwm = nwm;
+    re.context.Xh = Xh;  
+  });
+}
+
+module.exports = NWM;
