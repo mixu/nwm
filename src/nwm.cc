@@ -415,8 +415,7 @@ public:
   static void GrabKeys(NodeWM* hw, Display* dpy, Window root) {
     XUngrabKey(hw->dpy, AnyKey, AnyModifier, hw->root);
     for(Key* curr = hw->keys; curr != NULL; curr = curr->next) {
-      // curr->mod
-      XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), AnyModifier, hw->root, True, GrabModeAsync, GrabModeAsync);
+      XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod, hw->root, True, GrabModeAsync, GrabModeAsync);
     }
   }
 

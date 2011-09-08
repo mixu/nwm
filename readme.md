@@ -32,7 +32,38 @@ The default nwm.js starts a REPL, so you can issue commands to it interactively.
 Some notes:
 
 - Xephyr errors out under VirtualBox. You may need to start Xephyr with -nodri if you use VirtualBox with guest additions.
-- ev.h: No such file or directory. You need the developer package for libev (e.g. libev-devel on Fedora) and specify its location explicitly (e.g. change #include <ev.h> to #include "path_to_ev.h"). 
+- ev.h: No such file or directory. You need the developer package for libev and specify its location explicitly (e.g. change #include <ev.h> to #include "path_to_ev.h"). 
+    - The developer package is libev-devel on Fedora (yum install libev-devel)
+    - The developer package is libev-dev on Ubuntu (apt-get install libev-dev)
+- Other missing headers. Might be that you installed a version of node that didn't have the right headers for node-waf to work. Try reinstalling node. I am having trouble with the 0.5.x branches on Ubuntu, but v0.4.11 works (git checkout v0.4.11).
+
+# Using as a primary window manager
+
+Find out what your login manager is:
+
+    cat /etc/X11/default-display-manager
+
+If it is GDM:
+
+1: Create log directory and copy files
+
+    sudo mkdir /nwm-log
+    sudo chmod 777 /nwm-log
+    sudo cp -R ./mnt/nwm/ /usr/local/lib/
+    sudo chmod +x /usr/local/lib/nwm/nwm.sh
+
+2: add the following as nwm.desktop to /usr/share/xsessions:
+
+    [Desktop Entry]
+    Encoding=UTF-8
+    Name=nwm
+    Comment=This session starts nwm 
+    Exec=/usr/local/lib/nwm.sh
+    Type=Application
+
+Select "nwm" from the Sessions menu when logging in.
+
+Ubuntu tips: https://help.ubuntu.com/community/CustomXSession
 
 # Keyboard shortcuts
 
