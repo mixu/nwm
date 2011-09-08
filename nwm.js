@@ -116,7 +116,7 @@ NWM.prototype.start = function() {
       });
     }
     // c key is used to terminate the process
-    if(key.keysym == XK.XK_c && key.modifier == (Xh.Mod4Mask|Xh.ControlMask) && self.focused_window) {
+    if(key.keysym == XK.XK_c && self.focused_window) {
       console.log('Kill window', self.focused_window);
       self.wm.killWindow(self.focused_window);
     }
