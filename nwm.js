@@ -55,6 +55,13 @@ NWM.prototype.start = function() {
   });
   this.wm.on('mouseDrag', function(event) {
     console.log('Mouse drag event', event);
+    // move when drag is triggered
+    var change_x = event.move_x - event.x;
+    var change_y = event.move_y - event.y;
+    var window = self.windows[event.id];
+    if(window) {
+      self.wm.moveWindow(event.id, window.x+change_x, window.y+change_y);      
+    }
   });
 
   this.wm.on('enterNotify',function(event){
@@ -308,7 +315,7 @@ NWM.prototype.tween = function(id) {
 
 NWM.prototype.stop = function() {
   for(var i = 0; i < tweens.length; i++) {
-    clearInterval(tweens[i]); 
+    clearInterval(tweens[i].interval); 
   }
   tweens = [];
 };

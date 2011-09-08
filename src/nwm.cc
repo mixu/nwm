@@ -5,7 +5,7 @@
 
 #include <v8.h>
 #include <node.h>
-#include <ev.h>
+#include <libev/ev.h>
 
 #include <errno.h>
 #include <locale.h>
@@ -342,11 +342,13 @@ public:
   static void GrabButtons(Display* dpy, Window wnd, Bool focused) {
     XUngrabButton(dpy, AnyButton, AnyModifier, wnd);
     if(focused) {
-      XGrabButton(dpy, Button3,
+      fprintf( stderr, "GRABBUTTONS - focused: true\n");      
+      XGrabButton(dpy, Button1,
                         Mod4Mask|ControlMask,
                         wnd, False, (ButtonPressMask|ButtonReleaseMask),
                         GrabModeAsync, GrabModeSync, None, None);
     } else {
+      fprintf( stderr, "GRABBUTTONS - focused: false\n");      
       XGrabButton(dpy, AnyButton, AnyModifier, wnd, False,
                   (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
     }
@@ -433,6 +435,8 @@ public:
       // call the callback in Node.js, passing the window object...
       hw->Emit(onMouseDown, 1, argv);
       fprintf(stderr, "Call cbButtonPress\n");
+      // now emit the drag events
+      GrabMouseRelease(hw, id);
     }
   }
 
@@ -444,20 +448,18 @@ public:
     return XQueryPointer(dpy, root, &dummy, &dummy, x, y, &di, &di, &dui);
   }
 
-  static Handle<Value> GrabMouseRelease(const Arguments& args) {
+  static void GrabMouseRelease(NodeWM* hw, int id) {
     XEvent ev;
     int x, y;
     Local<Value> argv[1];
-    HandleScope scope;
-    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
-
+    
     if(XGrabPointer(hw->dpy, hw->root, False, 
       ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, 
       GrabModeAsync, None, XCreateFontCursor(hw->dpy, XC_fleur), CurrentTime) != GrabSuccess) {
-      return Undefined();
+      return;
     }
     if(!hw->getrootptr(&x, &y)) {
-      return Undefined();
+      return;
     }
     do{
       XMaskEvent(hw->dpy, ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|SubstructureRedirectMask, &ev);
@@ -473,7 +475,7 @@ public:
           break;
         case MotionNotify:
           {          
-            argv[0] = NodeWM::makeMouseDrag(x, y, ev.xmotion.x, ev.xmotion.y); // , ev.state);
+            argv[0] = NodeWM::makeMouseDrag(id, x, y, ev.xmotion.x, ev.xmotion.y); // , ev.state);
             hw->Emit(onMouseDrag, 1, argv);
           }
           break;
@@ -481,15 +483,17 @@ public:
     } while(ev.type != ButtonRelease);
 
     XUngrabPointer(hw->dpy, CurrentTime);
+    return;
   }
 
 
-  static Local<Object> makeMouseDrag(int x, int y, int movex, int movey //, unsigned int state
+  static Local<Object> makeMouseDrag(int id, int x, int y, int movex, int movey //, unsigned int state
   ) {
     // window object to return
     Local<Object> result = Object::New();
 
     // read and set the window geometry
+    result->Set(String::NewSymbol("id"), Integer::New(id));
     result->Set(String::NewSymbol("x"), Integer::New(x));
     result->Set(String::NewSymbol("y"), Integer::New(y));
     result->Set(String::NewSymbol("move_x"), Integer::New(movex));
@@ -717,12 +721,11 @@ public:
     // main event loop 
     while(XPending(hw->dpy)) {
       XNextEvent(hw->dpy, &event);
-      fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);      
       // handle event internally --> calls Node if necessary 
       switch (event.type) {
         case ButtonPress:
           {
-            fprintf(stderr, "EmitButtonPress\n");
+            fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);      
             NodeWM::EmitButtonPress(hw, &event);
           }
           break;
@@ -784,12 +787,13 @@ public:
             }
           }
             break;
-//        case PropertyNotify:
-//            break;
+        case PropertyNotify:
+            break;
         case UnmapNotify:
             NodeWM::EmitUnmapNotify(hw, &event);
             break;
         default:
+          fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);      
           fprintf(stderr, "Did nothing\n");
             break;
       }
