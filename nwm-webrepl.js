@@ -4,6 +4,7 @@ var webrepl = require('webrepl');
 
 var nwm = new NWM();
 nwm.start(function() {
-  var re = webrepl.start(8080);
+  console.log('Starting webrepl');
+  var re = webrepl.start(6000);
   re.context.nwm = nwm;
 });
