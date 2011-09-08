@@ -92,6 +92,7 @@ NWM.prototype.start = function() {
       return true;
     });
     console.log('keyPress', key, chr, keysym_name);
+    // number keys are used to move between screens
     if( key.keysym > XK.XK_0 && key.keysym <= XK.XK_9) {
       // check the modifier
       if(key.modifier == (Xh.Mod4Mask|Xh.ControlMask)) {
@@ -104,11 +105,20 @@ NWM.prototype.start = function() {
           self.windowTo(self.focused_window, chr);
         }
       }
-    }
+    } 
+    // enter key is used to launch xterm
     if(key.keysym == XK.XK_Return) {
       // enter pressed ...
       console.log('Enter key, start xterm');
-      child_process.spawn('xterm', ['-lc'], { env: { 'DISPLAY': ':1' } });
+      var term = child_process.spawn('xterm', ['-lc'], { env: { 'DISPLAY': ':1' } });
+      term.on('exit', function (code) {
+        console.log('child process exited with code ' + code);
+      });
+    }
+    // c key is used to terminate the process
+    if(key.keysym == XK.XK_c && key.modifier == (Xh.Mod4Mask|Xh.ControlMask) && self.focused_window) {
+      console.log('Kill window', self.focused_window);
+      self.wm.killWindow(self.focused_window);
     }
     return key;
   });  
@@ -135,7 +145,9 @@ NWM.prototype.start = function() {
       { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
       { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
 
-      { key: XK.XK_Return, modifier: Xh.Mod4Mask|Xh.ControlMask }
+      { key: XK.XK_Return, modifier: Xh.Mod4Mask|Xh.ControlMask },
+
+      { key: XK.XK_c, modifier: Xh.Mod4Mask|Xh.ControlMask }
 
     ]);
   this.screen = this.wm.setup();  

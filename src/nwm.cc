@@ -45,6 +45,8 @@ typedef struct NodeWM NodeWM;
 
 #include "client.h"
 #include "monitor.h"
+#include "handler.h"
+
 
 // make these classes of their own
 
@@ -103,6 +105,7 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "moveWindow", MoveWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "resizeWindow", ResizeWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "focusWindow", FocusWindow);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "killWindow", KillWindow);
 
     // Setting up
     NODE_SET_PROTOTYPE_METHOD(s_ct, "setup", Setup);
@@ -288,6 +291,19 @@ public:
 
     int id = args[0]->IntegerValue();
     RealFocus(hw, id);
+    return Undefined();
+  }
+
+  static Handle<Value> KillWindow(const Arguments& args) {
+    HandleScope scope;
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
+
+    int id = args[0]->IntegerValue();
+
+    Client* c = Client::getById(hw->monit, id);
+    if(c) {
+      c->kill(hw->dpy);
+    }
     return Undefined();
   }
 
@@ -721,11 +737,11 @@ public:
     // main event loop 
     while(XPending(hw->dpy)) {
       XNextEvent(hw->dpy, &event);
+      fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);      
       // handle event internally --> calls Node if necessary 
       switch (event.type) {
         case ButtonPress:
           {
-            fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);      
             NodeWM::EmitButtonPress(hw, &event);
           }
           break;
@@ -788,6 +804,7 @@ public:
           }
             break;
         case PropertyNotify:
+            // could be used for tracking hints, transient status and window name
             break;
         case UnmapNotify:
             NodeWM::EmitUnmapNotify(hw, &event);
@@ -799,24 +816,6 @@ public:
       }
     }
     return;
-  }
-
-  static int xerror(Display *dpy, XErrorEvent *ee) {
-    if(ee->error_code == BadWindow
-    || (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch)
-    || (ee->request_code == X_PolyText8 && ee->error_code == BadDrawable)
-    || (ee->request_code == X_PolyFillRectangle && ee->error_code == BadDrawable)
-    || (ee->request_code == X_PolySegment && ee->error_code == BadDrawable)
-    || (ee->request_code == X_ConfigureWindow && ee->error_code == BadMatch)
-    || (ee->request_code == X_GrabButton && ee->error_code == BadAccess)
-    || (ee->request_code == X_GrabKey && ee->error_code == BadAccess)
-    || (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
-      return 0;
-    fprintf(stderr, "dwm: fatal error: request code=%d, error code=%d\n",
-        ee->request_code, ee->error_code);
-//    return xerrorxlib(dpy, ee); /* may call exit */    
-    exit(-1);
-    return 0;
   }
 
 /*
