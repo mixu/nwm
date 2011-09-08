@@ -36,6 +36,7 @@ Some notes:
     - The developer package is libev-devel on Fedora (yum install libev-devel)
     - The developer package is libev-dev on Ubuntu (apt-get install libev-dev)
 - Other missing headers. Might be that you installed a version of node that didn't have the right headers for node-waf to work. Try reinstalling node. I am having trouble with the 0.5.x branches on Ubuntu, but v0.4.11 works (git checkout v0.4.11).
+- You may have to Chrome start with --explicitly-allowed-ports=6000 for it to connect to some localhost ports.
 
 # Using as a primary window manager
 
