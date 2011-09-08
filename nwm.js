@@ -110,7 +110,13 @@ NWM.prototype.start = function() {
     if(key.keysym == XK.XK_Return) {
       // enter pressed ...
       console.log('Enter key, start xterm');
-      var term = child_process.spawn('xterm', ['-lc'], { env: { 'DISPLAY': ':1' } });
+      console.log(process.env);
+      var term;
+      if(process.env.DISPLAY == ':1') {
+        term = child_process.spawn('xterm', ['-lc'], { env: { 'DISPLAY': ':1' } });        
+      } else {
+        term = child_process.spawn('xterm', ['-lc']);        
+      }
       term.on('exit', function (code) {
         console.log('child process exited with code ' + code);
       });
