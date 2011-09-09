@@ -139,4 +139,74 @@ layouts.wide = function(nwm) {
   }
 };
 
+
+/**
+ * Grid (a.k.a fair)
+
+    +----------+----------+ +----------+----------+
+    |          |          | |          |          |
+    |          |          | |          |          |
+    |          |          | |          |          |
+    |          |          | +----------+----------+
+    |          |          | |                     |
+    |          |          | |                     |
+    |          |          | |                     |
+    +---------------------+ +---------------------+
+          2 windows               3 windows
+
+    +----------+----------+ +------+-------+------+
+    |          |          | |      |       |      |
+    |          |          | |      |       |      |
+    |          |          | |      |       |      |
+    +----------+----------+ +------+---+---+------+
+    |          |          | |          |          |
+    |          |          | |          |          |
+    |          |          | |          |          |
+    +---------------------+ +---------------------+
+          4 windows               5 windows
+ */
+
+layouts.grid = function(nwm) {
+  var windows = nwm.visible();
+  var screen = nwm.screen;
+  if(windows.length < 1) {
+    return;
+  }
+  var rows, cols;
+  for(cols = 0; cols <= windows.length/2; cols++) {
+    if(cols * cols >= windows.length) {
+      break;
+    }
+  }
+  rows = ((cols && (cols -1) * cols >= windows.length) ? cols - 1 : cols);
+  console.log('rows, cols', rows, cols);
+  // cells
+  var cellHeight = screen.height / (rows ? rows : 1);
+  var cellWidth = screen.width / (cols ? cols : 1);
+  console.log('Cell dimensions', cellWidth, cellHeight);
+  windows.forEach(function(id, index) {
+
+    if(rows > 1 && index == (rows*cols) - cols 
+       && (windows.length - index) <= ( windows.length) 
+      ) {
+      cellWidth = screen.width / (windows.length - index);
+    }
+
+    var newX = Math.floor(index % cols) * cellWidth;
+    var newY = Math.floor(index / cols) * cellHeight;
+    nwm.move(id, Math.floor(newX), Math.floor(newY));
+
+    // adjust height/width of last row/col's windows
+    var adjustHeight = ( (index >= cols * (rows -1) ) ?  screen.height - cellHeight * rows : 0 );
+    var adjustWidth = 0;
+    if(rows > 1 && index == windows.length-1 && (windows.length - index) < (windows.length % cols) ) {
+      adjustWidth = screen.width - cellWidth * (windows.length % cols );     
+    } else {
+      adjustWidth = ( ((index + 1) % cols == 0 ) ? screen.width - cellWidth * cols : 0 );
+    }
+ 
+    nwm.resize(id, Math.floor(cellWidth+adjustWidth), Math.floor(cellHeight+adjustHeight) );
+  });
+};
+
 module.exports = layouts;
