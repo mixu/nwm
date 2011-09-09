@@ -163,8 +163,8 @@ Todo:
 Done:
 
 - More layouts:
--- Wide (upper half for main, lower half for others)
--- Monocle (full screen)
+    - Wide (upper half for main, lower half for others)
+    - Monocle (full screen)
 
 Todo:
 
@@ -173,13 +173,13 @@ Todo:
 - Keyboard shortcut for making the currently focused window the main window (JS)
 - Shortcut for switching between layouts (JS)
 - Per-workspace layouts e.g. http://haskell.org/haskellwiki/Xmonad/Screenshots (JS)
--- Fair (close to equal size)
+    - Fair (close to equal size)
 - Keyboard shortcuts for moving and resizing windows (JS)
 - Support for loading configuration files (JS)
--- Ability to customize keyboard shortcuts from conf file
--- Add new key bindings (e.g. to launch apps or change layouting) from conf file
--- Code hot loading from conf file
--- git clone + npm installation of personalized config
+    - Ability to customize keyboard shortcuts from conf file
+    - Add new key bindings (e.g. to launch apps or change layouting) from conf file
+    - Code hot loading from conf file
+    - git clone + npm installation of personalized config
 - TCP or HTTP configuration interface (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)

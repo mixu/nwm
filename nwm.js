@@ -145,7 +145,7 @@ NWM.prototype.start = function(callback) {
    */
   this.wm.on('resize', function(screen) {
     console.log('Screen size changed', screen);
-    this.screen = screen;
+    self.screen = screen;
   });
 
   /**

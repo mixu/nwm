@@ -5,7 +5,7 @@
 
 #include <v8.h>
 #include <node.h>
-#include <libev/ev.h>
+#include <ev.h>
 
 #include <errno.h>
 #include <locale.h>
