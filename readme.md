@@ -26,7 +26,7 @@ Nwm.js:
 - Support for workspaces (0-9 via keyboard, max int via JS).
 - REPL, so you can issue commands to it interactively
 
-# Installing
+# Installing and running under a secondary X11 server (Xephyr)
 
     node-waf configure build
     # start Xephyr
@@ -148,6 +148,7 @@ Done:
 - Expose window titles to JS (DONE)
 - Support switch to full screen requests (DONE)
 - Expose window classes to JS (DONE)
+- Ignore numlock (DONE)
 
 Todo:
 
@@ -159,21 +160,27 @@ Todo:
 
 # Todo (Nwm.js)
 
+Done:
+
+- More layouts:
+-- Wide (upper half for main, lower half for others)
+-- Monocle (full screen)
+
+Todo:
+
 - Resize main window area with shortcut (JS)
 - Newly mapped window should become the main window (JS)
 - Keyboard shortcut for making the currently focused window the main window (JS)
+- Shortcut for switching between layouts (JS)
+- Per-workspace layouts e.g. http://haskell.org/haskellwiki/Xmonad/Screenshots (JS)
+-- Fair (close to equal size)
+- Keyboard shortcuts for moving and resizing windows (JS)
 - Support for loading configuration files (JS)
 -- Ability to customize keyboard shortcuts from conf file
 -- Add new key bindings (e.g. to launch apps or change layouting) from conf file
 -- Code hot loading from conf file
 -- git clone + npm installation of personalized config
 - TCP or HTTP configuration interface (JS)
-- Monocle layout and shortcut for switching between layouts (JS)
-- Keyboard shortcuts for moving and resizing windows (JS)
-- More layouts and per-workspace layouts e.g. http://haskell.org/haskellwiki/Xmonad/Screenshots (JS)
--- fair (close to equal size)
--- wide (upper half for main, lower half for others)
--- tags 
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)
 - Media key bindings (JS)

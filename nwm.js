@@ -3,6 +3,7 @@ var X11wm = require('./build/default/nwm.node').NodeWM;
 var child_process = require('child_process');
 var XK = require('./lib/keysymdef.js');
 var Xh = require('./lib/x.js');
+var layouts = require('./nwm-layouts.js');
 
 var NWM = function() {
   this.windows = {};
@@ -11,6 +12,7 @@ var NWM = function() {
   this.wm = null;
   this.workspace = 1;
   this.focused_window = null;
+  this.layout = "tile";
 }
 
 NWM.prototype.start = function(callback) {
@@ -83,6 +85,7 @@ NWM.prototype.start = function(callback) {
   this.wm.on('keyPress', function(key) {
     // do something, e.g. launch a command
     var chr = String.fromCharCode(key.keysym);
+    // decode keysym name
     var keysym_name = '';
     Object.keys(XK).every(function(name) {
       if(XK[name] == key.keysym) {
@@ -91,7 +94,15 @@ NWM.prototype.start = function(callback) {
       }
       return true;
     });
-    console.log('keyPress', key, chr, keysym_name);
+    // decode modifier names
+    var modifiers = [];
+    Object.keys(Xh).forEach(function(name){
+      if(key.modifier & Xh[name]) {
+        modifiers.push(name);
+      }
+    });
+
+    console.log('keyPress', key, chr, keysym_name, modifiers);
     // number keys are used to move between screens
     if( key.keysym > XK.XK_0 && key.keysym <= XK.XK_9) {
       // check the modifier
@@ -276,33 +287,10 @@ NWM.prototype.windowTo = function(id, workspace) {
 };
 
 NWM.prototype.rearrange = function() {
-  this.tile();
+  var callback = layouts[this.layout];
+  callback(this);  
 };
 
-NWM.prototype.tile = function() {
-  // the way DWM does it is to reserve half the screen for the first screen, 
-  // then split the other half among the rest of the screens
-  var keys = this.visible();
-  var self = this;
-  var screen = this.screen;
-  if(keys.length < 1) {
-    return;
-  }
-  var firstId = keys.shift();  
-  if(keys.length == 0) {
-    this.move(firstId, 0, 0);
-    this.resize(firstId, screen.width, screen.height);
-  } else {
-    var halfWidth = Math.floor(screen.width / 2);
-    var sliceHeight = Math.floor(screen.height / (keys.length) );
-    this.move(firstId, 0, 0);
-    this.resize(firstId, halfWidth, screen.height);
-    keys.forEach(function(id, index) {
-      self.move(id, halfWidth, index*sliceHeight);
-      self.resize(id, halfWidth, sliceHeight);
-    });
-  }
-};
 
 NWM.prototype.random = function() {
   var self = this;

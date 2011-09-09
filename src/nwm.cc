@@ -84,6 +84,7 @@ private:
   Persistent<Function>* callbacks[onLast];
   // grabbed keys
   Key* keys;
+  unsigned int numlockmask;
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -125,7 +126,8 @@ public:
   NodeWM() :
     next_index(1),
     monit(NULL),
-    keys(NULL)
+    keys(NULL),
+    numlockmask(0)
   {
   }
 
@@ -253,7 +255,7 @@ public:
   
     // subscribe to window events
     XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
-    GrabButtons(hw->dpy, win, False);
+    hw->GrabButtons(win, False);
 
     // move and (finally) map the window
     XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);    
@@ -326,7 +328,7 @@ public:
     fprintf( stderr, "FocusWindow: id=%d\n", id);    
     // do not focus on the same window... it'll cause a flurry of events...
     if(hw->selected && hw->selected != win) {
-      GrabButtons(hw->dpy, win, True);
+      hw->GrabButtons(win, True);
       XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);    
       Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
       SendEvent(hw, win, atom);
@@ -363,18 +365,25 @@ public:
    * If focused, then we only grab the modifier keys.
    * Otherwise, we grab all buttons..
    */
-  static void GrabButtons(Display* dpy, Window wnd, Bool focused) {
-    XUngrabButton(dpy, AnyButton, AnyModifier, wnd);
-    if(focused) {
-      fprintf( stderr, "GRABBUTTONS - focused: true\n");      
-      XGrabButton(dpy, Button1,
-                        Mod4Mask|ControlMask,
-                        wnd, False, (ButtonPressMask|ButtonReleaseMask),
-                        GrabModeAsync, GrabModeSync, None, None);
-    } else {
-      fprintf( stderr, "GRABBUTTONS - focused: false\n");      
-      XGrabButton(dpy, AnyButton, AnyModifier, wnd, False,
-                  (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
+  void GrabButtons(Window wnd, Bool focused) {
+    this->updatenumlockmask();
+    {
+      unsigned int i;
+      unsigned int modifiers[] = { 0, LockMask, this->numlockmask, this->numlockmask|LockMask };
+      XUngrabButton(this->dpy, AnyButton, AnyModifier, wnd);
+      if(focused) {
+        fprintf( stderr, "GRABBUTTONS - focused: true\n");
+          for(i = 0; i < 4; i++) {
+            XGrabButton(dpy, Button1,
+                              Mod4Mask|ControlMask|modifiers[i],
+                              wnd, False, (ButtonPressMask|ButtonReleaseMask),
+                              GrabModeAsync, GrabModeSync, None, None);            
+          }
+      } else {
+        fprintf( stderr, "GRABBUTTONS - focused: false\n");
+        XGrabButton(this->dpy, AnyButton, AnyModifier, wnd, False,
+                    (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
+      }
     }
   }
 
@@ -417,13 +426,37 @@ public:
     curr->mod = mod;
     curr->next = *keys;
     *keys = curr;
-//    fprintf( stderr, "key: %d modifier %d \n", curr->keysym, curr->mod);
   }
 
+  void updatenumlockmask(void) {
+    unsigned int i;
+    int j;
+    XModifierKeymap *modmap;
+
+    this->numlockmask = 0;
+    modmap = XGetModifierMapping(dpy);
+    for(i = 0; i < 8; i++)
+      for(j = 0; j < modmap->max_keypermod; j++)
+        if(modmap->modifiermap[i * modmap->max_keypermod + j] == XKeysymToKeycode(dpy, XK_Num_Lock))
+          this->numlockmask = (1 << i);
+    XFreeModifiermap(modmap);
+  }
+
+
+
   static void GrabKeys(NodeWM* hw, Display* dpy, Window root) {
-    XUngrabKey(hw->dpy, AnyKey, AnyModifier, hw->root);
-    for(Key* curr = hw->keys; curr != NULL; curr = curr->next) {
-      XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod, hw->root, True, GrabModeAsync, GrabModeAsync);
+    hw->updatenumlockmask();
+    {
+      unsigned int i;
+      unsigned int modifiers[] = { 0, LockMask, hw->numlockmask, hw->numlockmask|LockMask };
+      XUngrabKey(hw->dpy, AnyKey, AnyModifier, hw->root);
+      for(Key* curr = hw->keys; curr != NULL; curr = curr->next) {
+        fprintf( stderr, "grab key -- key: %d modifier %d \n", curr->keysym, curr->mod);
+        // also grab the combinations of screen lock and num lock (as those should not matter)
+        for(i = 0; i < 4; i++) {
+          XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod | modifiers[i], hw->root, True, GrabModeAsync, GrabModeAsync);        
+        }
+      }      
     }
   }
 
