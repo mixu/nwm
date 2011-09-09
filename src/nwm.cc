@@ -61,6 +61,7 @@ enum callback_map {
   onEnterNotify,
   onResize,
   onUpdate,
+  onFullscreen,
   onLast
 };
 
@@ -154,7 +155,7 @@ public:
 
     v8::Local<v8::String> map[onLast+1] = {
         v8::String::New("add"),
-        v8::String::New("remove"), 
+        v8::String::New("remove"),
         v8::String::New("rearrange"),
         v8::String::New("mouseDown"),
         v8::String::New("mouseDrag"),
@@ -162,7 +163,8 @@ public:
         v8::String::New("keyPress"),
         v8::String::New("enterNotify"),
         v8::String::New("resize"),
-        v8::String::New("update")
+        v8::String::New("update"),
+        v8::String::New("fullscreen")
       };
 
     v8::Local<v8::String> value  = Local<v8::String>::Cast(args[0]);
@@ -626,6 +628,34 @@ public:
     }
   }
 
+  static void EmitClientMessage(NodeWM* hw, XEvent *e) {
+    XClientMessageEvent *cme = &e->xclient;
+    Client *c = Client::getByWindow(hw->monit, cme->window);
+    Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
+    Atom NetWMFullscreen = XInternAtom(hw->dpy, "_NET_WM_STATE_FULLSCREEN", False);
+    Local<Value> argv[2];
+
+    if((c)
+    && (cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen)) {
+      if(cme->data.l[0]) {
+        XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
+                        PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
+        argv[0] = Integer::New(c->getId());
+        argv[1] = Integer::New(1);
+        hw->Emit(onFullscreen, 2, argv);
+        // we don't expose XRaiseWindow yet
+//        XRaiseWindow(hw->dpy, c->win);
+      }
+      else {
+        XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
+                        PropModeReplace, (unsigned char*)0, 0);
+        argv[0] = Integer::New(c->getId());
+        argv[1] = Integer::New(0);
+        hw->Emit(onFullscreen, 2, argv);
+      }
+    }    
+  }
+
   static void EmitRemove(NodeWM* hw, Client *c, Bool destroyed) {
     fprintf( stderr, "EmitRemove\n");
     int id = c->getId();
@@ -774,6 +804,9 @@ public:
           {
             NodeWM::EmitButtonPress(hw, &event);
           }
+          break;
+        case ClientMessage:
+          NodeWM::EmitClientMessage(hw, &event);
           break;
         case ConfigureRequest:
           {

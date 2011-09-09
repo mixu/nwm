@@ -136,6 +136,7 @@ NWM.prototype.start = function(callback) {
     console.log('Screen size changed', screen);
     this.screen = screen;
   });
+
   /**
    * When a window is updated
    */
@@ -146,6 +147,17 @@ NWM.prototype.start = function(callback) {
       Object.keys(window).forEach( function(key) {
         updated_window[key] = window[key];
       });
+    }
+  });
+
+  this.wm.on('fullscreen', function(id, status) {
+    console.log('Window requested full screen', id, status);
+    if(self.windows[id]) {
+      if(status) {
+        self.wm.resizeWindow(id, self.screen.width, self.screen.height);
+      } else {
+        self.rearrange();
+      }
     }
   });
 

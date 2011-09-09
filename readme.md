@@ -8,20 +8,20 @@ I wrote the code in this repo during Node Knockout 2011 ([old repo](https://gith
 
 **This is the repo you should watch/fork for future updates.**
 
-The underlying X11 bindings are written as a Node native extension in c. 
+The underlying X11 bindings are written as a Node native extension in C++/C. 
 
 My plan is to dogfood this in the near future to bring it to a more useful state. Right now, I recommend you run it in a secondary X server using Xephyr.
 
 # Features
 
-C bindings:
+Cpp bindings:
 
 - Uses X11 via libev
-- C interface abstracts over X11 so you don't need to learn X11 just to customize your layout
+- API abstracts over X11 so you don't need to learn X11 just to customize your layout
 
 Nwm.js:
 
-- Layout decisions are done in Javascript, not C.
+- Layout decisions are done in Javascript, not C++.
 - Tiling window layout (like dwm): you can write your own in JS.
 - Support for workspaces (0-9 via keyboard, max int via JS).
 - REPL, so you can issue commands to it interactively
@@ -140,19 +140,17 @@ You should bind to the following events from the native extension:
 
 See nwm.js for a full example.
 
-# Todo (C bindings)
+# Todo (C++ bindings)
 
 - Monitor dimension change notifications (DONE)
 - Expose window titles to JS (DONE)
+- Support switch to full screen requests (DONE)
 
-
-
-- Customizable mouse key bindings (C)
 - Expose window classes to JS (C)
+- Customizable mouse key bindings (C)
 - Multi-monitor support (C)
 - Expose stacking order and stacking operations (C)
 - Graceful exit support (C)
-- Support switch to full screen requests (C)
 
 # Todo (Nwm.js)
 
