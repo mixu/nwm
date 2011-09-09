@@ -1,6 +1,34 @@
 
 #include "handler.h"
 
+static const char broken[] = "broken";
+
+Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int size) {
+  char **list = NULL;
+  int n;
+  XTextProperty name;
+
+  if(!text || size == 0)
+    return False;
+  text[0] = '\0';
+  XGetTextProperty(dpy, w, &name, atom);
+  if(!name.nitems)
+    return False;
+  if(name.encoding == XA_STRING)
+    strncpy(text, (char *)name.value, size - 1);
+  else {
+    if(XmbTextPropertyToTextList(dpy, &name, &list, &n) >= Success && n > 0 && *list) {
+      strncpy(text, *list, size - 1);
+      XFreeStringList(list);
+    }
+  }
+  text[size - 1] = '\0';
+  XFree(name.value);
+  return True;
+}
+
+
+
 class Client {
 public:
   Client(Window win, Monitor* monitor, int id, int x, int y, int width, int height) {
@@ -50,8 +78,31 @@ public:
       XUngrabServer(dpy);
     }
   }
+  void updatetitle(Display* dpy) {
+    Atom NetWMName = XInternAtom(dpy, "_NET_WM_NAME", False);
+    if(!gettextprop(dpy, this->win, NetWMName, this->name, sizeof this->name))
+      gettextprop(dpy, this->win, XA_WM_NAME, this->name, sizeof this->name);
+    if(this->name[0] == '\0') /* hack to mark broken clients */
+      strcpy(this->name, broken);    
+  }
+
+  Local<Object> toNode() {
+    // window object to return
+    Local<Object> result = Object::New();
+
+    // read and set the window geometry
+    result->Set(String::NewSymbol("id"), Integer::New(this->id));
+    result->Set(String::NewSymbol("x"), Integer::New(this->x));
+    result->Set(String::NewSymbol("y"), Integer::New(this->y));
+    result->Set(String::NewSymbol("height"), Integer::New(this->height));
+    result->Set(String::NewSymbol("width"), Integer::New(this->width));
+    result->Set(String::NewSymbol("name"), String::New(this->name));
+    return result;
+  }
+
   private:
     int id;
+    char name[256];
     int x, y, width, height;
     Client *next;
     Client *snext;

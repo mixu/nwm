@@ -19,7 +19,7 @@ NWM.prototype.start = function(callback) {
   this.workspace = 1;
 
   /**
-   * A single window should be positioned
+   * A new window is added
    */
   this.wm.on('add', function(window) {
     if(window.id) {
@@ -127,7 +127,28 @@ NWM.prototype.start = function(callback) {
       self.wm.killWindow(self.focused_window);
     }
     return key;
-  });  
+  });
+
+  /**
+   * When the screen is resized
+   */
+  this.wm.on('resize', function(screen) {
+    console.log('Screen size changed', screen);
+    this.screen = screen;
+  });
+  /**
+   * When a window is updated
+   */
+  this.wm.on('update', function(window) {
+    console.log('Window has been updated', window);
+    if(window.id && self.windows[window.id]) {      
+      var updated_window = self.windows[window.id];
+      Object.keys(window).forEach( function(key) {
+        updated_window[key] = window[key];
+      });
+    }
+  });
+
   this.wm.keys([ 
       { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask },

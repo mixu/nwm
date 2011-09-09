@@ -51,7 +51,7 @@ typedef struct NodeWM NodeWM;
 // make these classes of their own
 
 enum callback_map { 
-  onAdd, 
+  onAdd,  
   onRemove,
   onRearrange,
   onMouseDown,
@@ -59,6 +59,8 @@ enum callback_map {
   onConfigureRequest,
   onKeyPress,
   onEnterNotify,
+  onResize,
+  onUpdate,
   onLast
 };
 
@@ -159,6 +161,8 @@ public:
         v8::String::New("configureRequest"),
         v8::String::New("keyPress"),
         v8::String::New("enterNotify"),
+        v8::String::New("resize"),
+        v8::String::New("update")
       };
 
     v8::Local<v8::String> value  = Local<v8::String>::Cast(args[0]);
@@ -216,8 +220,9 @@ public:
     // onManage receives a window object
     Local<Value> argv[1];
     Client* c = new Client(win, hw->monit, hw->next_index, wa->x, wa->y, wa->height, wa->width);
+    c->updatetitle(hw->dpy);
     c->attach();
-    argv[0] = NodeWM::makeWindow(hw->next_index, wa->x, wa->y, wa->height, wa->width, wa->border_width);
+    argv[0] = c->toNode(); 
     hw->next_index++;
 
     // call the callback in Node.js, passing the window object...
@@ -409,7 +414,7 @@ public:
     curr->mod = mod;
     curr->next = *keys;
     *keys = curr;
-    fprintf( stderr, "key: %d modifier %d \n", curr->keysym, curr->mod);
+//    fprintf( stderr, "key: %d modifier %d \n", curr->keysym, curr->mod);
   }
 
   static void GrabKeys(NodeWM* hw, Display* dpy, Window root) {
@@ -417,22 +422,6 @@ public:
     for(Key* curr = hw->keys; curr != NULL; curr = curr->next) {
       XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod, hw->root, True, GrabModeAsync, GrabModeAsync);
     }
-  }
-
-  static Local<Object> makeWindow(int id, int x, int y, int height, int width, int border_width) {
-    // window object to return
-    Local<Object> result = Object::New();
-
-    // read and set the window geometry
-    result->Set(String::NewSymbol("id"), Integer::New(id));
-    result->Set(String::NewSymbol("x"), Integer::New(x));
-    result->Set(String::NewSymbol("y"), Integer::New(y));
-    result->Set(String::NewSymbol("height"), Integer::New(height));
-    result->Set(String::NewSymbol("width"), Integer::New(width));
-    result->Set(String::NewSymbol("border_width"), Integer::New(border_width));
-    // read and set the monitor (not important)
-//    result->Set(String::NewSymbol("monitor"), Integer::New(hw->selected_monitor));
-    return result;
   }
 
   static void EmitButtonPress(NodeWM* hw, XEvent *e) {
@@ -594,6 +583,47 @@ public:
 
     if((c = Client::getByWindow(hw->monit, ev->window)))
       EmitRemove(hw, c, True);    
+  }
+
+  static void EmitConfigureNotify(NodeWM* hw, XEvent *e) {
+    XConfigureEvent *ev = &e->xconfigure;
+    Local<Value> argv[1];
+
+    if(ev->window == hw->root) {
+      hw->screen_width = ev->width;
+      hw->screen_height = ev->height;
+      // update monitor structures
+      updateGeometry(hw);
+      // make screen object
+      Local<Object> result = Object::New();
+      result->Set(String::NewSymbol("width"), Integer::New(hw->screen_width));
+      result->Set(String::NewSymbol("height"), Integer::New(hw->screen_height));
+      argv[0] = result;
+      hw->Emit(onResize, 1, argv);
+      hw->Emit(onRearrange, 0, 0);
+    }
+  }
+
+  static void EmitPropertyNotify(NodeWM* hw, XEvent *e) {
+    XPropertyEvent *ev = &e->xproperty;
+    // could be used for tracking hints, transient status and window name
+    if((ev->window == hw->root) && (ev->atom == XA_WM_NAME)) {
+      // the root window name has changed      
+    } else if(ev->state == PropertyDelete) {
+      return; // ignore property deletes
+    } else {
+      Local<Value> argv[1];
+      Client* c = Client::getByWindow(hw->monit, ev->window);
+      if(c) {
+        Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
+        if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
+          c->updatetitle(hw->dpy);
+          argv[0] = c->toNode();
+          // call the callback in Node.js, passing the window object...
+          hw->Emit(onUpdate, 1, argv);              
+        }
+      }
+    }
   }
 
   static void EmitRemove(NodeWM* hw, Client *c, Bool destroyed) {
@@ -759,8 +789,9 @@ public:
             XConfigureWindow(hw->dpy, ev->window, ev->value_mask, &wc);            
           }
           break;
-//        case ConfigureNotify:
-//            break;
+        case ConfigureNotify:
+            NodeWM::EmitConfigureNotify(hw, &event);
+            break;
         case DestroyNotify:
             NodeWM::EmitDestroyNotify(hw, &event);        
             break;
@@ -804,7 +835,7 @@ public:
           }
             break;
         case PropertyNotify:
-            // could be used for tracking hints, transient status and window name
+            NodeWM::EmitPropertyNotify(hw, &event);
             break;
         case UnmapNotify:
             NodeWM::EmitUnmapNotify(hw, &event);

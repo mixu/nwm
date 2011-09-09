@@ -6,17 +6,25 @@ It uses libev to interface with X11, and allows you to lay out windows in Node.
 
 I wrote the code in this repo during Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)). Unfortunately I'm not in the competition since I forgot to confirm my initial team registration (click accept). Not a big deal.
 
-**This is the repo you should watch/fork for future updates. **
+**This is the repo you should watch/fork for future updates.**
 
-The underlying X11 bindings are written as a Node native extension in c. I apologize for the ugliness of the code - if you look at the first commit, I started on Friday with [this tutorial](https://www.cloudkick.com/blog/2010/aug/23/writing-nodejs-native-extensions/), a vague knowledge of X11 and a lot of enthusiasm.
+The underlying X11 bindings are written as a Node native extension in c. 
 
 My plan is to dogfood this in the near future to bring it to a more useful state. Right now, I recommend you run it in a secondary X server using Xephyr.
 
 # Features
 
-nwm supports all kinds of layouts - you can write your own, or use the default (tiling) layout. It's like dwm, but layouts are enforced in JS rather than in C.
+C bindings:
 
-The default nwm.js starts a REPL, so you can issue commands to it interactively.
+- Uses X11 via libev
+- C interface abstracts over X11 so you don't need to learn X11 just to customize your layout
+
+Nwm.js:
+
+- Layout decisions are done in Javascript, not C.
+- Tiling window layout (like dwm): you can write your own in JS.
+- Support for workspaces (0-9 via keyboard, max int via JS).
+- REPL, so you can issue commands to it interactively
 
 # Installing
 
@@ -70,12 +78,18 @@ Ubuntu tips: https://help.ubuntu.com/community/CustomXSession
 
 Keyboard shortcuts are now working. The binding is Ctrl+Win which happens to be free in my dev env.
 
+    # Workspaces 
     Ctrl+Win 1 # Switch to workspace 1
-    Ctrl+Win 2 # Switch to workspace 2
-    Ctrl+Win 3 # Switch to workspace 3
+    Ctrl+Shift+Win 1 # Move focused window to workspace 1
     ...
     Ctrl+Win 9 # Switch to workspace 9
+    Ctrl+Shift+Win 9 # Move focused window to workspace 9
+  
+    # Launching xterm
     Ctrl+Win Enter # Start xterm
+
+    # Closing window
+    Ctrl+Win c # Close focused window
 
 
 # Using from the console
@@ -126,3 +140,45 @@ You should bind to the following events from the native extension:
 
 See nwm.js for a full example.
 
+# Todo (C bindings)
+
+- Monitor dimension change notifications (DONE)
+- Expose window titles to JS (DONE)
+
+
+
+- Customizable mouse key bindings (C)
+- Expose window classes to JS (C)
+- Multi-monitor support (C)
+- Expose stacking order and stacking operations (C)
+- Graceful exit support (C)
+- Support switch to full screen requests (C)
+
+# Todo (Nwm.js)
+
+- Resize main window area with shortcut (JS)
+- Newly mapped window should become the main window (JS)
+- Keyboard shortcut for making the currently focused window the main window (JS)
+- Support for loading configuration files (JS)
+-- Ability to customize keyboard shortcuts from conf file
+-- Add new key bindings (e.g. to launch apps or change layouting) from conf file
+-- Code hot loading from conf file
+-- git clone + npm installation of personalized config
+- TCP or HTTP configuration interface (JS)
+- Monocle layout and shortcut for switching between layouts (JS)
+- Keyboard shortcuts for moving and resizing windows (JS)
+- More layouts and per-workspace layouts e.g. http://haskell.org/haskellwiki/Xmonad/Screenshots (JS)
+-- fair (close to equal size)
+-- wide (upper half for main, lower half for others)
+-- tags 
+- Website and tutorial e.g. http://xmonad.org/tour.html
+- Saving state on exit (JS)
+- Media key bindings (JS)
+- Dropdown Chrome (JS)
+
+Long term plans (likely to be separate projects):
+
+- Drawing window borders and titlebars
+- App launcher
+- App switcher
+- Expose clone (e.g. show all windows, monocle selected window)
