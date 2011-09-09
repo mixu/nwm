@@ -85,7 +85,27 @@ public:
     if(this->name[0] == '\0') /* hack to mark broken clients */
       strcpy(this->name, broken);    
   }
-
+  void updateclass(Display* dpy) {
+    XClassHint ch = { 0 };
+    if(XGetClassHint(dpy, this->win, &ch)) {  
+      if(ch.res_class) {
+        strncpy(this->klass, ch.res_class, 256-1 );
+      } else {
+        strncpy(this->klass, broken, 256-1 );        
+      }
+      this->klass[256-1] = 0;
+      if(ch.res_name) {
+        strncpy(this->instance, ch.res_name, 256-1 );
+      } else {
+        strncpy(this->instance, broken, 256-1 );        
+      }
+      this->instance[256-1] = 0;
+      if(ch.res_class)
+        XFree(ch.res_class);
+      if(ch.res_name)
+        XFree(ch.res_name);
+    }
+  }
   Local<Object> toNode() {
     // window object to return
     Local<Object> result = Object::New();
@@ -96,13 +116,17 @@ public:
     result->Set(String::NewSymbol("y"), Integer::New(this->y));
     result->Set(String::NewSymbol("height"), Integer::New(this->height));
     result->Set(String::NewSymbol("width"), Integer::New(this->width));
-    result->Set(String::NewSymbol("name"), String::New(this->name));
+    result->Set(String::NewSymbol("title"), String::New(this->name));
+    result->Set(String::NewSymbol("instance"), String::New(this->instance));
+    result->Set(String::NewSymbol("class"), String::New(this->klass));
     return result;
   }
 
   private:
     int id;
     char name[256];
+    char klass[256];
+    char instance[256];
     int x, y, width, height;
     Client *next;
     Client *snext;

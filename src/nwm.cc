@@ -223,6 +223,7 @@ public:
     Local<Value> argv[1];
     Client* c = new Client(win, hw->monit, hw->next_index, wa->x, wa->y, wa->height, wa->width);
     c->updatetitle(hw->dpy);
+    c->updateclass(hw->dpy);
     c->attach();
     argv[0] = c->toNode(); 
     hw->next_index++;
@@ -620,6 +621,7 @@ public:
         Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
         if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
           c->updatetitle(hw->dpy);
+          c->updateclass(hw->dpy);
           argv[0] = c->toNode();
           // call the callback in Node.js, passing the window object...
           hw->Emit(onUpdate, 1, argv);              

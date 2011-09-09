@@ -142,11 +142,16 @@ See nwm.js for a full example.
 
 # Todo (C++ bindings)
 
+Done:
+
 - Monitor dimension change notifications (DONE)
 - Expose window titles to JS (DONE)
 - Support switch to full screen requests (DONE)
+- Expose window classes to JS (DONE)
 
-- Expose window classes to JS (C)
+Todo:
+
+- Test reloading key bindings on the fly (C)
 - Customizable mouse key bindings (C)
 - Multi-monitor support (C)
 - Expose stacking order and stacking operations (C)
