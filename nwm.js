@@ -12,13 +12,18 @@ var NWM = function() {
   this.wm = null;
   this.workspace = 1;
   this.focused_window = null;
-  this.layout = "tile";
+  this.layout = null;
+  this.layout_list = [];
 }
 
 NWM.prototype.start = function(callback) {
   this.wm = new X11wm();
   var self = this;  
   this.workspace = 1;
+  this.layout_list = Object.keys(layouts);
+  console.log('Layouts', this.layout_list)
+  this.layout = this.layout_list.shift();
+  console.log('Layout', this.layout);
 
   /**
    * A new window is added
@@ -137,6 +142,16 @@ NWM.prototype.start = function(callback) {
       console.log('Kill window', self.focused_window);
       self.wm.killWindow(self.focused_window);
     }
+    // space switches between layouts
+    if(key.keysym == XK.XK_space) {
+      console.log('Change layout from', self.layout, self.layout_list);
+      self.layout_list.push(self.layout);      
+      self.layout = self.layout_list.shift();
+      console.log('to', self.layout, self.layout_list);
+      // monocle hides windows in the current workspace, so unhide them
+      self.go(self.workspace);
+      self.rearrange();
+    }
     return key;
   });
 
@@ -173,6 +188,7 @@ NWM.prototype.start = function(callback) {
   });
 
   this.wm.keys([ 
+      // workspace switching
       { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask },
@@ -183,7 +199,7 @@ NWM.prototype.start = function(callback) {
       { key: XK.XK_8, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask },
-
+      // moving windows between workspaces
       { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
       { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
       { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
@@ -194,11 +210,22 @@ NWM.prototype.start = function(callback) {
       { key: XK.XK_8, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
       { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
       { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-
+      // starting xterm
       { key: XK.XK_Return, modifier: Xh.Mod4Mask|Xh.ControlMask },
-
-      { key: XK.XK_c, modifier: Xh.Mod4Mask|Xh.ControlMask }
-
+      // closing a window
+      { key: XK.XK_c, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      // alternating between layout modes
+      { key: XK.XK_space, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      // TODO: increase and decrease master area size
+      { key: XK.XK_h, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_l, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      // TODO: moving focus 
+      { key: XK.XK_j, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_k, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      // TODO: make the currently focused window the master
+      { key: XK.XK_Tab, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      // TODO: graceful shutdown
+      { key: XK.XK_q, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask }
     ]);
   this.screen = this.wm.setup();  
   this.wm.scan();

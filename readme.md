@@ -91,6 +91,9 @@ Keyboard shortcuts are now working. The binding is Ctrl+Win which happens to be 
     # Closing window
     Ctrl+Win c # Close focused window
 
+    # Switching between layouts
+    Ctrl+Win Space # Switch between tile, monocle and wide layouts
+
 
 # Using from the console
 
@@ -162,16 +165,16 @@ Todo:
 
 Done:
 
-- More layouts:
+- More layouts: (DONE)
     - Wide (upper half for main, lower half for others)
     - Monocle (full screen)
+- Shortcut for switching between layouts (DONE)
 
 Todo:
 
 - Resize main window area with shortcut (JS)
 - Newly mapped window should become the main window (JS)
 - Keyboard shortcut for making the currently focused window the main window (JS)
-- Shortcut for switching between layouts (JS)
 - Per-workspace layouts e.g. http://haskell.org/haskellwiki/Xmonad/Screenshots (JS)
     - Fair (close to equal size)
 - Keyboard shortcuts for moving and resizing windows (JS)
@@ -185,6 +188,7 @@ Todo:
 - Saving state on exit (JS)
 - Media key bindings (JS)
 - Dropdown Chrome (JS)
+- Floating window mode (JS)
 
 Long term plans (likely to be separate projects):
 
