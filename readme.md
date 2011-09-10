@@ -169,6 +169,7 @@ Todo:
 - Customizable mouse key bindings (C)
 - Multi-monitor support (C)
 - Expose stacking order and stacking operations (C)
+- Ignore transient windows (C)
 - Graceful exit support (C)
 
 # Todo (Nwm.js)

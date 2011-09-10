@@ -34,7 +34,7 @@ var baseModifier = Xh.Mod4Mask|Xh.ControlMask;
 // enter key is used to launch xterm
 nwm.addKey({ key: XK.XK_Return, modifier: baseModifier }, function(event) {
   // check for whether we are running in a different display
-  var term = require('child_process').spawn('xterm', ['-lc'], (process.env.DISPLAY ? { env: { 'DISPLAY': process.env.DISPLAY } } : undefined ));
+  var term = require('child_process').spawn('xterm', ['-lc'], { env: process.env });
   term.on('exit', function (code) {
     console.log('child process exited with code ', code);
   });  
