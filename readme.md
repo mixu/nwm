@@ -139,14 +139,6 @@ nwm also supports workspaces:
     nwm.gimme(window_id);
     nwm.windowTo(window_id, workspace_number);
 
-
-There are also a couple of easter egg type functions:
-
-    nwm.tween(window_id);
-    nwm.stop(); // stop tweens
-    nwm.random();
-    nwm.globalSmall(); // set all to 200x200
-
 # Writing your own layout engine
 
 You should bind to the following events from the native extension:
