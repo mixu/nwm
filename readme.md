@@ -191,13 +191,14 @@ Done:
 - Keyboard shortcut for making the currently focused window the main window (DONE)
 - Resize main window area with shortcut (DONE)
 - Newly mapped window should become the main window (DONE)
+- Support for loading configuration files (PARTIAL)
+    - Ability to customize keyboard shortcuts from conf file
+    - Add new key bindings (e.g. to launch apps or change layouting) from conf file
 
 Todo:
 
 - Setting main focus should move that window to the first window in grid layout (JS)
 - Support for loading configuration files (JS)
-    - Ability to customize keyboard shortcuts from conf file
-    - Add new key bindings (e.g. to launch apps or change layouting) from conf file
     - Code hot loading from conf file
     - git clone + npm installation of personalized config
 - TCP or HTTP configuration interface (JS)

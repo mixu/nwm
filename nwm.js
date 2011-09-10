@@ -1,6 +1,5 @@
 var repl = require('repl');
 var X11wm = require('./build/default/nwm.node').NodeWM;
-var child_process = require('child_process');
 var XK = require('./lib/keysymdef.js');
 var Xh = require('./lib/x.js');
 
@@ -54,6 +53,8 @@ var NWM = function() {
   this.workspaces = [];
   // current workspace id 
   this.current_workspace = 1;
+  // keyboard shortcut lookup
+  this.shortcuts = [];
 
   // Remove?
   this.focused_window = null;
@@ -106,6 +107,9 @@ NWM.prototype.getMainWindowScale = function() {
   return workspace.getMainWindowScale();
 };
 
+NWM.prototype.addKey = function(keyobj, callback) {
+  this.shortcuts.push({ key: keyobj.key, modifier: keyobj.modifier, callback: callback });
+};
 
 NWM.prototype.start = function(callback) {
   this.wm = new X11wm();
@@ -176,13 +180,13 @@ NWM.prototype.start = function(callback) {
   /**
    * A key has been pressed
    */
-  this.wm.on('keyPress', function(key) {
+  this.wm.on('keyPress', function(event) {
     // do something, e.g. launch a command
-    var chr = String.fromCharCode(key.keysym);
+    var chr = String.fromCharCode(event.keysym);
     // decode keysym name
     var keysym_name = '';
     Object.keys(XK).every(function(name) {
-      if(XK[name] == key.keysym) {
+      if(XK[name] == event.keysym) {
         keysym_name = name;
         return false; // stop iteration
       }
@@ -191,79 +195,18 @@ NWM.prototype.start = function(callback) {
     // decode modifier names
     var modifiers = [];
     Object.keys(Xh).forEach(function(name){
-      if(key.modifier & Xh[name]) {
+      if(event.modifier & Xh[name]) {
         modifiers.push(name);
       }
     });
 
-    console.log('keyPress', key, chr, keysym_name, modifiers);
-    // number keys are used to move between screens
-    if( key.keysym > XK.XK_0 && key.keysym <= XK.XK_9) {
-      // check the modifier
-      if( (key.modifier & Xh.Mod4Mask) && (key.modifier & Xh.ControlMask) ) {
-        console.log('go to workspace',  chr);      
-        self.go(chr); // jump to workspace        
-      }
-      if( (key.modifier & Xh.Mod4Mask) && (key.modifier & Xh.ControlMask) && (key.modifier & Xh.ShiftMask)) {
-        console.log('move focused window to workspace', chr);
-        if(self.focused_window) {
-          self.windowTo(self.focused_window, chr);
-        }
-      } 
-     
-    } 
-    // enter key is used to launch xterm
-    if(key.keysym == XK.XK_Return) {
-      // enter pressed ...
-      console.log('Enter key, start xterm');
-      console.log(process.env);
-      var term;
-      if(process.env.DISPLAY == ':1') {
-        term = child_process.spawn('xterm', ['-lc'], { env: { 'DISPLAY': ':1' } });        
-      } else {
-        term = child_process.spawn('xterm', ['-lc']);        
-      }
-      term.on('exit', function (code) {
-        console.log('child process exited with code ' + code);
-      });
-    }
-    // c key is used to terminate the process
-    if(key.keysym == XK.XK_c && self.focused_window) {
-      console.log('Kill window', self.focused_window);
-      self.wm.killWindow(self.focused_window);
-    }
-    // space switches between layouts
-    if(key.keysym == XK.XK_space) {
-      var workspace = self.getWorkspace(self.current_workspace);
-      console.log('Change layout from ', workspace.layout);
-      workspace.layout = self.nextLayout(workspace.layout);
-      console.log('to ', workspace.layout);      
-      // monocle hides windows in the current workspace, so unhide them
-      self.go(self.current_workspace);
-      self.rearrange();
-    }
-    // tab makes the current window the main window
-    if(key.keysym == XK.XK_Tab) {
-      console.log('Set main window', self.focused_window);
-      self.setMainWindow(self.focused_window);
-      self.rearrange();
-    }
-    // h increases the main window size
-    if(key.keysym == XK.XK_h || key.keysym == XK.XK_F10) {
-      var workspace = self.getWorkspace(self.current_workspace);
-      workspace.setMainWindowScale(workspace.getMainWindowScale() - 5);
-      console.log('Set main window scale', workspace.getMainWindowScale());
-      self.rearrange();
-    }
-    // l decreases the main window size
-    if(key.keysym == XK.XK_l || key.keysym == XK.XK_F11) {
-      var workspace = self.getWorkspace(self.current_workspace);
-      workspace.setMainWindowScale(workspace.getMainWindowScale() + 5);
-      console.log('Set main window scale', workspace.getMainWindowScale());
-      self.rearrange();
-    }
-
-    return key;
+    console.log('keyPress', event, chr, keysym_name, modifiers);
+    // find the matching callback and emit it
+    self.shortcuts.forEach(function(shortcut) {
+      if(event.keysym == shortcut.key && event.modifier == shortcut.modifier ) {
+        shortcut.callback(event);
+      };
+    });
   });
 
   /**
@@ -298,48 +241,11 @@ NWM.prototype.start = function(callback) {
     }
   });
 
-  this.wm.keys([ 
-      // workspace switching
-      { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_4, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_5, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_6, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_7, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_8, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // moving windows between workspaces
-      { key: XK.XK_1, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_2, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_3, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_4, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_5, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_6, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_7, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_8, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_9, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      { key: XK.XK_0, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask },
-      // starting xterm
-      { key: XK.XK_Return, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // closing a window
-      { key: XK.XK_c, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // alternating between layout modes
-      { key: XK.XK_space, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // increase and decrease master area size
-      { key: XK.XK_h, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_l, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_F10, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_F11, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // make the currently focused window the master
-      { key: XK.XK_Tab, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // TODO: moving focus 
-      { key: XK.XK_j, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      { key: XK.XK_k, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // TODO: graceful shutdown
-      { key: XK.XK_q, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask }
-    ]);
+  var grab_keys = [];
+  this.shortcuts.forEach(function(shortcut) {
+    grab_keys.push( { key: shortcut.key, modifier: shortcut.modifier });
+  });
+  this.wm.keys(grab_keys);
   this.screen = this.wm.setup();  
   this.wm.scan();
   this.wm.loop();
@@ -431,75 +337,6 @@ NWM.prototype.rearrange = function() {
   var callback = this.layouts[workspace.layout];
   callback(this);  
 };
-
-
-NWM.prototype.random = function() {
-  var self = this;
-  var screen = this.screen;
-  var keys = Object.keys(this.windows);
-  keys.forEach(function(id, index) {
-    self.move(id, Math.floor(Math.random()*(screen.width-300)), Math.floor(Math.random()*(screen.height-300)));    
-  });
-};
-
-NWM.prototype.globalSmall = function() {
-  var self = this;
-  var keys = Object.keys(this.windows);
-  keys.forEach(function(id, index) {
-    self.resize(id, 200, 200);    
-  });  
-};
-
-var tweens = [];
-
-NWM.prototype.tween = function(id) {
-  var self = this;
-  var radius = 200;
-  var circle_x = Math.floor(self.screen.width / 2);
-  var circle_y = Math.floor(self.screen.height / 2);
-  if(circle_x+radius*2 > self.screen.width) {
-    circle_x -= radius*2;
-  }
-  if(circle_y+radius*2 > self.screen.height) {
-    circle_y -= radius*2;
-  }
-  if(circle_x-radius*2 < 0) {
-    circle_x += radius*2;
-  }
-  if(circle_y-radius*2 < 0) {
-    circle_y += radius*2;
-  }
-
-  function circularPath(index) {
-
-    var cx = circle_x;
-    var cy = circle_y;
-    var aStep = 3;   // 3 degrees per step
-    var theta = index * aStep;  // +ve angles are cw
-
-    var newX = cx + radius * Math.cos(theta * Math.PI / 180);
-    var newY = cy + radius * Math.sin(theta * Math.PI / 180);
-
-    // return an object defining state that can be understood by drawFn
-    return  {x: newX, y: newY};
-  }
-  var step = 0;
-  var result = setInterval(function() {
-    step++;
-    var pos = circularPath(step);
-    self.move(id, Math.floor(pos.x), Math.floor(pos.y));
-  }, 1000 / 60);
-  tweens.push({ id: id, interval: result} );
-};
-
-NWM.prototype.stop = function() {
-  for(var i = 0; i < tweens.length; i++) {
-    clearInterval(tweens[i].interval); 
-  }
-  tweens = [];
-};
-
-
 
 // if this module is the script being run, then run the window manager
 if (module == require.main) {

@@ -35,7 +35,7 @@ layouts.tile = function(nwm) {
     return;
   }
   var mainId = nwm.getMainWindow();
-  if(windows.length == 0) {
+  if(windows.length == 1) {
     nwm.move(mainId, 0, 0);
     nwm.resize(mainId, screen.width, screen.height);
   } else {
@@ -132,7 +132,7 @@ layouts.wide = function(nwm) {
     return;
   }
   var mainId = nwm.getMainWindow();
-  if(windows.length == 0) {
+  if(windows.length == 1) {
     nwm.move(mainId, 0, 0);
     nwm.resize(mainId, screen.width, screen.height);
   } else {
