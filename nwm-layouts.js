@@ -34,18 +34,24 @@ layouts.tile = function(nwm) {
   if(windows.length < 1) {
     return;
   }
-  var firstId = windows.shift();
+  var mainId = nwm.getMainWindow();
   if(windows.length == 0) {
-    nwm.move(firstId, 0, 0);
-    nwm.resize(firstId, screen.width, screen.height);
+    nwm.move(mainId, 0, 0);
+    nwm.resize(mainId, screen.width, screen.height);
   } else {
-    var halfWidth = Math.floor(screen.width / 2);
+    // when main scale = 50, the divisor is 2
+    var mainScaleFactor = (100 / nwm.getMainWindowScale() );
+    var halfWidth = Math.floor(screen.width / mainScaleFactor);
+    nwm.move(mainId, 0, 0);
+    nwm.resize(mainId, halfWidth, screen.height);
+    // remove from visible
+    windows = windows.filter(function(id) { return (id != mainId); });
+    console.log('tile', 'main window', mainId, 'others', windows );
+    var remainWidth = screen.width - halfWidth;
     var sliceHeight = Math.floor(screen.height / (windows.length) );
-    nwm.move(firstId, 0, 0);
-    nwm.resize(firstId, halfWidth, screen.height);
     windows.forEach(function(id, index) {
       nwm.move(id, halfWidth, index*sliceHeight);
-      nwm.resize(id, halfWidth, sliceHeight);
+      nwm.resize(id, remainWidth, sliceHeight);
     });
   }
 };
@@ -82,9 +88,11 @@ layouts.monocle = function(nwm){
   if(windows.length < 1) {
     return;
   }
-  var firstId = windows.shift();
-  nwm.move(firstId, 0, 0);
-  nwm.resize(firstId, screen.width, screen.height);
+  var mainId = nwm.getMainWindow();
+  nwm.move(mainId, 0, 0);
+  nwm.resize(mainId, screen.width, screen.height);
+  // remove from visible
+  windows = windows.filter(function(id) { return (id != mainId); });
   windows.forEach(function(id, index) {
     nwm.hide(id);
   });
@@ -123,18 +131,23 @@ layouts.wide = function(nwm) {
   if(windows.length < 1) {
     return;
   }
-  var firstId = windows.shift();
+  var mainId = nwm.getMainWindow();
   if(windows.length == 0) {
-    nwm.move(firstId, 0, 0);
-    nwm.resize(firstId, screen.width, screen.height);
+    nwm.move(mainId, 0, 0);
+    nwm.resize(mainId, screen.width, screen.height);
   } else {
-    var halfHeight = Math.floor(screen.height / 2);
+    // when main scale = 50, the divisor is 2
+    var mainScaleFactor = (100 / nwm.getMainWindowScale() );
+    var halfHeight = Math.floor(screen.height / mainScaleFactor);
+    nwm.move(mainId, 0, 0);
+    nwm.resize(mainId, screen.width, halfHeight);
+    // remove from visible
+    windows = windows.filter(function(id) { return (id != mainId); });
+    var remainHeight = screen.height - halfHeight;
     var sliceWidth = Math.floor(screen.width / (windows.length) );
-    nwm.move(firstId, 0, 0);
-    nwm.resize(firstId, screen.width, halfHeight);
     windows.forEach(function(id, index) {
       nwm.move(id, index*sliceWidth, halfHeight);
-      nwm.resize(id, sliceWidth, halfHeight);
+      nwm.resize(id, sliceWidth, remainHeight);
     });
   }
 };

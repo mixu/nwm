@@ -22,8 +22,18 @@ Cpp bindings:
 Nwm.js:
 
 - Layout decisions are done in Javascript, not C++.
-- Tiling window layout (like dwm): you can write your own in JS.
-- Support for workspaces (0-9 via keyboard, max int via JS).
+- Write your own layout, or use one of the built-in layouts:
+    - Vertical Stack Tiling (e.g. DWM's tiling)
+    - Monocle (a.k.a. fullscreen)
+    - Bottom Stack Tiling (a.k.a. wide)
+    - Grid (a.k.a fair)
+- Support for workspaces:
+    - Access workspaces 0-9 via keyboard (and max int via JS)
+    - Each workspace can have it's own layout
+- Support for "main window":
+    - One window is considered to be the "main window"
+    - That window usually gets more space depending on the layout
+    - Each workspace has it's own main window scale setting
 - REPL, so you can issue commands to it interactively
 
 # Installing and running under a secondary X11 server (Xephyr)
@@ -92,7 +102,14 @@ Keyboard shortcuts are now working. The binding is Ctrl+Win which happens to be 
     Ctrl+Win c # Close focused window
 
     # Switching between layouts
-    Ctrl+Win Space # Switch between tile, monocle and wide layouts
+    Ctrl+Win Space # Switch between tile, monocle, wide and grid layouts
+
+    # Main window management
+    Ctrl+Win Tab # Set the focused window as the "main" window
+    Ctrl+Win h   # Decrease the size of main window (different impact depending on layout)
+    Ctrl+Win F10 # Alternative shortcut for above, e.g. under OSX
+    Ctrl+Win l   # Increase the size of main window (different impact depending on layout)
+    Ctrl+Win F11 # Alternative shortcut for above, e.g. under OSX
 
 
 # Using from the console
@@ -171,13 +188,13 @@ Done:
     - Grid (close to equal size)
 - Shortcut for switching between layouts (DONE)
 - Per-workspace layouts (DONE)
+- Keyboard shortcut for making the currently focused window the main window (DONE)
+- Resize main window area with shortcut (DONE)
+- Newly mapped window should become the main window (DONE)
 
 Todo:
 
-- Resize main window area with shortcut (JS)
-- Newly mapped window should become the main window (JS)
-- Keyboard shortcut for making the currently focused window the main window (JS)
-- Keyboard shortcuts for moving and resizing windows (JS)
+- Setting main focus should move that window to the first window in grid layout (JS)
 - Support for loading configuration files (JS)
     - Ability to customize keyboard shortcuts from conf file
     - Add new key bindings (e.g. to launch apps or change layouting) from conf file

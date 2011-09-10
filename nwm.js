@@ -4,9 +4,41 @@ var child_process = require('child_process');
 var XK = require('./lib/keysymdef.js');
 var Xh = require('./lib/x.js');
 
-
 var Workspace = function(id, layout) {
   this.layout = layout;
+  this.main_window = null;
+  this.main_window_scale = 50;
+};
+
+Workspace.prototype.getMainWindow = function(nwm) {
+  var visible = nwm.visible();
+  if(visible.indexOf(''+this.main_window) > -1) {
+    console.log('getMainWindow using old value', this.main_window);
+    return this.main_window;
+  } 
+  // no visible window, or the main window has gone away. Pick one from the visible windows
+  // Take the largest id (e.g. most recent window)
+  console.log('getMainWindow old window gone, get new one', visible, this.main_window, visible.indexOf(this.main_window));
+  this.main_window = Math.max.apply(Math, visible);
+  return this.main_window;
+};
+
+Workspace.prototype.setMainWindow = function(id) {
+  this.main_window = id;
+};
+
+Workspace.prototype.getMainWindowScale = function() {
+  return this.main_window_scale;
+};
+
+Workspace.prototype.setMainWindowScale = function(scale) {
+  if(scale <= 0) {
+    scale = 1;
+  }
+  if(scale >= 100) {
+    scale = 99;
+  }
+  this.main_window_scale = scale;
 };
 
 var NWM = function() {
@@ -23,10 +55,8 @@ var NWM = function() {
   // current workspace id 
   this.current_workspace = 1;
 
-  this.workspace = 1;
+  // Remove?
   this.focused_window = null;
-
-  // currently d
   this.drag_window = null;
 }
 
@@ -60,6 +90,23 @@ NWM.prototype.getWorkspace = function(id) {
   return this.workspaces[id];
 };
 
+NWM.prototype.getMainWindow = function() {
+  var workspace = this.getWorkspace(this.current_workspace);
+  console.log('getMainWindow', this.current_workspace);
+  return workspace.getMainWindow(this);
+};
+
+NWM.prototype.setMainWindow = function(id) {
+  var workspace = this.getWorkspace(this.current_workspace);
+  return workspace.setMainWindow(id);  
+};
+
+NWM.prototype.getMainWindowScale = function() {
+  var workspace = this.getWorkspace(this.current_workspace);
+  return workspace.getMainWindowScale();
+};
+
+
 NWM.prototype.start = function(callback) {
   this.wm = new X11wm();
   var self = this;  
@@ -78,6 +125,9 @@ NWM.prototype.start = function(callback) {
         console.log('Moving window '+window.id+' on to screen');
         self.move(window.id, 1, 1);
       }
+      // set the new window as the main window for this workspace
+      // so new windows get the primary working area
+      self.setMainWindow(window.id);
       console.log('onAdd', self.windows[window.id]);
     }
   });
@@ -150,16 +200,17 @@ NWM.prototype.start = function(callback) {
     // number keys are used to move between screens
     if( key.keysym > XK.XK_0 && key.keysym <= XK.XK_9) {
       // check the modifier
-      if(key.modifier == (Xh.Mod4Mask|Xh.ControlMask)) {
+      if( (key.modifier & Xh.Mod4Mask) && (key.modifier & Xh.ControlMask) ) {
         console.log('go to workspace',  chr);      
         self.go(chr); // jump to workspace        
       }
-      if(key.modifier == (Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask)) {
+      if( (key.modifier & Xh.Mod4Mask) && (key.modifier & Xh.ControlMask) && (key.modifier & Xh.ShiftMask)) {
         console.log('move focused window to workspace', chr);
         if(self.focused_window) {
           self.windowTo(self.focused_window, chr);
         }
-      }
+      } 
+     
     } 
     // enter key is used to launch xterm
     if(key.keysym == XK.XK_Return) {
@@ -191,6 +242,27 @@ NWM.prototype.start = function(callback) {
       self.go(self.current_workspace);
       self.rearrange();
     }
+    // tab makes the current window the main window
+    if(key.keysym == XK.XK_Tab) {
+      console.log('Set main window', self.focused_window);
+      self.setMainWindow(self.focused_window);
+      self.rearrange();
+    }
+    // h increases the main window size
+    if(key.keysym == XK.XK_h || key.keysym == XK.XK_F10) {
+      var workspace = self.getWorkspace(self.current_workspace);
+      workspace.setMainWindowScale(workspace.getMainWindowScale() - 5);
+      console.log('Set main window scale', workspace.getMainWindowScale());
+      self.rearrange();
+    }
+    // l decreases the main window size
+    if(key.keysym == XK.XK_l || key.keysym == XK.XK_F11) {
+      var workspace = self.getWorkspace(self.current_workspace);
+      workspace.setMainWindowScale(workspace.getMainWindowScale() + 5);
+      console.log('Set main window scale', workspace.getMainWindowScale());
+      self.rearrange();
+    }
+
     return key;
   });
 
@@ -255,14 +327,16 @@ NWM.prototype.start = function(callback) {
       { key: XK.XK_c, modifier: Xh.Mod4Mask|Xh.ControlMask },
       // alternating between layout modes
       { key: XK.XK_space, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // TODO: increase and decrease master area size
+      // increase and decrease master area size
       { key: XK.XK_h, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_l, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_F10, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      { key: XK.XK_F11, modifier: Xh.Mod4Mask|Xh.ControlMask },
+      // make the currently focused window the master
+      { key: XK.XK_Tab, modifier: Xh.Mod4Mask|Xh.ControlMask },
       // TODO: moving focus 
       { key: XK.XK_j, modifier: Xh.Mod4Mask|Xh.ControlMask },
       { key: XK.XK_k, modifier: Xh.Mod4Mask|Xh.ControlMask },
-      // TODO: make the currently focused window the master
-      { key: XK.XK_Tab, modifier: Xh.Mod4Mask|Xh.ControlMask },
       // TODO: graceful shutdown
       { key: XK.XK_q, modifier: Xh.Mod4Mask|Xh.ControlMask|Xh.ShiftMask }
     ]);
