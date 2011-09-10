@@ -1,0 +1,13 @@
+{
+  "name": "nwm",
+  "description": "Dynamic window manager for X11",
+  "version": "0.0.1",
+  "author": {
+    "name": "Mikito Takada",
+    "email": "mixu@mixu.net",
+    "url": "http://blog.mixu.net/"
+    },
+  "keywords": ["nwm", "window manager", "X11"],
+  "repository": "git://github.com/mixu/nwm",
+  "main": "nwm.js",
+}

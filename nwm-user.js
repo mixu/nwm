@@ -16,10 +16,11 @@ Object.keys(layouts).forEach(function(name){
 });
 
 // KEYBOARD SHORTCUTS
-var baseModifier = Xh.Mod4Mask|Xh.ControlMask; // to make it easier to reassign the "base" modifier combination
-// Workspace management - since we do the same thing for keys 0..9, use an array
+// Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
+var baseModifier = Xh.Mod4Mask|Xh.ControlMask; 
+
+// Workspace management keys
 [XK.XK_1, XK.XK_2, XK.XK_3, XK.XK_4, XK.XK_5, XK.XK_6, XK.XK_7, XK.XK_8, XK.XK_9].forEach(function(key) {
-  // workspace switching
   // number keys are used to move between screens
   nwm.addKey({ key: key, modifier: baseModifier }, function(event) { 
     nwm.go(String.fromCharCode(event.keysym)); 
@@ -30,7 +31,6 @@ var baseModifier = Xh.Mod4Mask|Xh.ControlMask; // to make it easier to reassign 
   });
 });
 
-// starting xterm
 // enter key is used to launch xterm
 nwm.addKey({ key: XK.XK_Return, modifier: baseModifier }, function(event) {
   // check for whether we are running in a different display
@@ -40,14 +40,12 @@ nwm.addKey({ key: XK.XK_Return, modifier: baseModifier }, function(event) {
   });  
 });
 
-// closing a window
-// c key is used to terminate the process
+// c key is used to close a window
 nwm.addKey({ key: XK.XK_c, modifier: baseModifier }, function(event) {
   nwm.focused_window && nwm.wm.killWindow(nwm.focused_window);
 });
 
-// alternating between layout modes
-// space switches between layouts
+// space switches between layout modes
 nwm.addKey({ key: XK.XK_space, modifier: baseModifier }, function(event) {
   var workspace = nwm.getWorkspace(nwm.current_workspace);
   workspace.layout = nwm.nextLayout(workspace.layout);
@@ -56,7 +54,6 @@ nwm.addKey({ key: XK.XK_space, modifier: baseModifier }, function(event) {
   nwm.rearrange();  
 });
 
-// increase and decrease master area size
 // h increases the main window size
 [XK.XK_h, XK.XK_F10].forEach(function(key) {
   nwm.addKey({ key: key, modifier: baseModifier }, function(event) {
@@ -77,7 +74,6 @@ nwm.addKey({ key: XK.XK_space, modifier: baseModifier }, function(event) {
   });  
 });
 
-// make the currently focused window the main window
 // tab makes the current window the main window
 nwm.addKey({ key: XK.XK_Tab, modifier: baseModifier }, function(event) {
   console.log('Set main window', nwm.focused_window);
@@ -89,76 +85,6 @@ nwm.addKey({ key: XK.XK_Tab, modifier: baseModifier }, function(event) {
 nwm.addKey({ key: XK.XK_j, modifier: baseModifier }, function() {});
 // TODO: graceful shutdown
 nwm.addKey({ key: XK.XK_q, modifier: baseModifier|Xh.ShiftMask }, function() {});
-
-// CUSTOM FUNCTIONS
-
-nwm.random = function() {
-  var self = this;
-  var screen = this.screen;
-  var keys = Object.keys(this.windows);
-  keys.forEach(function(id, index) {
-    self.move(id, Math.floor(Math.random()*(screen.width-300)), Math.floor(Math.random()*(screen.height-300)));    
-  });
-};
-
-nwm.globalSmall = function() {
-  var self = this;
-  var keys = Object.keys(this.windows);
-  keys.forEach(function(id, index) {
-    self.resize(id, 200, 200);    
-  });  
-};
-
-var tweens = [];
-
-nwm.tween = function(id) {
-  var self = this;
-  var radius = 200;
-  var circle_x = Math.floor(self.screen.width / 2);
-  var circle_y = Math.floor(self.screen.height / 2);
-  if(circle_x+radius*2 > self.screen.width) {
-    circle_x -= radius*2;
-  }
-  if(circle_y+radius*2 > self.screen.height) {
-    circle_y -= radius*2;
-  }
-  if(circle_x-radius*2 < 0) {
-    circle_x += radius*2;
-  }
-  if(circle_y-radius*2 < 0) {
-    circle_y += radius*2;
-  }
-
-  function circularPath(index) {
-
-    var cx = circle_x;
-    var cy = circle_y;
-    var aStep = 3;   // 3 degrees per step
-    var theta = index * aStep;  // +ve angles are cw
-
-    var newX = cx + radius * Math.cos(theta * Math.PI / 180);
-    var newY = cy + radius * Math.sin(theta * Math.PI / 180);
-
-    // return an object defining state that can be understood by drawFn
-    return  {x: newX, y: newY};
-  }
-  var step = 0;
-  var result = setInterval(function() {
-    step++;
-    var pos = circularPath(step);
-    self.move(id, Math.floor(pos.x), Math.floor(pos.y));
-  }, 1000 / 60);
-  tweens.push({ id: id, interval: result} );
-};
-
-nwm.stop = function() {
-  for(var i = 0; i < tweens.length; i++) {
-    clearInterval(tweens[i].interval); 
-  }
-  tweens = [];
-};
-
-
 
 // START
 nwm.start(function() {
