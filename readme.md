@@ -168,15 +168,15 @@ Done:
 - More layouts: (DONE)
     - Wide (upper half for main, lower half for others)
     - Monocle (full screen)
+    - Grid (close to equal size)
 - Shortcut for switching between layouts (DONE)
+- Per-workspace layouts (DONE)
 
 Todo:
 
 - Resize main window area with shortcut (JS)
 - Newly mapped window should become the main window (JS)
 - Keyboard shortcut for making the currently focused window the main window (JS)
-- Per-workspace layouts e.g. http://haskell.org/haskellwiki/Xmonad/Screenshots (JS)
-    - Fair (close to equal size)
 - Keyboard shortcuts for moving and resizing windows (JS)
 - Support for loading configuration files (JS)
     - Ability to customize keyboard shortcuts from conf file
@@ -196,3 +196,4 @@ Long term plans (likely to be separate projects):
 - App launcher
 - App switcher
 - Expose clone (e.g. show all windows, monocle selected window)
+- Even more layouts e.g. http://haskell.org/haskellwiki/Xmonad/Screenshots

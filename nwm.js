@@ -3,27 +3,66 @@ var X11wm = require('./build/default/nwm.node').NodeWM;
 var child_process = require('child_process');
 var XK = require('./lib/keysymdef.js');
 var Xh = require('./lib/x.js');
-var layouts = require('./nwm-layouts.js');
+
+
+var Workspace = function(id, layout) {
+  this.layout = layout;
+};
 
 var NWM = function() {
-  this.windows = {};
-  this.screen = null;
-  this.drag_window = null;
+  // external binding
   this.wm = null;
+  // list of windows 
+  this.windows = {};
+  // screen dimensions
+  this.screen = null;
+  // list of layouts
+  this.layouts = {};
+  // list of workspaces
+  this.workspaces = [];
+  // current workspace id 
+  this.current_workspace = 1;
+
   this.workspace = 1;
   this.focused_window = null;
-  this.layout = null;
-  this.layout_list = [];
+
+  // currently d
+  this.drag_window = null;
 }
+
+/**
+ * Register a new layout
+ */
+NWM.prototype.addLayout = function(name, callback){
+  this.layouts[name] = callback;
+};
+
+/**
+ * Given the current layout, get the next layout (e.g. for switching layouts via keyboard shortcut)
+ */
+NWM.prototype.nextLayout = function(name) {
+  var keys = Object.keys(this.layouts);
+  var pos = keys.indexOf(name);
+  // wrap around the array
+  return (keys[pos+1] ? keys[pos+1] : keys[0] );
+};
+
+NWM.prototype.getWorkspace = function(id) {
+  if(!this.workspaces[id]) {
+    // use the current workspace, or if that does not exist, the default values
+    if(this.workspaces[this.current_workspace]) {
+      this.workspaces[id] = new Workspace(id, current.layout);
+    } else {
+      var layout_names = Object.keys(this.layouts);
+      this.workspaces[id] = new Workspace(id, layout_names[0]);
+    }
+  }
+  return this.workspaces[id];
+};
 
 NWM.prototype.start = function(callback) {
   this.wm = new X11wm();
   var self = this;  
-  this.workspace = 1;
-  this.layout_list = Object.keys(layouts);
-  console.log('Layouts', this.layout_list)
-  this.layout = this.layout_list.shift();
-  console.log('Layout', this.layout);
 
   /**
    * A new window is added
@@ -31,7 +70,7 @@ NWM.prototype.start = function(callback) {
   this.wm.on('add', function(window) {
     if(window.id) {
       window.visible = true;
-      window.workspace = self.workspace;
+      window.workspace = self.current_workspace;
       self.windows[window.id] = window;      
       // windows might be placed outside the screen if the wm was terminated
        console.log(window);
@@ -144,12 +183,12 @@ NWM.prototype.start = function(callback) {
     }
     // space switches between layouts
     if(key.keysym == XK.XK_space) {
-      console.log('Change layout from', self.layout, self.layout_list);
-      self.layout_list.push(self.layout);      
-      self.layout = self.layout_list.shift();
-      console.log('to', self.layout, self.layout_list);
+      var workspace = self.getWorkspace(self.current_workspace);
+      console.log('Change layout from ', workspace.layout);
+      workspace.layout = self.nextLayout(workspace.layout);
+      console.log('to ', workspace.layout);      
       // monocle hides windows in the current workspace, so unhide them
-      self.go(self.workspace);
+      self.go(self.current_workspace);
       self.rearrange();
     }
     return key;
@@ -272,8 +311,8 @@ NWM.prototype.resize = function(id, width, height) {
 NWM.prototype.visible = function() {
   var self = this;
   var keys = Object.keys(this.windows);
-  keys = keys.filter(function(id) { return (self.windows[id].visible && self.windows[id].workspace == self.workspace); });
-  console.log('get visible', 'workspace = ', self.workspace, keys);
+  keys = keys.filter(function(id) { return (self.windows[id].visible && self.windows[id].workspace == self.current_workspace); });
+  console.log('get visible', 'workspace = ', self.current_workspace, keys);
   return keys;
 };
 
@@ -287,8 +326,8 @@ NWM.prototype.go = function(workspace) {
       self.show(id);
     }
   });
-  if(workspace != this.workspace) {
-    this.workspace = workspace;
+  if(workspace != this.current_workspace) {
+    this.current_workspace = workspace;
     this.rearrange();
   }
 };
@@ -301,20 +340,21 @@ NWM.prototype.windowTo = function(id, workspace) {
   if(this.windows[id]) {
     var old_workspace = this.windows[id].workspace;
     this.windows[id].workspace = workspace;
-    if(workspace == this.workspace) {
+    if(workspace == this.current_workspace) {
       this.show(id);
     }
-    if(old_workspace == this.workspace && old_workspace != workspace) {
+    if(old_workspace == this.current_workspace && old_workspace != workspace) {
       this.hide(id); 
     } 
-    if(workspace == this.workspace || old_workspace == this.workspace) {
+    if(workspace == this.current_workspace || old_workspace == this.current_workspace) {
       this.rearrange();
     }
   }    
 };
 
 NWM.prototype.rearrange = function() {
-  var callback = layouts[this.layout];
+  var workspace = this.getWorkspace(this.current_workspace);
+  var callback = this.layouts[workspace.layout];
   callback(this);  
 };
 
@@ -390,6 +430,12 @@ NWM.prototype.stop = function() {
 // if this module is the script being run, then run the window manager
 if (module == require.main) {
   var nwm = new NWM();
+  // add layouts from external hash/object
+  var layouts = require('./nwm-layouts.js');
+  Object.keys(layouts).forEach(function(name){
+    var callback = layouts[name];
+    nwm.addLayout(name, layouts[name]);
+  });
   nwm.start(function() {
     var re = repl.start();
     re.context.nwm = nwm;
