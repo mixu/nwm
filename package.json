@@ -9,5 +9,5 @@
     },
   "keywords": ["nwm", "window manager", "X11"],
   "repository": "git://github.com/mixu/nwm",
-  "main": "nwm.js",
+  "main": "index.js"
 }
