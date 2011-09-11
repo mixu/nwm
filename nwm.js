@@ -329,7 +329,7 @@ NWM.prototype.windowTo = function(id, workspace) {
     if(workspace == this.current_workspace || old_workspace == this.current_workspace) {
       this.rearrange();
     }
-  }    
+  }
 };
 
 NWM.prototype.rearrange = function() {
@@ -337,6 +337,66 @@ NWM.prototype.rearrange = function() {
   var callback = this.layouts[workspace.layout];
   callback(this);  
 };
+
+NWM.prototype.hotLoad = function(filename) {
+  var self = this;
+  // load all files in the directory
+  console.log('hot load', filename);
+  self.require(filename);
+  // watch the directory
+  console.log('watch', filename)
+  require('fs').watchFile(filename, function (curr, prev) {
+    if (curr.mtime.toString() !== prev.mtime.toString()) {
+      self.require(filename);
+    }
+  });
+};
+
+NWM.prototype.require = function(filename) {
+  // From lib/module.js in the Node.js core (v.0.5.3)
+  function stripBOM(content) {
+    // Remove byte order marker. This catches EF BB BF (the UTF-8 BOM)
+    // because the buffer-to-string conversion in `fs.readFileSync()`
+    // translates it to FEFF, the UTF-16 BOM.
+    if (content.charCodeAt(0) === 0xFEFF) {
+      content = content.slice(1);
+    }
+    return content;
+  }
+  function isFunction(obj) {
+    return !!(obj && obj.constructor && obj.call && obj.apply);
+  };
+  var fullname = require.resolve(filename);
+  console.log('readfile', filename, fullname)
+  var content = require('fs').readFileSync(fullname, 'utf8');
+  // remove shebang
+  content = stripBOM(content).replace(/^\#\!.*/, '');
+  var sandbox = {};
+  // emulate require()
+  for (var k in global) {
+    sandbox[k] = global[k];
+  }
+  sandbox.require = require;
+  sandbox.__filename = filename;
+  sandbox.__dirname = require('path').dirname(filename);
+  sandbox.exports = {};
+  sandbox.module = sandbox;
+  sandbox.global = sandbox;
+
+  try {
+    require('vm').runInNewContext(content, sandbox);
+  } catch(err) {
+    console.log('Error: running hot loaded file ', fullname, 'failed. Probably a syntax error.');
+    return;
+  }
+  // now call the callback
+  if(sandbox.exports && isFunction(sandbox.exports)) {
+    sandbox.exports(this);
+  } else {
+    console.log('Error: hot loading file ', fullname, 'failed. Probably a syntax error.');
+  }
+};
+
 
 // if this module is the script being run, then run the window manager
 if (module == require.main) {
@@ -350,7 +410,7 @@ if (module == require.main) {
   nwm.start(function() {
     var re = repl.start();
     re.context.nwm = nwm;
-    re.context.Xh = Xh;  
+    re.context.Xh = Xh;
   });
 }
 

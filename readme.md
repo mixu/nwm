@@ -164,12 +164,12 @@ Done:
 
 Todo:
 
-- Test reloading key bindings on the fly (C)
-- Display full info of PropertyNotify, ClientMessage, ConfigureRequest and ConfigureNotify as nwm should not honor some requests e.g. guake Ctrl+shift+t.
-- Customizable mouse key bindings (C)
-- Multi-monitor support (C)
-- Expose stacking order and stacking operations (C)
 - Ignore transient windows (C)
+- Expose stacking order and stacking operations (C)
+- Display full info of PropertyNotify, ClientMessage, ConfigureRequest and ConfigureNotify as nwm should not honor some requests e.g. guake Ctrl+shift+t.
+- Multi-monitor support (C)
+- Test reloading key bindings on the fly (C)
+- Customizable mouse key bindings (C)
 - Graceful exit support (C)
 
 # Todo (Nwm.js)
@@ -189,12 +189,11 @@ Done:
     - Ability to customize keyboard shortcuts from conf file
     - Add new key bindings (e.g. to launch apps or change layouting) from conf file
     - git clone + npm installation of personalized config
+    - Code hot loading from file
 - Setting main focus should move that window to the first window in grid layout (DONE)
 
 Todo:
 
-- Support for loading configuration files (JS)
-    - Code hot loading from conf file
 - TCP or HTTP configuration interface (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)
