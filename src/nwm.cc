@@ -220,10 +220,15 @@ public:
    * Prepare the window object and call the Node.js callback.
    */
   static void EmitAdd(NodeWM* hw, Window win, XWindowAttributes *wa) {
+    Window trans = None;
     TryCatch try_catch;
     // onManage receives a window object
     Local<Value> argv[1];
-    Client* c = new Client(win, hw->monit, hw->next_index, wa->x, wa->y, wa->height, wa->width);
+    Bool isfloating = false;
+    // check whether the window is transient
+    XGetTransientForHint(hw->dpy, win, &trans);
+    isfloating = (trans != None);
+    Client* c = new Client(win, hw->monit, hw->next_index, wa->x, wa->y, wa->height, wa->width, isfloating);
     c->updatetitle(hw->dpy);
     c->updateclass(hw->dpy);
     c->attach();
@@ -256,6 +261,10 @@ public:
     // subscribe to window events
     XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     hw->GrabButtons(win, False);
+
+    if(isfloating) {
+      c->raise(hw->dpy);
+    }
 
     // move and (finally) map the window
     XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);    
@@ -679,8 +688,7 @@ public:
         argv[0] = Integer::New(c->getId());
         argv[1] = Integer::New(1);
         hw->Emit(onFullscreen, 2, argv);
-        // we don't expose XRaiseWindow yet
-//        XRaiseWindow(hw->dpy, c->win);
+        c->raise(hw->dpy);
       }
       else {
         XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,

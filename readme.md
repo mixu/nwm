@@ -38,6 +38,7 @@ Nwm.js:
 
 # Installing and running under a secondary X11 server (Xephyr)
 
+    node-waf clean
     node-waf configure build
     # start Xephyr
     Xephyr -screen 1024x768 -br :1 &

@@ -122,6 +122,12 @@ NWM.prototype.start = function(callback) {
     if(window.id) {
       window.visible = true;
       window.workspace = self.current_workspace;
+      // do not add floating windows
+      if(window.isfloating) {
+        console.log('Ignoring floating window: ', window);
+        return;
+      }
+
       self.windows[window.id] = window;      
       // windows might be placed outside the screen if the wm was terminated
        console.log(window);
@@ -291,7 +297,12 @@ NWM.prototype.resize = function(id, width, height) {
 NWM.prototype.visible = function() {
   var self = this;
   var keys = Object.keys(this.windows);
-  keys = keys.filter(function(id) { return (self.windows[id].visible && self.windows[id].workspace == self.current_workspace); });
+  keys = keys.filter(function(id) {
+    return (
+      self.windows[id].visible  // is visible
+      && self.windows[id].workspace == self.current_workspace // on current workspace
+    );
+  });
   console.log('get visible', 'workspace = ', self.current_workspace, keys);
   return keys;
 };

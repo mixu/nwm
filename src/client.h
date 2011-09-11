@@ -31,7 +31,7 @@ Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int siz
 
 class Client {
 public:
-  Client(Window win, Monitor* monitor, int id, int x, int y, int width, int height) {
+  Client(Window win, Monitor* monitor, int id, int x, int y, int width, int height, Bool isfloating) {
     this->win = win;
     this->mon = monitor;
     this->id = id;
@@ -39,6 +39,7 @@ public:
     this->y = y;
     this->width = width;
     this->height = height;
+    this->isfloating = isfloating;
   }
   static Client* getByWindow(Monitor* monit, Window win);
   static Client* getById(Monitor* monit, int id);
@@ -78,6 +79,10 @@ public:
       XUngrabServer(dpy);
     }
   }
+  void raise(Display* dpy) {
+    XRaiseWindow(dpy, this->win);
+  }
+
   void updatetitle(Display* dpy) {
     Atom NetWMName = XInternAtom(dpy, "_NET_WM_NAME", False);
     if(!gettextprop(dpy, this->win, NetWMName, this->name, sizeof this->name))
@@ -119,6 +124,7 @@ public:
     result->Set(String::NewSymbol("title"), String::New(this->name));
     result->Set(String::NewSymbol("instance"), String::New(this->instance));
     result->Set(String::NewSymbol("class"), String::New(this->klass));
+    result->Set(String::NewSymbol("isfloating"), Integer::New(this->isfloating));
     return result;
   }
 
@@ -132,6 +138,7 @@ public:
     Client *snext;
     Monitor *mon;
     Window win;
+    Bool isfloating;
     Bool isprotodel(Display* dpy) {
       int i, n;
       Atom *protocols;
