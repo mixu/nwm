@@ -189,10 +189,10 @@ Done:
     - Ability to customize keyboard shortcuts from conf file
     - Add new key bindings (e.g. to launch apps or change layouting) from conf file
     - git clone + npm installation of personalized config
+- Setting main focus should move that window to the first window in grid layout (DONE)
 
 Todo:
 
-- Setting main focus should move that window to the first window in grid layout (JS)
 - Support for loading configuration files (JS)
     - Code hot loading from conf file
 - TCP or HTTP configuration interface (JS)

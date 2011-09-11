@@ -197,7 +197,13 @@ layouts.grid = function(nwm) {
   var cellHeight = screen.height / (rows ? rows : 1);
   var cellWidth = screen.width / (cols ? cols : 1);
   console.log('Cell dimensions', cellWidth, cellHeight);
-  windows.forEach(function(id, index) {
+  // order the windows so that the main window is the first window in the grid
+  // and the others are in numeric order (with wraparound)
+  var mainId = nwm.getMainWindow();
+  var mainPos = windows.indexOf(mainId);
+  var ordered = windows.slice(mainId).concat(windows.slice(0, mainPos));
+  console.log('Ordered grid windows', ordered);
+  ordered.forEach(function(id, index) {
 
     if(rows > 1 && index == (rows*cols) - cols 
        && (windows.length - index) <= ( windows.length) 
