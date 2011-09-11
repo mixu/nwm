@@ -401,7 +401,7 @@ NWM.prototype.require = function(filename) {
 
 // Workspaces
 // ----------
-var Workspace = function(id, layout) {}
+var Workspace = function(id, layout) {
   // Each workspace has a layout
   this.layout = layout;
   // Each workspace has a main_window
