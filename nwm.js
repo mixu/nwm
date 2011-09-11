@@ -1,83 +1,120 @@
-var repl = require('repl');
+//     nwm.js
+//     (c) 2011 Mikito Takada
+//     nwm is freely distributable under the MIT license.
+//     Portions of nwm are inspired or borrowed from dwm.
+
+// Modules
+// -------
+
+// Native extension
 var X11wm = require('./build/default/nwm.node').NodeWM;
+// X11 keysym definitions
 var XK = require('./lib/keysymdef.js');
+// X.h defitions for key masks
 var Xh = require('./lib/x.js');
 
-var Workspace = function(id, layout) {
-  this.layout = layout;
-  this.main_window = null;
-  this.main_window_scale = 50;
-};
+// Node Window Manager
+// -------------------
 
-Workspace.prototype.getMainWindow = function(nwm) {
-  var visible = nwm.visible();
-  if(visible.indexOf(''+this.main_window) > -1) {
-    console.log('getMainWindow using old value', this.main_window);
-    return this.main_window;
-  } 
-  // no visible window, or the main window has gone away. Pick one from the visible windows
-  // Take the largest id (e.g. most recent window)
-  console.log('getMainWindow old window gone, get new one', visible, this.main_window, visible.indexOf(this.main_window));
-  this.main_window = Math.max.apply(Math, visible);
-  return this.main_window;
-};
-
-Workspace.prototype.setMainWindow = function(id) {
-  this.main_window = id;
-};
-
-Workspace.prototype.getMainWindowScale = function() {
-  return this.main_window_scale;
-};
-
-Workspace.prototype.setMainWindowScale = function(scale) {
-  if(scale <= 0) {
-    scale = 1;
-  }
-  if(scale >= 100) {
-    scale = 99;
-  }
-  this.main_window_scale = scale;
-};
-
+// A window manager consists of
 var NWM = function() {
-  // external binding
+  // A reference to the nwm C++ X11 binding
   this.wm = null;
-  // list of windows 
+  // List of windows
   this.windows = {};
-  // screen dimensions
+  // Screen dimensions
   this.screen = null;
-  // list of layouts
+  // Known layous
   this.layouts = {};
-  // list of workspaces
+  // List of workspaces
   this.workspaces = [];
-  // current workspace id 
+  // Current workspace id
   this.current_workspace = 1;
-  // keyboard shortcut lookup
+  // Keyboard shortcut lookup
   this.shortcuts = [];
-
-  // Remove?
+  // Currently focused window
   this.focused_window = null;
-  this.drag_window = null;
 }
 
-/**
- * Register a new layout
- */
-NWM.prototype.addLayout = function(name, callback){
-  this.layouts[name] = callback;
+// Window management API
+// ---------------------
+
+// Move a window
+NWM.prototype.move = function(id, x, y) {
+  if(this.windows[id]) {
+    this.windows[id].x = x;
+    this.windows[id].y = y;
+    this.wm.moveWindow(id, x, y);
+  }
 };
 
-/**
- * Given the current layout, get the next layout (e.g. for switching layouts via keyboard shortcut)
- */
-NWM.prototype.nextLayout = function(name) {
-  var keys = Object.keys(this.layouts);
-  var pos = keys.indexOf(name);
-  // wrap around the array
-  return (keys[pos+1] ? keys[pos+1] : keys[0] );
+// Resize a window
+NWM.prototype.resize = function(id, width, height) {
+  if(this.windows[id]) {
+    this.windows[id].width = width;
+    this.windows[id].height = height;
+    this.wm.resizeWindow(id, width, height);
+  }
 };
 
+// Hide a window
+NWM.prototype.hide = function(id) {
+  var screen = this.screen;
+  if(this.windows[id] && this.windows[id].visible) {
+    this.windows[id].visible = false;
+    this.wm.moveWindow(id, this.windows[id].x + 2*screen.width, this.windows[id].y);    
+    this.rearrange();
+  }
+};
+
+// Show a window
+NWM.prototype.show = function(id) {
+  var screen = this.screen;
+  if(this.windows[id] && !this.windows[id].visible) {
+    this.windows[id].visible = true;
+    this.wm.moveWindow(id, this.windows[id].x, this.windows[id].y);    
+    this.rearrange();
+  }
+};
+
+// Workspace operations
+// --------------------
+
+// Switch to another workspace
+NWM.prototype.go = function(workspace) {
+  var self = this;
+  var keys = Object.keys(this.windows);
+  keys.forEach(function(id) {
+    if(self.windows[id].workspace != workspace) {
+      self.hide(id);
+    } else {
+      self.show(id);
+    }
+  });
+  if(workspace != this.current_workspace) {
+    this.current_workspace = workspace;
+    this.rearrange();
+  }
+};
+
+// Move a window to a different workspace
+NWM.prototype.windowTo = function(id, workspace) {
+  if(this.windows[id]) {
+    var old_workspace = this.windows[id].workspace;
+    this.windows[id].workspace = workspace;
+    if(workspace == this.current_workspace) {
+      this.show(id);
+    }
+    if(old_workspace == this.current_workspace && old_workspace != workspace) {
+      this.hide(id);
+    }
+    if(workspace == this.current_workspace || old_workspace == this.current_workspace) {
+      this.rearrange();
+    }
+  }
+};
+
+// Get a workspace
 NWM.prototype.getWorkspace = function(id) {
   if(!this.workspaces[id]) {
     // use the current workspace, or if that does not exist, the default values
@@ -107,17 +144,58 @@ NWM.prototype.getMainWindowScale = function() {
   return workspace.getMainWindowScale();
 };
 
+// Layout operations
+// -----------------
+
+// Register a new layout
+NWM.prototype.addLayout = function(name, callback){
+  this.layouts[name] = callback;
+};
+
+// Rearrange the windows on the current workspace
+NWM.prototype.rearrange = function() {
+  var workspace = this.getWorkspace(this.current_workspace);
+  console.log('rearrange', workspace.layout);
+  var callback = this.layouts[workspace.layout];
+  callback(this);
+};
+
+// Given the current layout, get the next layout (e.g. for switching layouts via keyboard shortcut)
+NWM.prototype.nextLayout = function(name) {
+  var keys = Object.keys(this.layouts);
+  var pos = keys.indexOf(name);
+  // Wrap around the array
+  return (keys[pos+1] ? keys[pos+1] : keys[0] );
+};
+
+// Get the currently visible windows (used in implementing layouts)
+NWM.prototype.visible = function() {
+  var self = this;
+  var keys = Object.keys(this.windows);
+  keys = keys.filter(function(id) {
+    return (
+      self.windows[id].visible  // is visible
+      && self.windows[id].workspace == self.current_workspace // on current workspace
+    );
+  });
+  console.log('get visible', 'workspace = ', self.current_workspace, keys);
+  return keys;
+};
+
+// Keyboard shortcut operations
+// ----------------------------
+
+// Add a new keyboard shortcut
 NWM.prototype.addKey = function(keyobj, callback) {
   this.shortcuts.push({ key: keyobj.key, modifier: keyobj.modifier, callback: callback });
 };
 
+// Start the window manager
 NWM.prototype.start = function(callback) {
   this.wm = new X11wm();
   var self = this;  
 
-  /**
-   * A new window is added
-   */
+  // A new window is added
   this.wm.on('add', function(window) {
     if(window.id) {
       window.visible = true;
@@ -260,101 +338,13 @@ NWM.prototype.start = function(callback) {
   }
 };
 
-NWM.prototype.hide = function(id) {
-  var screen = this.screen;
-  if(this.windows[id] && this.windows[id].visible) {
-    this.windows[id].visible = false;
-    this.wm.moveWindow(id, this.windows[id].x + 2*screen.width, this.windows[id].y);    
-    this.rearrange();
-  }
-};
-
-NWM.prototype.show = function(id) {
-  var screen = this.screen;
-  if(this.windows[id] && !this.windows[id].visible) {
-    this.windows[id].visible = true;
-    this.wm.moveWindow(id, this.windows[id].x, this.windows[id].y);    
-    this.rearrange();
-  }
-};
-
-NWM.prototype.move = function(id, x, y) {
-  if(this.windows[id]) {
-    this.windows[id].x = x;
-    this.windows[id].y = y;
-    this.wm.moveWindow(id, x, y);
-  }
-};
-
-NWM.prototype.resize = function(id, width, height) {
-  if(this.windows[id]) {
-    this.windows[id].width = width;
-    this.windows[id].height = height;
-    this.wm.resizeWindow(id, width, height);
-  }
-};
-
-NWM.prototype.visible = function() {
-  var self = this;
-  var keys = Object.keys(this.windows);
-  keys = keys.filter(function(id) {
-    return (
-      self.windows[id].visible  // is visible
-      && self.windows[id].workspace == self.current_workspace // on current workspace
-    );
-  });
-  console.log('get visible', 'workspace = ', self.current_workspace, keys);
-  return keys;
-};
-
-NWM.prototype.go = function(workspace) {
-  var self = this;
-  var keys = Object.keys(this.windows);
-  keys.forEach(function(id) {
-    if(self.windows[id].workspace != workspace) {
-      self.hide(id); 
-    } else {
-      self.show(id);
-    }
-  });
-  if(workspace != this.current_workspace) {
-    this.current_workspace = workspace;
-    this.rearrange();
-  }
-};
-
-NWM.prototype.gimme = function(id){
-  this.windowTo(id, this.workspace);
-}
-
-NWM.prototype.windowTo = function(id, workspace) {
-  if(this.windows[id]) {
-    var old_workspace = this.windows[id].workspace;
-    this.windows[id].workspace = workspace;
-    if(workspace == this.current_workspace) {
-      this.show(id);
-    }
-    if(old_workspace == this.current_workspace && old_workspace != workspace) {
-      this.hide(id); 
-    } 
-    if(workspace == this.current_workspace || old_workspace == this.current_workspace) {
-      this.rearrange();
-    }
-  }
-};
-
-NWM.prototype.rearrange = function() {
-  var workspace = this.getWorkspace(this.current_workspace);
-  var callback = this.layouts[workspace.layout];
-  callback(this);  
-};
-
+// Load, and watch a single file for changes.
 NWM.prototype.hotLoad = function(filename) {
   var self = this;
-  // load all files in the directory
+  // Load all files in the directory
   console.log('hot load', filename);
   self.require(filename);
-  // watch the directory
+  // Watch the directory
   console.log('watch', filename)
   require('fs').watchFile(filename, function (curr, prev) {
     if (curr.mtime.toString() !== prev.mtime.toString()) {
@@ -363,6 +353,7 @@ NWM.prototype.hotLoad = function(filename) {
   });
 };
 
+// Non-caching version of Node's default require()
 NWM.prototype.require = function(filename) {
   // From lib/module.js in the Node.js core (v.0.5.3)
   function stripBOM(content) {
@@ -408,6 +399,52 @@ NWM.prototype.require = function(filename) {
   }
 };
 
+// Workspaces
+// ----------
+var Workspace = function(id, layout) {}
+  // Each workspace has a layout
+  this.layout = layout;
+  // Each workspace has a main_window
+  this.main_window = null;
+  // The main window can be scaled (interpretation differs)
+  this.main_window_scale = 50;
+};
+
+// Get the main window
+Workspace.prototype.getMainWindow = function(nwm) {
+  var visible = nwm.visible();
+  if(visible.indexOf(''+this.main_window) > -1) {
+    console.log('getMainWindow using old value', this.main_window);
+    return this.main_window;
+  }
+  // no visible window, or the main window has gone away. Pick one from the visible windows..
+  console.log('getMainWindow old window gone, get new one', visible, this.main_window, visible.indexOf(this.main_window));
+  // Take the largest id (e.g. most recent window)
+  this.main_window = Math.max.apply(Math, visible);
+  return this.main_window;
+};
+
+// Set the main window
+Workspace.prototype.setMainWindow = function(id) {
+  this.main_window = id;
+};
+
+// Get the main window scale
+Workspace.prototype.getMainWindowScale = function() {
+  return this.main_window_scale;
+};
+
+// Set the main window scale
+Workspace.prototype.setMainWindowScale = function(scale) {
+  if(scale <= 0) {
+    scale = 1;
+  }
+  if(scale >= 100) {
+    scale = 99;
+  }
+  this.main_window_scale = scale;
+};
+
 
 // if this module is the script being run, then run the window manager
 if (module == require.main) {
@@ -419,7 +456,7 @@ if (module == require.main) {
     nwm.addLayout(name, layouts[name]);
   });
   nwm.start(function() {
-    var re = repl.start();
+    var re = require('repl').start();
     re.context.nwm = nwm;
     re.context.Xh = Xh;
   });

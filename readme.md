@@ -162,10 +162,10 @@ Done:
 - Support switch to full screen requests (DONE)
 - Expose window classes to JS (DONE)
 - Ignore numlock (DONE)
+- Ignore transient windows (DONE)
 
 Todo:
 
-- Ignore transient windows (C)
 - Expose stacking order and stacking operations (C)
 - Display full info of PropertyNotify, ClientMessage, ConfigureRequest and ConfigureNotify as nwm should not honor some requests e.g. guake Ctrl+shift+t.
 - Multi-monitor support (C)
