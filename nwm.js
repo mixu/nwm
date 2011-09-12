@@ -77,6 +77,104 @@ NWM.prototype.show = function(id) {
   }
 };
 
+// Events
+// ------
+NWM.prototype.event = {};
+
+// Window events
+// -------------
+NWM.prototype.event.window = {};
+
+// A new window is added
+NWM.prototype.event.window.add = function(window) {
+  if(window.id) {
+    window.visible = true;
+    window.workspace = this.current_workspace;
+    // do not add floating windows
+    if(window.isfloating) {
+      console.log('Ignoring floating window: ', window);
+      return;
+    }
+
+    this.windows[window.id] = window;      
+    // windows might be placed outside the screen if the wm was terminated
+    console.log(window);
+    if(window.x > this.screen.width || window.y > this.screen.height) {
+      console.log('Moving window '+window.id+' on to screen');
+      this.move(window.id, 1, 1);
+    }
+    // set the new window as the main window for this workspace
+    // so new windows get the primary working area
+    this.setMainWindow(window.id);
+    console.log('onAdd', this.windows[window.id]);
+  }
+};
+
+// When a window is removed
+NWM.prototype.event.window.remove = function(id) {
+  console.log('onRemove', id);
+  if(this.windows[id]) {
+    delete this.windows[id];
+  }
+  this.rearrange();
+};
+
+// When a window is updated
+NWM.prototype.event.window.update = function(window) {
+  console.log('Window has been updated', window);
+  if(window.id && this.windows[window.id]) {      
+    var updated_window = this.windows[window.id];
+    Object.keys(window).forEach( function(key) {
+      updated_window[key] = window[key];
+    });
+  }
+};
+
+// When a window requests full screen mode
+NWM.prototype.event.window.fullscreen = function(id, status) {
+  console.log('Window requested full screen', id, status);
+  if(this.windows[id]) {
+    if(status) {
+      this.wm.resizeWindow(id, this.screen.width, this.screen.height);
+    } else {
+      this.rearrange();
+    }
+  }
+});
+
+// TODO - NOT IMPLEMENTED: A window is requesting to be configured to particular dimensions
+NWM.prototype.event.window.reconfigure = function(event){
+  return event;
+};
+
+// Mouse events
+// ------------
+NWM.prototype.event.mouse = {};
+
+// A mouse button has been clicked
+NWM.prototype.event.mouse.down = function(event) {
+  console.log('Mouse button pressed', event);
+  this.wm.focusWindow(event.id);
+};
+
+// A mouse drag is in progress
+NWM.prototype.event.mouse.drag = function(event) {
+  console.log('Mouse drag event', event);
+  // move when drag is triggered
+  var change_x = event.move_x - event.x;
+  var change_y = event.move_y - event.y;
+  var window = this.windows[event.id];
+  if(window) {
+    this.wm.moveWindow(event.id, window.x+change_x, window.y+change_y);      
+  }
+};
+
+NWM.prototype.event.mouse.enter = function(event){
+  console.log('focusing to window', event.id);
+  this.focused_window = event.id;
+  this.wm.focusWindow(event.id);
+});
+
 // Workspace operations
 // --------------------
 
@@ -195,71 +293,21 @@ NWM.prototype.start = function(callback) {
   this.wm = new X11wm();
   var self = this;  
 
-  // A new window is added
-  this.wm.on('add', function(window) {
-    if(window.id) {
-      window.visible = true;
-      window.workspace = self.current_workspace;
-      // do not add floating windows
-      if(window.isfloating) {
-        console.log('Ignoring floating window: ', window);
-        return;
-      }
+  // Window events
+  this.wm.on('add', function(window) { self.event.window.add.call(self, window); });
+  this.wm.on('remove', function(id) { self.event.window.remove.call(self, id); });
+  this.wm.on('update', function(window) { self.event.window.update.call(self, window); });
+  this.wm.on('fullscreen', function(id, status) { self.event.window.fullscreen.call(self, id, status); });
+  this.wm.on('configureRequest', function(event) { self.event.window.reconfigure.call(self, event); });
 
-      self.windows[window.id] = window;      
-      // windows might be placed outside the screen if the wm was terminated
-       console.log(window);
-      if(window.x > self.screen.width || window.y > self.screen.height) {
-        console.log('Moving window '+window.id+' on to screen');
-        self.move(window.id, 1, 1);
-      }
-      // set the new window as the main window for this workspace
-      // so new windows get the primary working area
-      self.setMainWindow(window.id);
-      console.log('onAdd', self.windows[window.id]);
-    }
-  });
-
-  this.wm.on('remove', function(id) {
-    console.log('onRemove', id);
-    if(self.windows[id]) {
-      delete self.windows[id];
-    }
-    self.rearrange();
-  });
-
+  // Screen events
   this.wm.on('rearrange', function() { self.rearrange(); }); 
+  this.wm.on('resize', function(screen) { self.screen = screen; });
 
-  /**
-   * A mouse button has been clicked
-   */
-  this.wm.on('mouseDown', function(event) {
-    console.log('Mouse button pressed', event);
-    self.wm.focusWindow(event.id);
-  });
-  this.wm.on('mouseDrag', function(event) {
-    console.log('Mouse drag event', event);
-    // move when drag is triggered
-    var change_x = event.move_x - event.x;
-    var change_y = event.move_y - event.y;
-    var window = self.windows[event.id];
-    if(window) {
-      self.wm.moveWindow(event.id, window.x+change_x, window.y+change_y);      
-    }
-  });
-
-  this.wm.on('enterNotify',function(event){
-    console.log('focusing to window', event.id);
-    self.focused_window = event.id;
-    self.wm.focusWindow(event.id);    
-  });
-
-  /**
-   * A window is requesting to be configured to particular dimensions
-   */
-  this.wm.on('configureRequest', function(event){
-    return event;
-  });
+  // Mouse events
+  this.wm.on('mouseDown', function(event) { self.event.mouse.down.call(self, event); });
+  this.wm.on('mouseDrag', function(event) { self.event.mouse.drag.call(self, event); });
+  this.wm.on('enterNotify', function(event) { self.event.mouse.enter.call(self, event); }); 
 
   /**
    * A key has been pressed
@@ -291,38 +339,6 @@ NWM.prototype.start = function(callback) {
         shortcut.callback(event);
       };
     });
-  });
-
-  /**
-   * When the screen is resized
-   */
-  this.wm.on('resize', function(screen) {
-    console.log('Screen size changed', screen);
-    self.screen = screen;
-  });
-
-  /**
-   * When a window is updated
-   */
-  this.wm.on('update', function(window) {
-    console.log('Window has been updated', window);
-    if(window.id && self.windows[window.id]) {      
-      var updated_window = self.windows[window.id];
-      Object.keys(window).forEach( function(key) {
-        updated_window[key] = window[key];
-      });
-    }
-  });
-
-  this.wm.on('fullscreen', function(id, status) {
-    console.log('Window requested full screen', id, status);
-    if(self.windows[id]) {
-      if(status) {
-        self.wm.resizeWindow(id, self.screen.width, self.screen.height);
-      } else {
-        self.rearrange();
-      }
-    }
   });
 
   var grab_keys = [];
@@ -398,6 +414,14 @@ NWM.prototype.require = function(filename) {
     console.log('Error: hot loading file ', fullname, 'failed. Probably a syntax error.');
   }
 };
+
+// Monitor
+//  has Workspaces
+//  has Windows
+
+// Workspace
+//  has Windows (subset of what the Monitor has)
+
 
 // Workspaces
 // ----------
