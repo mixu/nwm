@@ -140,7 +140,7 @@ NWM.prototype.event.window.fullscreen = function(id, status) {
       this.rearrange();
     }
   }
-});
+};
 
 // TODO - NOT IMPLEMENTED: A window is requesting to be configured to particular dimensions
 NWM.prototype.event.window.reconfigure = function(event){
@@ -173,7 +173,7 @@ NWM.prototype.event.mouse.enter = function(event){
   console.log('focusing to window', event.id);
   this.focused_window = event.id;
   this.wm.focusWindow(event.id);
-});
+};
 
 // Workspace operations
 // --------------------
