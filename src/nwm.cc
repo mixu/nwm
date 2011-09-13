@@ -64,7 +64,6 @@ enum callback_map {
   onConfigureRequest,
   onKeyPress,
   onEnterNotify,
-  onResize,
   onFullscreen,
   onLast
 };
@@ -174,7 +173,6 @@ public:
         v8::String::New("configureRequest"),
         v8::String::New("keyPress"),
         v8::String::New("enterNotify"),
-        v8::String::New("resize"),
         v8::String::New("fullscreen")
       };
 
