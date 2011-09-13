@@ -8,10 +8,6 @@
 
 // Native extension
 var X11wm = require('./build/default/nwm.node').NodeWM;
-// X11 keysym definitions
-var XK = require('./lib/keysymdef.js');
-// X.h defitions for key masks
-var Xh = require('./lib/x.js');
 
 // Generic evented collection
 // --------------------------
@@ -447,7 +443,7 @@ NWM.prototype.start = function(callback) {
 
   // A key has been pressed
   this.wm.on('keyPress', function(event) {
-    console.log('keyPress', event, String.fromCharCode(event.keysym), keysym_name, modifiers);
+    console.log('keyPress', event, String.fromCharCode(event.keysym));
     // find the matching callback and emit it
     self.shortcuts.forEach(function(shortcut) {
       if(event.keysym == shortcut.key && event.modifier == shortcut.modifier ) {
@@ -461,7 +457,7 @@ NWM.prototype.start = function(callback) {
     grab_keys.push( { key: shortcut.key, modifier: shortcut.modifier });
   });
   this.wm.keys(grab_keys);
-  this.wm.setup();  
+  this.wm.setup();
   this.wm.scan();
   this.wm.loop();
   if(callback) {
