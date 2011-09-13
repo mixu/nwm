@@ -31,7 +31,10 @@ layouts.tile = function(workspace) {
   // then split the other half among the rest of the screens
   var windows = workspace.visible();
   console.log('TILE', windows);
-  var screen = workspace.nwm.monitors.screen;
+  var screen = {
+    width: workspace.nwm.monitors.get(workspace.monitor).width,
+    height: workspace.nwm.monitors.get(workspace.monitor).height
+  };
   console.log('TILE screen', screen);  
   if(windows.length < 1) {
     return;
@@ -43,8 +46,7 @@ layouts.tile = function(workspace) {
     windows[0].resize(screen.width, screen.height);
   } else {
     // when main scale = 50, the divisor is 2
-    //nwm.getMainWindowScale()
-    var mainScaleFactor = (100 / 50 );
+    var mainScaleFactor = (100 / workspace.main_window_scale );
     var halfWidth = Math.floor(screen.width / mainScaleFactor);
     windows[mainId].move(0, 0);
     windows[mainId].resize(halfWidth, screen.height);

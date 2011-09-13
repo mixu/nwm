@@ -33,9 +33,10 @@ class Client {
 public:
   int id;
   Monitor *mon;  
-  Client(Window win, Monitor* monitor, int id, int x, int y, int width, int height, Bool isfloating) {
+  Client(Window win, Monitor* monitor, int mon_id, int id, int x, int y, int width, int height, Bool isfloating) {
     this->win = win;
     this->mon = monitor;
+    this->mon_id = mon_id;
     this->id = id;
     this->x = x;
     this->y = y;
@@ -119,6 +120,7 @@ public:
     result->Set(String::NewSymbol("id"), Integer::New(this->id));
     result->Set(String::NewSymbol("x"), Integer::New(this->x));
     result->Set(String::NewSymbol("y"), Integer::New(this->y));
+    result->Set(String::NewSymbol("monitor"), Integer::New(this->mon_id));
     result->Set(String::NewSymbol("height"), Integer::New(this->height));
     result->Set(String::NewSymbol("width"), Integer::New(this->width));
     result->Set(String::NewSymbol("title"), String::New(this->name));
@@ -133,6 +135,7 @@ public:
     char klass[256];
     char instance[256];
     int x, y, width, height;
+    int mon_id;
     Client *next;
     Client *snext;
     Window win;

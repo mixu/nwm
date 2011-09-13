@@ -5,6 +5,7 @@ class Monitor {
     inline void setHeight(int h) { this->height = h; }
     inline void setX(int x) { this->x = x; }
     inline void setY(int y) { this->y = y; }
+    inline int getId() { return this->id; }
     inline int getWidth() { return this->width; }
     inline int getHeight() { return this->height; }
     inline int getX() { return this->x; }

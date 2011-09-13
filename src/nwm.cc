@@ -284,6 +284,9 @@ public:
             // make screen object
             Local<Value> argv[1];
             Local<Object> result = Object::New();
+            result->Set(String::NewSymbol("id"), Integer::New(i));
+            result->Set(String::NewSymbol("x"), Integer::New(unique[i].x_org));
+            result->Set(String::NewSymbol("y"), Integer::New(unique[i].y_org));
             result->Set(String::NewSymbol("width"), Integer::New(unique[i].width));
             result->Set(String::NewSymbol("height"), Integer::New(unique[i].height));
             argv[0] = result;
@@ -322,6 +325,9 @@ public:
         // make screen object
         Local<Value> argv[1];
         Local<Object> result = Object::New();
+        result->Set(String::NewSymbol("id"), Integer::New(0));
+        result->Set(String::NewSymbol("x"), Integer::New(0));
+        result->Set(String::NewSymbol("y"), Integer::New(0));
         result->Set(String::NewSymbol("width"), Integer::New(hw->screen_width));
         result->Set(String::NewSymbol("height"), Integer::New(hw->screen_height));
         argv[0] = result;
@@ -330,7 +336,6 @@ public:
       }
     }
     hw->selmon = hw->wintomon(hw->root);
-
     return;
   }
 
@@ -346,7 +351,7 @@ public:
     // check whether the window is transient
     XGetTransientForHint(hw->dpy, win, &trans);
     isfloating = (trans != None);
-    Client* c = new Client(win, hw->selmon, hw->next_index, wa->x, wa->y, wa->height, wa->width, isfloating);
+    Client* c = new Client(win, hw->selmon, hw->selmon->getId(), hw->next_index, wa->x, wa->y, wa->height, wa->width, isfloating);
     c->updatetitle(hw->dpy);
     c->updateclass(hw->dpy);
     // attach to monitor
@@ -389,8 +394,6 @@ public:
     XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);    
     XMapWindow(hw->dpy, win);
 
-    // emit a rearrange
-    hw->Emit(onRearrange, 0, 0);
     delete c;
  }
 
@@ -883,10 +886,7 @@ public:
 
     GrabKeys(hw, hw->dpy, hw->root);
 
-    Local<Object> result = Object::New();
-    result->Set(String::NewSymbol("width"), Integer::New(hw->screen_width));
-    result->Set(String::NewSymbol("height"), Integer::New(hw->screen_height));
-    return scope.Close(result);
+    return Undefined();
   }
 
 
@@ -930,8 +930,9 @@ public:
       }
     }
 
-    Local<String> result = String::New("Scan done");
-    return scope.Close(result);
+    // emit a rearrange
+    hw->Emit(onRearrange, 0, 0);
+    return Undefined();
   }
 
   static Handle<Value> Loop(const Arguments& args) {
@@ -1025,6 +1026,8 @@ public:
               // dwm actually does this only once per window (e.g. for unknown windows only...)
               // that's because otherwise you'll cause a hang when you map a mapped window again...
               NodeWM::EmitAdd(hw, ev->window, &wa);
+              // emit a rearrange
+              hw->Emit(onRearrange, 0, 0);
             } else {
               fprintf(stderr, "Window is known\n");              
             }

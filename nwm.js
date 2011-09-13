@@ -25,8 +25,7 @@ var NWM = function() {
   // Keyboard shortcut lookup
   this.shortcuts = [];
   // monitors
-  this.monitors = new Monitor(this);
-  this.screen = {};
+  this.monitors = new MonitorList(this);
 }
 
 // Events
@@ -40,13 +39,17 @@ NWM.prototype.event.monitor = {};
 // A new monitor is added
 NWM.prototype.event.monitor.add = function(monitor) {
   console.log('add monitor', monitor);
-  this.monitors.screen.width = monitor.width;
-  this.monitors.screen.height = monitor.height;
+  var mon = this.monitors.get(monitor.id);
+  mon.width = monitor.width;
+  mon.height = monitor.height;
 };
 
 // A monitor is updated
 NWM.prototype.event.monitor.update = function(monitor) {
   console.log('update monitor', monitor);  
+  var mon = this.monitors.get(monitor.id);
+  mon.width = monitor.width;
+  mon.height = monitor.height;
 };
 
 // A monitor is removed
@@ -62,24 +65,24 @@ NWM.prototype.event.window = {};
 NWM.prototype.event.window.add = function(window) {
   if(window.id) {
     window.visible = true;
-    window.workspace = this.monitors.workspaces.current().id;
+    window.workspace = this.monitors.current().workspaces.current().id;
     // do not add floating windows
     if(window.isfloating) {
       console.log('Ignoring floating window: ', window);
       return;
     }
 
-    this.monitors.windows[window.id] = new Window(nwm, nwm.monitors, window);
+    this.monitors.current().windows[window.id] = new Window(nwm, window);
     // windows might be placed outside the screen if the wm was terminated
     console.log(window);
-    if(window.x > this.screen.width || window.y > this.screen.height) {
+    if(window.x > this.monitors.current().width || window.y > this.monitors.current().height) {
       console.log('Moving window '+window.id+' on to screen');
       window.move(1, 1);
     }
     // set the new window as the main window for this workspace
     // so new windows get the primary working area
-    this.monitors.workspaces.current().setMainWindow(window.id);
-    console.log('onAdd', this.monitors.windows);
+    this.monitors.current().workspaces.current().setMainWindow(window.id);
+    console.log('onAdd', this.monitors.current().windows);
   }
 };
 
@@ -106,9 +109,9 @@ NWM.prototype.event.window.update = function(window) {
 // When a window requests full screen mode
 NWM.prototype.event.window.fullscreen = function(id, status) {
   console.log('Window requested full screen', id, status);
-  if(this.monitors.windows[id]) {
+  if(this.monitors.current().windows[id]) {
     if(status) {
-      this.wm.resizeWindow(id, this.screen.width, this.screen.height);
+      this.wm.resizeWindow(id, this.monitors.current().width, this.monitors.current().height);
     } else {
       this.rearrange();
     }
@@ -190,8 +193,11 @@ NWM.prototype.start = function(callback) {
   this.wm.on('configureRequest', function(event) { self.event.window.reconfigure.call(self, event); });
 
   // Screen events
-  this.wm.on('rearrange', function() { self.monitors.workspaces.current().rearrange(); }); 
-  this.wm.on('resize', function(screen) { self.screen = screen; });
+  this.wm.on('rearrange', function() { self.monitors.current().workspaces.current().rearrange(); }); 
+  this.wm.on('resize', function(screen) { 
+    self.monitors.current().width = screen.width;
+    self.monitors.current().height = screen.height;
+  });
 
   // Mouse events
   this.wm.on('mouseDown', function(event) { self.event.mouse.down.call(self, event); });
@@ -235,7 +241,7 @@ NWM.prototype.start = function(callback) {
     grab_keys.push( { key: shortcut.key, modifier: shortcut.modifier });
   });
   this.wm.keys(grab_keys);
-  this.screen = this.wm.setup();  
+  this.wm.setup();  
   this.wm.scan();
   this.wm.loop();
   if(callback) {
@@ -307,15 +313,20 @@ NWM.prototype.require = function(filename) {
 
 // Windows
 // -------
-var Window = function(nwm, monitor, window) {
-  this.monitor = monitor;
+var Window = function(nwm, window) {
   this.nwm = nwm;
-  this.visible = true;
+  // Window properties
   this.id = window.id;
   this.x = window.x;
   this.y = window.y;
+  this.monitor = window.monitor;
   this.width = window.width;
   this.height = window.height;
+  this.title = window.title;
+  this.instance = window.instance;
+  this.class = window.class;
+  this.isfloating = window.isfloating;  
+  this.visible = window.visible;
   this.workspace = window.workspace;
 };
 
@@ -340,7 +351,7 @@ Window.prototype.hide = function() {
   if(this.visible) {
     this.visible = false;
     console.log('hide', this.id);
-    this.nwm.wm.moveWindow(this.id, this.x + 2 * nwm.screen.width, this.y);
+    this.nwm.wm.moveWindow(this.id, this.x + 2 * nwm.monitors.get(window.monitor).width, this.y);
   }
 };
 
@@ -354,10 +365,12 @@ Window.prototype.show = function() {
 };
 
 // Monitor
-var Monitor = function(nwm) {
+var Monitor = function(nwm, id) {
   this.nwm = nwm;
+  this.id = id;
   // Screen dimensions
-  this.screen = {};
+  this.width = 0;
+  this.height = 0;
   // List of windows
   this.windows = {};
   // List of workspaces
@@ -426,9 +439,27 @@ Monitor.prototype.getMainWindow = function() {
   return this.workspaces.current().getMainWindow();
 };
 
+var MonitorList = function(nwm) {
+  this.nwm = nwm;
+  this.monitors = {};
+  this.current_monitor = 0;
+};
+
+// Get a workspace
+MonitorList.prototype.get = function(id) {
+  if(!this.monitors[id]) {
+    this.monitors[id] = new Monitor(this.nwm, id);
+  }
+  return this.monitors[id];  
+};
+
+MonitorList.prototype.current = function() {
+  return this.get(this.current_monitor);
+}
+
 // Workspace
 // ---------
-var Workspace = function(nwm, id, layout) {
+var Workspace = function(nwm, id, layout, monitor) {
   this.nwm = nwm;
   //  has an id
   this.id = id;
@@ -440,12 +471,13 @@ var Workspace = function(nwm, id, layout) {
   this.main_window = null;
   // The main window can be scaled (interpretation differs)
   this.main_window_scale = 50;
+  this.monitor = monitor;
 };
 
 // Get the currently visible windows (used in implementing layouts)
 Workspace.prototype.visible = function() {
   var self = this;
-  return nwm.monitors.filter(function(window){
+  return nwm.monitors.current().filter(function(window){
     return (
       window.visible  // is visible
       && window.workspace == self.id // on current workspace
@@ -513,9 +545,9 @@ WorkspaceList.prototype.get = function(id) {
     // use the current workspace, or if that does not exist, the default values
     var layout_names = Object.keys(this.nwm.layouts);
     if(this.workspaces[this.current_workspace]) {
-      this.workspaces[id] = new Workspace(this.nwm, id, current.layout || layout_names[0]);
+      this.workspaces[id] = new Workspace(this.nwm, id, current.layout || layout_names[0], this.nwm.monitors.current().id);
     } else {
-      this.workspaces[id] = new Workspace(this.nwm, id, layout_names[0]);
+      this.workspaces[id] = new Workspace(this.nwm, id, layout_names[0], this.nwm.monitors.current().id);
     }
   }
   return this.workspaces[id];  
