@@ -31,6 +31,8 @@ Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int siz
 
 class Client {
 public:
+  int id;
+  Monitor *mon;  
   Client(Window win, Monitor* monitor, int id, int x, int y, int width, int height, Bool isfloating) {
     this->win = win;
     this->mon = monitor;
@@ -41,12 +43,10 @@ public:
     this->height = height;
     this->isfloating = isfloating;
   }
-  static Client* getByWindow(Monitor* monit, Window win);
-  static Client* getById(Monitor* monit, int id);
+  static Client* getByWindow(std::vector <Monitor>* monits, Window win);
+  static Client* getById(std::vector <Monitor>* monits, int id);
   inline int getId() { return this->id; }
   inline Window getWin() { return this->win; }
-  void attach();
-  void detach(); 
   void resize(Display* dpy, int width, int height) {
     fprintf( stderr, "ResizeWindow: id=%d width=%d height=%d \n", id, width, height);    
     XResizeWindow(dpy, this->win, width, height);    
@@ -129,14 +129,12 @@ public:
   }
 
   private:
-    int id;
     char name[256];
     char klass[256];
     char instance[256];
     int x, y, width, height;
     Client *next;
     Client *snext;
-    Monitor *mon;
     Window win;
     Bool isfloating;
     Bool isprotodel(Display* dpy) {

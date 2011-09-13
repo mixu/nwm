@@ -1,27 +1,22 @@
-Client* Client::getByWindow(Monitor* monit, Window win) {
-  Client *c;
-  for(c = monit->clients; c; c = c->next)
-    if(c->win == win)
-      return c;
+
+Client* Client::getByWindow(std::vector <Monitor>* monits, Window win) {
+  unsigned int i, j;
+  for(i = 0; i < monits->size(); j++) {
+    for(j = 0; j < monits->at(i).clients.size(); j++) {
+      if(monits->at(i).clients[j].win == win)
+        return &monits->at(i).clients[j];
+    }
+  }
   return NULL;
 }
 
-Client* Client::getById(Monitor* monit, int id) {
-  Client *c;
-  for(c = monit->clients; c; c = c->next)
-    if(c->id == id)
-      return c;
+Client* Client::getById(std::vector <Monitor>* monits, int id) {
+  unsigned int i, j;
+  for(i = 0; i < monits->size(); j++) {
+    for(j = 0; j < monits->at(i).clients.size(); j++) {
+      if(monits->at(i).clients[j].id == id)
+        return &monits->at(i).clients[j];
+    }
+  }
   return NULL;  
 }
-
-void Client::attach() {
-  this->next = this->mon->clients;
-  this->mon->clients = this;  
-}
-
-void Client::detach(){
-  Client **tc;
-  for(tc = &this->mon->clients; *tc && *tc != this; tc = &(*tc)->next);
-  *tc = this->next;      
-}
-

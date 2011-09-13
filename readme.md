@@ -166,6 +166,7 @@ Done:
 
 Todo:
 
+- Ignore popup windows (C)
 - Expose stacking order and stacking operations (C)
 - Display full info of PropertyNotify, ClientMessage, ConfigureRequest and ConfigureNotify as nwm should not honor some requests e.g. guake Ctrl+shift+t.
 - Multi-monitor support (C)

@@ -7,6 +7,7 @@
 #include <node.h>
 #include <ev.h>
 
+#include <vector>
 #include <errno.h>
 #include <locale.h>
 #include <stdarg.h>
@@ -51,8 +52,12 @@ typedef struct NodeWM NodeWM;
 // make these classes of their own
 
 enum callback_map { 
-  onAdd,  
-  onRemove,
+  onAddMonitor,
+  onUpdateMonitor,
+  onRemoveMonitor,
+  onAddWindow,
+  onUpdateWindow,
+  onRemoveWindow,
   onRearrange,
   onMouseDown,
   onMouseDrag,
@@ -60,7 +65,6 @@ enum callback_map {
   onKeyPress,
   onEnterNotify,
   onResize,
-  onUpdate,
   onFullscreen,
   onLast
 };
@@ -77,7 +81,8 @@ private:
   Window wnd;
   Window root;
   Window selected;
-  Monitor* monit;
+  Monitor* selmon;
+  std::vector <Monitor> monits;
   // screen dimensions
   int screen, screen_width, screen_height;
   // callback storage
@@ -85,6 +90,7 @@ private:
   // grabbed keys
   Key* keys;
   unsigned int numlockmask;
+
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -125,7 +131,7 @@ public:
   // C++ constructor
   NodeWM() :
     next_index(1),
-    monit(NULL),
+    selmon(NULL),
     keys(NULL),
     numlockmask(0)
   {
@@ -156,8 +162,12 @@ public:
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     v8::Local<v8::String> map[onLast+1] = {
-        v8::String::New("add"),
-        v8::String::New("remove"),
+        v8::String::New("addMonitor"),
+        v8::String::New("updateMonitor"),
+        v8::String::New("removeMonitor"),
+        v8::String::New("addWindow"),
+        v8::String::New("updateWindow"),
+        v8::String::New("removeWindow"),
         v8::String::New("rearrange"),
         v8::String::New("mouseDown"),
         v8::String::New("mouseDrag"),
@@ -165,7 +175,6 @@ public:
         v8::String::New("keyPress"),
         v8::String::New("enterNotify"),
         v8::String::New("resize"),
-        v8::String::New("update"),
         v8::String::New("fullscreen")
       };
 
@@ -197,22 +206,131 @@ public:
     }
   }
 
-  static Monitor* createMonitor(void) {
-    Monitor *m;
-    if(!(m = (Monitor *)calloc(1, sizeof(Monitor)))) {
-      fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(Monitor));
-      exit( -1 );            
+  static Bool isuniquegeom(XineramaScreenInfo *unique, size_t len, XineramaScreenInfo *info) {
+    unsigned int i;
+
+    for(i = 0; i < len; i++)
+      if(unique[i].x_org == info->x_org && unique[i].y_org == info->y_org
+      && unique[i].width == info->width && unique[i].height == info->height)
+        return False;
+    return True;
+  }
+
+  Monitor * wintomon(Window w) {
+    int x, y;
+    Client *c;
+    if(w == root && getrootptr(&x, &y))
+      return ptrtomon(x, y);
+    if((c = Client::getByWindow(&this->monits, w)))
+      return c->mon;
+    // ERROR!
+    return NULL;
+  }
+
+  Monitor * ptrtomon(int x, int y) {
+    unsigned int i;
+    for(i = 0; i < this->monits.size(); i++) {
+      int mx = monits[i].getX();
+      int my = monits[i].getY();
+      int mw = monits[i].getWidth();
+      int mh = monits[i].getHeight();
+      if ((x) >= (mx) && (x) < (mx) + (mw) && (y) >= (my) && (y) < (my) + (mh)) {
+        return &monits[i];        
+      }
     }
-   fprintf( stderr, "Create monitor\n");
-    return m;    
+    // ERROR!
+    return NULL;
   }
 
   static void updateGeometry(NodeWM* hw) {
-    if(!hw->monit) {
-      hw->monit = new Monitor();
+    if(XineramaIsActive(hw->dpy)) {
+      int i, n, nn;
+      unsigned int j;
+      Monitor *m;
+      XineramaScreenInfo *info = XineramaQueryScreens(hw->dpy, &nn);
+      XineramaScreenInfo *unique = NULL;
+
+      n = hw->monits.size();
+      /* only consider unique geometries as separate screens */
+      if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
+        fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
+        exit( -1 );         
+      }
+      for(i = 0, j = 0; i < nn; i++)
+        if(isuniquegeom(unique, j, &info[i]))
+          memcpy(&unique[j++], &info[i], sizeof(XineramaScreenInfo));
+      XFree(info);
+      nn = j;
+      if(n <= nn) {
+        // reserve space
+        for(i = 0; i < (nn - n); i++) { /* new monitors available */
+          fprintf(stderr, "Monitor %d \n", i);
+          m = new Monitor();
+          hw->monits.push_back(*m);
+          delete m;
+        }
+        // update monitor dimensions
+        for(i = 0; i < nn; i++) {
+          if(i >= n
+          || (unique[i].x_org != hw->monits[i].getX() || unique[i].y_org != hw->monits[i].getY()
+              || unique[i].width != hw->monits[i].getWidth() || unique[i].height != hw->monits[i].getHeight()))
+          {
+            hw->monits[i].setId(i);
+            hw->monits[i].setX(unique[i].x_org);
+            hw->monits[i].setY(unique[i].y_org);
+            hw->monits[i].setWidth(unique[i].width);
+            hw->monits[i].setHeight(unique[i].height);
+            // emit ADD MONITOR or UPDATE MONITOR here
+            // make screen object
+            Local<Value> argv[1];
+            Local<Object> result = Object::New();
+            result->Set(String::NewSymbol("width"), Integer::New(unique[i].width));
+            result->Set(String::NewSymbol("height"), Integer::New(unique[i].height));
+            argv[0] = result;
+            if(i >= n) {
+              hw->Emit(onAddMonitor, 1, argv);
+            } else {
+              hw->Emit(onUpdateMonitor, 1, argv);              
+            }
+          }          
+        }
+      }
+      else { /* less monitors available nn < n */
+        for(i = nn; i < n; i++) {
+          // remove clients
+          for(j = 0; j < hw->monits[i].clients.size(); j++) {
+            // emit REATTACH WINDOW (j)
+            hw->monits[i].clients.pop_back();
+          }
+          // emit REMOVE MONITOR (i)
+          // remove monitor          
+          hw->monits.pop_back();
+        }
+      }
+      free(unique);
+    } else {
+      if(hw->monits.size() == 0) {
+        Monitor *m;
+        m = new Monitor();
+        m->setId(0);
+        m->setX(0);
+        m->setY(0);
+        m->setWidth(hw->screen_width);
+        m->setHeight(hw->screen_height);
+        hw->monits.push_back(*m);
+        // emit ADD MONITOR
+        // make screen object
+        Local<Value> argv[1];
+        Local<Object> result = Object::New();
+        result->Set(String::NewSymbol("width"), Integer::New(hw->screen_width));
+        result->Set(String::NewSymbol("height"), Integer::New(hw->screen_height));
+        argv[0] = result;
+        hw->Emit(onAddMonitor, 1, argv);
+        delete m;
+      }
     }
-    hw->monit->setWidth(hw->screen_width);
-    hw->monit->setHeight(hw->screen_height);
+    hw->selmon = hw->wintomon(hw->root);
+
     return;
   }
 
@@ -228,15 +346,16 @@ public:
     // check whether the window is transient
     XGetTransientForHint(hw->dpy, win, &trans);
     isfloating = (trans != None);
-    Client* c = new Client(win, hw->monit, hw->next_index, wa->x, wa->y, wa->height, wa->width, isfloating);
+    Client* c = new Client(win, hw->selmon, hw->next_index, wa->x, wa->y, wa->height, wa->width, isfloating);
     c->updatetitle(hw->dpy);
     c->updateclass(hw->dpy);
-    c->attach();
+    // attach to monitor
+    hw->selmon->clients.push_back(*c);
     argv[0] = c->toNode(); 
     hw->next_index++;
 
     // call the callback in Node.js, passing the window object...
-    hw->Emit(onAdd, 1, argv);
+    hw->Emit(onAddWindow, 1, argv);
       
     // configure the window
     XConfigureEvent ce;
@@ -272,7 +391,8 @@ public:
 
     // emit a rearrange
     hw->Emit(onRearrange, 0, 0);
-  }
+    delete c;
+ }
 
   static Handle<Value> ResizeWindow(const Arguments& args) {
     HandleScope scope;
@@ -282,7 +402,7 @@ public:
     int width = args[1]->IntegerValue();
     int height = args[2]->IntegerValue();
 
-    Client* c = Client::getById(hw->monit, id);
+    Client* c = Client::getById(&hw->monits, id);
     if(c) {
       c->resize(hw->dpy, width, height);
     }
@@ -297,7 +417,7 @@ public:
     int x = args[1]->IntegerValue();
     int y = args[2]->IntegerValue();
 
-    Client* c = Client::getById(hw->monit, id);
+    Client* c = Client::getById(&hw->monits, id);
     if(c) {
       c->move(hw->dpy, x, y);
     }
@@ -319,7 +439,7 @@ public:
 
     int id = args[0]->IntegerValue();
 
-    Client* c = Client::getById(hw->monit, id);
+    Client* c = Client::getById(&hw->monits, id);
     if(c) {
       c->kill(hw->dpy);
     }
@@ -328,7 +448,7 @@ public:
 
   static void RealFocus(NodeWM* hw, int id) {
     Window win;
-    Client* c = Client::getById(hw->monit, id);
+    Client* c = Client::getById(&hw->monits, id);
     if(c) {
       win = c->getWin();
     } else {
@@ -463,7 +583,7 @@ public:
         fprintf( stderr, "grab key -- key: %d modifier %d \n", curr->keysym, curr->mod);
         // also grab the combinations of screen lock and num lock (as those should not matter)
         for(i = 0; i < 4; i++) {
-          XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod | modifiers[i], hw->root, True, GrabModeAsync, GrabModeAsync);        
+          XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod | modifiers[i], hw->root, True, GrabModeAsync, GrabModeAsync);
         }
       }      
     }
@@ -477,7 +597,7 @@ public:
 
     // fetch window: ev->window --> to window id
     // fetch root_x,root_y
-    Client* c = Client::getByWindow(hw->monit, ev->window);
+    Client* c = Client::getByWindow(&hw->monits, ev->window);
     if(c) {
       int id = c->getId();
       argv[0] = NodeWM::makeButtonPress(id, ev->x, ev->y, ev->button, ev->state);
@@ -598,7 +718,7 @@ public:
 
     fprintf(stderr, "EmitEnterNotify\n");
 
-    Client* c = Client::getByWindow(hw->monit, ev->window);
+    Client* c = Client::getByWindow(&hw->monits, ev->window);
     if(c) {
       int id = c->getId();
       argv[0] = NodeWM::makeEvent(id);
@@ -609,7 +729,7 @@ public:
 
   static void EmitFocusIn(NodeWM* hw, XEvent *e) {
     XFocusChangeEvent *ev = &e->xfocus;
-    Client* c = Client::getByWindow(hw->monit, ev->window);
+    Client* c = Client::getByWindow(&hw->monits, ev->window);
     if(c) {
       int id = c->getId();
       RealFocus(hw, id);
@@ -619,7 +739,7 @@ public:
   static void EmitUnmapNotify(NodeWM* hw, XEvent *e) {
     Client *c;
     XUnmapEvent *ev = &e->xunmap;
-    if((c = Client::getByWindow(hw->monit, ev->window)))
+    if((c = Client::getByWindow(&hw->monits, ev->window)))
       EmitRemove(hw, c, False);
   }
 
@@ -627,7 +747,7 @@ public:
     Client *c;
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
-    if((c = Client::getByWindow(hw->monit, ev->window)))
+    if((c = Client::getByWindow(&hw->monits, ev->window)))
       EmitRemove(hw, c, True);    
   }
 
@@ -640,12 +760,6 @@ public:
       hw->screen_height = ev->height;
       // update monitor structures
       updateGeometry(hw);
-      // make screen object
-      Local<Object> result = Object::New();
-      result->Set(String::NewSymbol("width"), Integer::New(hw->screen_width));
-      result->Set(String::NewSymbol("height"), Integer::New(hw->screen_height));
-      argv[0] = result;
-      hw->Emit(onResize, 1, argv);
       hw->Emit(onRearrange, 0, 0);
     }
   }
@@ -659,7 +773,7 @@ public:
       return; // ignore property deletes
     } else {
       Local<Value> argv[1];
-      Client* c = Client::getByWindow(hw->monit, ev->window);
+      Client* c = Client::getByWindow(&hw->monits, ev->window);
       if(c) {
         Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
         if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
@@ -667,7 +781,7 @@ public:
           c->updateclass(hw->dpy);
           argv[0] = c->toNode();
           // call the callback in Node.js, passing the window object...
-          hw->Emit(onUpdate, 1, argv);              
+          hw->Emit(onUpdateWindow, 1, argv);
         }
       }
     }
@@ -675,7 +789,7 @@ public:
 
   static void EmitClientMessage(NodeWM* hw, XEvent *e) {
     XClientMessageEvent *cme = &e->xclient;
-    Client *c = Client::getByWindow(hw->monit, cme->window);
+    Client *c = Client::getByWindow(&hw->monits, cme->window);
     Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
     Atom NetWMFullscreen = XInternAtom(hw->dpy, "_NET_WM_STATE_FULLSCREEN", False);
     Local<Value> argv[2];
@@ -703,11 +817,16 @@ public:
   static void EmitRemove(NodeWM* hw, Client *c, Bool destroyed) {
     fprintf( stderr, "EmitRemove\n");
     int id = c->getId();
+    unsigned int i;
     // emit a remove
     Local<Value> argv[1];
     argv[0] = Integer::New(id);
-    hw->Emit(onRemove, 1, argv);
-    c->detach();
+    hw->Emit(onRemoveWindow, 1, argv);
+    // remove from monitor
+    for(i = 0; i < c->mon->clients.size(); i++) {
+      if(c->mon->clients[i].id == id)
+         c->mon->clients.erase(c->mon->clients.begin() + i);
+    }
     if(!destroyed) {
       XGrabServer(hw->dpy);
       XUngrabButton(hw->dpy, AnyButton, AnyModifier, c->getWin());
@@ -900,7 +1019,7 @@ public:
             if(wa.override_redirect)
               return;
             fprintf(stderr, "MapRequest\n");
-            Client* c = Client::getByWindow(hw->monit, ev->window);
+            Client* c = Client::getByWindow(&hw->monits, ev->window);
             if(c == NULL) {
               fprintf(stderr, "Emit manage!\n");
               // dwm actually does this only once per window (e.g. for unknown windows only...)
