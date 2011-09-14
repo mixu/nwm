@@ -32,7 +32,7 @@ layouts.tile = function(workspace) {
   var windows = workspace.visible();
   console.log('TILE', workspace, windows);
   var screen = workspace.monitor;
-  console.log('TILE screen', screen);  
+  console.log('TILE screen', screen);
   if(Object.keys(windows).length < 1) {
     return;
   }
