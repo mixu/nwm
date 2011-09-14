@@ -242,6 +242,7 @@ public:
 
   static void updateGeometry(NodeWM* hw) {
     if(XineramaIsActive(hw->dpy)) {
+      fprintf( stderr, "Xinerama active\n");
       int i, n, nn;
       unsigned int j;
       Monitor *m;
@@ -249,6 +250,7 @@ public:
       XineramaScreenInfo *unique = NULL;
 
       n = hw->monits.size();
+      fprintf( stderr, "Monitors known %d, minitors found %d\n", n, nn);
       /* only consider unique geometries as separate screens */
       if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
         fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
@@ -288,6 +290,7 @@ public:
             result->Set(String::NewSymbol("width"), Integer::New(unique[i].width));
             result->Set(String::NewSymbol("height"), Integer::New(unique[i].height));
             argv[0] = result;
+            fprintf( stderr, "Emit monitor %d\n", i);
             if(i >= n) {
               hw->Emit(onAddMonitor, 1, argv);
             } else {
@@ -297,6 +300,7 @@ public:
         }
       }
       else { /* less monitors available nn < n */
+        fprintf( stderr, "Less monitors available %d %d\n", n, nn);
         for(i = nn; i < n; i++) {
           // remove clients
           for(j = 0; j < hw->monits[i].clients.size(); j++) {
