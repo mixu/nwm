@@ -250,11 +250,11 @@ public:
       XineramaScreenInfo *unique = NULL;
 
       n = hw->monits.size();
-      fprintf( stderr, "Monitors known %d, minitors found %d\n", n, nn);
+      fprintf( stderr, "Monitors known %d, monitors found %d\n", n, nn);
       /* only consider unique geometries as separate screens */
       if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
         fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
-        exit( -1 );         
+        exit( -1 );
       }
       for(i = 0, j = 0; i < nn; i++)
         if(isuniquegeom(unique, j, &info[i]))
@@ -501,24 +501,24 @@ public:
    */
   void GrabButtons(Window wnd, Bool focused) {
     this->updatenumlockmask();
-    {
-      unsigned int i;
-      unsigned int modifiers[] = { 0, LockMask, this->numlockmask, this->numlockmask|LockMask };
-      XUngrabButton(this->dpy, AnyButton, AnyModifier, wnd);
-      if(focused) {
-        fprintf( stderr, "GRABBUTTONS - focused: true\n");
-          for(i = 0; i < 4; i++) {
-            XGrabButton(dpy, Button1,
-                              Mod4Mask|ControlMask|modifiers[i],
-                              wnd, False, (ButtonPressMask|ButtonReleaseMask),
-                              GrabModeAsync, GrabModeSync, None, None);            
-          }
-      } else {
-        fprintf( stderr, "GRABBUTTONS - focused: false\n");
-        XGrabButton(this->dpy, AnyButton, AnyModifier, wnd, False,
-                    (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
-      }
-    }
+//    {
+//      unsigned int i;
+//      unsigned int modifiers[] = { 0, LockMask, this->numlockmask, this->numlockmask|LockMask };
+//      XUngrabButton(this->dpy, AnyButton, AnyModifier, wnd);
+//      if(focused) {
+//        fprintf( stderr, "GRABBUTTONS - focused: true\n");
+//          for(i = 0; i < 4; i++) {
+//            XGrabButton(dpy, Button1,
+//                              Mod4Mask|ControlMask|modifiers[i],
+//                              wnd, False, (ButtonPressMask|ButtonReleaseMask),
+//                              GrabModeAsync, GrabModeSync, None, None);            
+//          }
+//      } else {
+//        fprintf( stderr, "GRABBUTTONS - focused: false\n");
+//        XGrabButton(this->dpy, AnyButton, AnyModifier, wnd, False,
+//                    (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
+//      }
+//    }
   }
 
   /**

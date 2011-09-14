@@ -51,7 +51,6 @@ Collection.prototype.update = function(id, values) {
 };
 
 Collection.prototype.exists = function(id) {
-  console.log('EXists check', id, this.items[id]);
   return !!this.items[id];
 };
 
@@ -149,7 +148,7 @@ var Monitor = function(nwm, monitor) {
   // Listen to events
   var self = this;
   nwm.on('add window', function(window) {
-    console.log('Monitor add window', window);
+    console.log('Monitor add window', window.id);
     if(window.monitor == self.id) {
       self.window_ids.push(window.id);
       // Set the new window as the main window for this workspace so new windows get the primary working area
@@ -157,7 +156,7 @@ var Monitor = function(nwm, monitor) {
     }
   });
   nwm.on('remove window', function(id) {
-    console.log('Monitor remove window', id, self.window_ids);
+    console.log('Monitor remove window', id);
     var index = -1;
     self.window_ids.some(function(tid, inx) {
       if(tid == id) {
@@ -168,7 +167,6 @@ var Monitor = function(nwm, monitor) {
     });
     if(index != -1) {      
       self.window_ids.splice(index, 1);
-      console.log('Monitor REAL remove window', id, self.window_ids);
       self.workspaces.get(self.workspaces.current).rearrange();
     }
   });
@@ -178,7 +176,6 @@ var Monitor = function(nwm, monitor) {
 Monitor.prototype.filter = function(filtercb) {
   var self = this;
   var results = {};
-  console.log('filter ids', this.window_ids);
   this.window_ids.forEach(function(id){
     var window = self.nwm.windows.get(id);
     // If a filter callback is not set, then take all items
@@ -246,7 +243,6 @@ var Workspace = function(nwm, id, layout, monitor) {
 Workspace.prototype.visible = function() {
   var self = this;
   return this.monitor.filter(function(window){
-    console.log('filter item', window);
     return (window.visible  // is visible
       && window.workspace == self.id // on current workspace
     );    
@@ -269,7 +265,6 @@ Workspace.prototype.getMainWindow = function() {
   if(this.nwm.windows.exists(this.main_window)){
     var window = this.nwm.windows.get(this.main_window);
     if(window.workspace == this.id && window.visible) {
-      console.log('Window exists', this.main_window, window);
       return this.main_window;
     }
   }
@@ -359,7 +354,6 @@ NWM.prototype.event.window.add = function(window) {
       window.move(1, 1);
     }
     this.windows.add(window);
-    console.log('onAdd', window);
   }
 };
 
@@ -367,7 +361,6 @@ NWM.prototype.event.window.add = function(window) {
 NWM.prototype.event.window.remove = function(id) {
   console.log('onRemove', id);
   this.windows.remove(function(window) { return (window.id != id); });
-  console.log('RESULT from onremove', this.windows);
 };
 
 // When a window is updated
@@ -412,7 +405,7 @@ NWM.prototype.event.mouse.drag = function(event) {
   // move when drag is triggered
   var change_x = event.move_x - event.x;
   var change_y = event.move_y - event.y;
-  var window = this.monitors.windows[event.id];
+  var window = this.windows.exists(event.id) && this.windows.get(event.id);
   if(window) {
     this.wm.moveWindow(event.id, window.x+change_x, window.y+change_y);      
   }
