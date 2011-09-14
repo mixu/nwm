@@ -199,8 +199,12 @@ var Monitor = function(nwm, monitor) {
     if(window.monitor == self.id) {
       self.window_ids.push(window.id);
       // Set the new window as the main window for this workspace so new windows get the primary working area
-      self.workspaces.get(self.workspaces.current).setMainWindow(window.id);      
+      self.workspaces.get(self.workspaces.current).mainWindow = window.id;
     }
+    Object.keys(self.workspaces.items).forEach(function(ws_id) {
+      self.workspaces.get(ws_id).rearrange();
+    });
+
   });
   nwm.on('remove window', function(id) {
     console.log('Monitor remove window', id);
@@ -286,6 +290,33 @@ var Workspace = function(nwm, id, layout, monitor) {
   this.monitor = monitor;
 };
 
+Workspace.prototype = {
+  // Get the main window
+  get mainWindow(){
+    // check if the current window:
+    // 1) exists
+    // 2) is on this workspace
+    // 3) is visible
+    // 4) is on the current monitor
+    if(this.nwm.windows.exists(this.main_window)){
+      var window = this.nwm.windows.get(this.main_window);
+      if(window.workspace == this.id && window.visible && window.monitor == this.monitor.id) {
+        return this.main_window;
+      }
+    }
+    // otherwise, take all the visible windows on this workspace
+    // and pick the largest id
+    var window_ids = Object.keys(this.visible());
+    console.log('Take largest', window_ids);
+    this.main_window = Math.max.apply(Math, window_ids);
+    return this.main_window;
+  },
+  // Set the main window
+  set mainWindow(id){
+    this.main_window = id;
+  }
+};
+
 // Get the currently visible windows (used in implementing layouts)
 Workspace.prototype.visible = function() {
   var self = this;
@@ -302,31 +333,6 @@ Workspace.prototype.rearrange = function() {
   console.log('rearrange', this.layout);
   var callback = this.nwm.layouts[this.layout];
   callback(this);
-};
-
-// Get the main window
-Workspace.prototype.getMainWindow = function() {
-  // check if the current window:
-  // 1) exists
-  // 2) is on this workspace
-  // 3) is visible
-  if(this.nwm.windows.exists(this.main_window)){
-    var window = this.nwm.windows.get(this.main_window);
-    if(window.workspace == this.id && window.visible) {
-      return this.main_window;
-    }
-  }
-  // otherwise, take all the visible windows on this workspace
-  // and pick the largest id
-  var window_ids = Object.keys(this.visible());
-  console.log('Take largest', window_ids);
-  this.main_window = Math.max.apply(Math, window_ids);
-  return this.main_window;
-};
-
-// Set the main window
-Workspace.prototype.setMainWindow = function(id) {
-  this.main_window = id;
 };
 
 // Get the main window scale
@@ -461,10 +467,14 @@ NWM.prototype.event.mouse.drag = function(event) {
 
 NWM.prototype.event.mouse.enter = function(event){
   console.log('focusing to window', event.id);
-  var window = this.windows.get(event.id);
-  console.log('focused monitor is ', window.monitor);
-  this.monitors.get(window.monitor).focused_window = event.id;
-  this.wm.focusWindow(event.id);
+  if(this.windows.exists(event.id)) {
+    var window = this.windows.get(event.id);
+    console.log('focused monitor is ', window.monitor);
+    this.monitors.get(window.monitor).focused_window = event.id;
+    this.wm.focusWindow(event.id);
+  } else {
+    console.log('WARNING got focus event for nonexistent (transient) window', event);
+  }
 };
 
 // Layout operations

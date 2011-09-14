@@ -193,15 +193,16 @@ Done:
     - git clone + npm installation of personalized config
     - Code hot loading from file
 - Setting main focus should move that window to the first window in grid layout (DONE)
+- Multi-monitor bug fixes:
+    - GetMainWindow() should take into account whether the window is on the same monitor as the workspace (JS)
+    - Rearrange should apply to all windows (e.g. when a new window is mapped it is put at 0,0 but is associated with the focused monitor in C) (TESTME)
+    - Window termination relies on nwm.focused_window which is deprecated (JS)
 
 Todo:
 
 - Multi-monitor bug fixes:
     - Need a key to reassign a window to a different monitor (JS)
-    - Rearrange should apply to all windows (e.g. when a new window is mapped it is put at 0,0 but is associated with the focused monitor in C) (JS)
     - The window_ids set of Monitors is not updated when a window's monitor_id is changed (JS)
-    - GetMainWindow() should take into account whether the window is on the same monitor as the workspace (JS)
-    - Window termination relies on nwm.focused_window which is deprecated (JS)
     - Focused_window is funky, probably because window.monitor is not updated.
 - TCP or HTTP configuration interface (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
