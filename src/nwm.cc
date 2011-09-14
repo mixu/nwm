@@ -720,6 +720,7 @@ public:
     fprintf(stderr, "EmitEnterNotify\n");
 
     Client* c = Client::getByWindow(&hw->monits, ev->window);
+    fprintf(stderr, "EmitEnterNotify got client\n");
     if(c) {
       int id = c->getId();
       argv[0] = NodeWM::makeEvent(id);
@@ -823,18 +824,18 @@ public:
     Local<Value> argv[1];
     argv[0] = Integer::New(id);
     hw->Emit(onRemoveWindow, 1, argv);
-    // remove from monitor
-    for(i = 0; i < c->mon->clients.size(); i++) {
-      if(c->mon->clients[i].id == id)
-         c->mon->clients.erase(c->mon->clients.begin() + i);
-    }
     if(!destroyed) {
       XGrabServer(hw->dpy);
       XUngrabButton(hw->dpy, AnyButton, AnyModifier, c->getWin());
       XSync(hw->dpy, False);
       XUngrabServer(hw->dpy);
     }
-    delete c;
+    // remove from monitor
+    for(i = 0; i < c->mon->clients.size(); i++) {
+      if(c->mon->clients[i].id == id) {
+        c->mon->clients.erase(c->mon->clients.begin() + i);
+      }
+    }
     RealFocus(hw, -1);
     hw->Emit(onRearrange, 0, 0);
   }

@@ -30,17 +30,17 @@ layouts.tile = function(workspace) {
   // the way DWM does it is to reserve half the screen for the first screen,
   // then split the other half among the rest of the screens
   var windows = workspace.visible();
-  console.log('TILE', windows);
-  var screen = workspace.getMonitor();
+  console.log('TILE', workspace, windows);
+  var screen = workspace.monitor;
   console.log('TILE screen', screen);  
-  if(windows.length < 1) {
+  if(Object.keys(windows).length < 1) {
     return;
   }
   var mainId = workspace.getMainWindow();
-  console.log('mainID', mainId);
-  if(windows.length == 1) {
-    windows[0].move(0, 0);
-    windows[0].resize(screen.width, screen.height);
+  console.log('mainID', mainId, windows);
+  if(Object.keys(windows).length == 1) {
+    windows[mainId].move(0, 0);
+    windows[mainId].resize(screen.width, screen.height);
   } else {
     // when main scale = 50, the divisor is 2
     var mainScaleFactor = (100 / workspace.getMainWindowScale() );

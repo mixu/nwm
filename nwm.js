@@ -16,6 +16,7 @@ var Collection = function(parent, name, current) {
   this.parent = parent;
   this.name = name;
   this.current = current;
+  this.lazyInit = false;
 };
 
 //Add an item to the collection and notify callback listeners
@@ -28,11 +29,13 @@ Collection.prototype.add = function(item) {
 
 Collection.prototype.remove = function(callback) {
   var self = this;
-  Object.keys(this.items).forEach(function(key, index) { 
+  console.log('Collection remove', this.name);  
+  Object.keys(this.items).forEach(function(key, index) {
     var result = callback.call(self, self.items[key], key);
     if (!result) {
-      this.parent.emit('remove '+self.name, self.items[key]);
+      // must do this before emitting any events!!
       delete self.items[key];
+      self.parent.emit('remove '+self.name, key);
     }
   });
 };
@@ -43,42 +46,43 @@ Collection.prototype.update = function(id, values) {
     Object.keys(values).forEach(function(key) {
       updated_item[key] = values[key];
     });
-    this.parent.emit('update '+self.name, self.items[id]);
+    this.parent.emit('update '+this.name, this.items[id]);
   } 
 };
 
 Collection.prototype.exists = function(id) {
+  console.log('EXists check', id, this.items[id]);
   return !!this.items[id];
 };
 
-/*
- Get a workspace
+
 Collection.prototype.get = function(id) {
-  if(!this.monitors[id]) {
-    this.monitors[id] = new Monitor(this.nwm, id);
+  if(!this.items[id]) {
+    if(this.lazyInit) {
+      this.items[id] = this.lazyInit(id);            
+    } else {
+      return null;
+    }
   }
-  return this.monitors[id];  
+  return this.items[id];
 };
-*/
 
 // Windows
 // -------
 var Window = function(nwm, window) {
-  this = {
-    nwm: nwm,
-    id: window.id,
-    x: window.x,
-    y: window.y,
-    monitor: window.monitor,
-    width: window.width,
-    height: window.height,
-    title: window.title,
-    instance: window.instance,
-    class: window.class,
-    isfloating: window.isfloating,
-    visible: true,
-    workspace: window.workspace
-  };
+  this.nwm = nwm;
+  this.id = window.id;
+  this.x = window.x;
+  this.y = window.y;
+  this.monitor = window.monitor;
+  this.width = window.width;
+  this.height = window.height;
+  this.title = window.title;
+  this.instance = window.instance;
+  this.class = window.class;
+  this.isfloating = window.isfloating;
+  this.visible = true;
+  this.workspace =  window.workspace;
 };
 
 // Move a window
@@ -102,7 +106,7 @@ Window.prototype.hide = function() {
   if(this.visible) {
     this.visible = false;
     console.log('hide', this.id);
-    this.nwm.wm.moveWindow(this.id, this.x + 2 * nwm.monitors.get(window.monitor).width, this.y);
+    this.nwm.wm.moveWindow(this.id, this.x + 2 * this.nwm.monitors.get(this.monitor).width, this.y);
   }
 };
 
@@ -116,47 +120,56 @@ Window.prototype.show = function() {
 };
 
 // Monitor
-var Monitor = function(nwm, id) {
+var Monitor = function(nwm, monitor) {
   this.nwm = nwm;
-  this.id = id;
+  this.id = monitor.id;
   // Screen dimensions
-  this.width = 0;
-  this.height = 0;
+  this.width = monitor.width;
+  this.height = monitor.height;
+  this.x = monitor.x;
+  this.y = monitor.y;
   // List of window ids
   this.window_ids = [];
   // List of workspaces
   this.workspaces = new Collection(nwm, 'workspace', 1);
-
-// Get a workspace
-WorkspaceList.prototype.get = function(id) {
-  if(!this.workspaces[id]) {
+  var self = this;
+  this.workspaces.lazyInit = function(id) {
+    console.log('Lazy init workspace', id);
     // Use the current workspace, or if that does not exist, the default values
-    var layout_names = Object.keys(this.nwm.layouts);
-    if(this.workspaces[this.current_workspace]) {
-      this.workspaces[id] = new Workspace(this.nwm, id, current.layout || layout_names[0], this.nwm.monitors.current().id);
+    var layout_names = Object.keys(self.nwm.layouts);
+    if(self.workspaces.exists(self.workspaces.current)) {      
+      return new Workspace(self.nwm, id, current.layout || layout_names[0], self);
     } else {
-      this.workspaces[id] = new Workspace(this.nwm, id, layout_names[0], this.nwm.monitors.current().id);
+      return new Workspace(self.nwm, id, layout_names[0], self);
     }
-  }
-  return this.workspaces[id];  
-};
+  };
 
   // Currently focused window
   this.focused_window = null;
   // Listen to events
   var self = this;
   nwm.on('add window', function(window) {
-    if(window.monitor == id) {
+    console.log('Monitor add window', window);
+    if(window.monitor == self.id) {
       self.window_ids.push(window.id);
       // Set the new window as the main window for this workspace so new windows get the primary working area
-      self.workspaces.current().setMainWindow(window.id);      
+      self.workspaces.get(self.workspaces.current).setMainWindow(window.id);      
     }
   });
-  nwm.on('remove window', function(window) {
-    var index = self.window_ids.indexOf(window.id);
-    if(index != -1) {
+  nwm.on('remove window', function(id) {
+    console.log('Monitor remove window', id, self.window_ids);
+    var index = -1;
+    self.window_ids.some(function(tid, inx) {
+      if(tid == id) {
+        index = inx;
+        return true;
+      }
+      return false;
+    });
+    if(index != -1) {      
       self.window_ids.splice(index, 1);
-      self.workspaces.current().rearrange();
+      console.log('Monitor REAL remove window', id, self.window_ids);
+      self.workspaces.get(self.workspaces.current).rearrange();
     }
   });
 };
@@ -165,6 +178,7 @@ WorkspaceList.prototype.get = function(id) {
 Monitor.prototype.filter = function(filtercb) {
   var self = this;
   var results = {};
+  console.log('filter ids', this.window_ids);
   this.window_ids.forEach(function(id){
     var window = self.nwm.windows.get(id);
     // If a filter callback is not set, then take all items
@@ -178,35 +192,37 @@ Monitor.prototype.filter = function(filtercb) {
 };
 
 // Switch to another workspace
-Monitor.prototype.go = function(workspace) {
+Monitor.prototype.go = function(workspace_id) {
   var windows = this.filter();
-  windows.forEach(function(window) {
-    if(window.workspace != workspace) {
+  var window_ids = Object.keys(windows);
+  window_ids.forEach(function(window_id) {
+    var window = windows[window_id];
+    if(window.workspace != workspace_id) {
       window.hide();
     } else {
       window.show();
     }
   });
-  if(workspace != this.workspaces.current) {
-    this.workspaces.current = workspace;
-    this.rearrange();
+  if(workspace_id != this.workspaces.current) {
+    this.workspaces.current = workspace_id;
+    this.workspaces.get(this.workspaces.current).rearrange();
   }
 };
 
 // Move a window to a different workspace
-Monitor.prototype.windowTo = function(id, workspace) {
-  if(nwm.windows.exists(id)) {
-    var window = nwm.windows.get(id);
+Monitor.prototype.windowTo = function(id, workspace_id) {
+  if(this.nwm.windows.exists(id)) {
+    var window = this.nwm.windows.get(id);
     var old_workspace = window.workspace;
-    window.workspace = workspace;
-    if(workspace == this.workspaces.current) {
+    window.workspace = workspace_id;
+    if(workspace_id == this.workspaces.current) {
       window.show();
     }
-    if(old_workspace == this.workspaces.current && old_workspace != workspace) {
+    if(old_workspace == this.workspaces.current && old_workspace != workspace_id) {
       window.hide();
     }
-    if(workspace == this.workspaces.current || old_workspace == this.workspaces.current) {
-      this.workspaces[this.workspaces.current].rearrange();
+    if(workspace_id == this.workspaces.current || old_workspace == this.workspaces.current) {
+      this.workspaces.get(this.workspaces.current).rearrange();
     }
   }
 };
@@ -230,6 +246,7 @@ var Workspace = function(nwm, id, layout, monitor) {
 Workspace.prototype.visible = function() {
   var self = this;
   return this.monitor.filter(function(window){
+    console.log('filter item', window);
     return (window.visible  // is visible
       && window.workspace == self.id // on current workspace
     );    
@@ -245,12 +262,21 @@ Workspace.prototype.rearrange = function() {
 
 // Get the main window
 Workspace.prototype.getMainWindow = function() {
-  if(this.monitor.window_ids.indexOf(''+this.main_window) > -1) {
-    console.log('getMainWindow using old value', this.main_window);
-    return this.main_window;
+  // check if the current window:
+  // 1) exists
+  // 2) is on this workspace
+  // 3) is visible
+  if(this.nwm.windows.exists(this.main_window)){
+    var window = this.nwm.windows.get(this.main_window);
+    if(window.workspace == this.id && window.visible) {
+      console.log('Window exists', this.main_window, window);
+      return this.main_window;
+    }
   }
-  // no visible window, or the main window has gone away. Pick one from the visible windows..
-  // Take the largest id (e.g. most recent window)
+  // otherwise, take all the visible windows on this workspace
+  // and pick the largest id
+  var window_ids = Object.keys(this.visible());
+  console.log('Take largest', window_ids);
   this.main_window = Math.max.apply(Math, window_ids);
   return this.main_window;
 };
@@ -285,6 +311,8 @@ var NWM = function() {
   this.windows = new Collection(this, 'window', 1);
 }
 
+require('util').inherits(NWM, require('events').EventEmitter);
+
 // Events
 // ------
 NWM.prototype.event = {};
@@ -296,7 +324,7 @@ NWM.prototype.event.monitor = {};
 // A new monitor is added
 NWM.prototype.event.monitor.add = function(monitor) {
   console.log('add monitor', monitor);
-  this.monitors.add(monitor);
+  this.monitors.add(new Monitor(this, monitor));
 };
 
 // A monitor is updated
@@ -319,17 +347,18 @@ NWM.prototype.event.window = {};
 NWM.prototype.event.window.add = function(window) {
   if(window.id) {
     var monitor = this.monitors.get(window.monitor);
-    window.workspace = monitor.workspaces.current().id;
+    window.workspace = monitor.workspaces.current;
     // do not add floating windows
     if(window.isfloating) {
       console.log('Ignoring floating window: ', window);
       return;
     }
+    var window = new Window(this, window);
     // windows might be placed outside the screen if the wm was terminated
     if(window.x > monitor.width || window.y > monitor.height) {
       window.move(1, 1);
     }
-    this.windows.add(new Window(nwm, window));
+    this.windows.add(window);
     console.log('onAdd', window);
   }
 };
@@ -338,6 +367,7 @@ NWM.prototype.event.window.add = function(window) {
 NWM.prototype.event.window.remove = function(id) {
   console.log('onRemove', id);
   this.windows.remove(function(window) { return (window.id != id); });
+  console.log('RESULT from onremove', this.windows);
 };
 
 // When a window is updated
@@ -350,11 +380,13 @@ NWM.prototype.event.window.update = function(window) {
 NWM.prototype.event.window.fullscreen = function(id, status) {
   console.log('Window requested full screen', id, status);
   if(this.windows.exists(id)) {
+    var monitor = this.monitors.get(this.monitors.current);
+    var workspace = monitor.workspaces.get(monitor.workspaces.current);
     if(status) {
       this.wm.moveWindow(id, 0, 0);
-      this.wm.resizeWindow(id, this.monitors.current().width, this.monitors.current().height);
+      this.wm.resizeWindow(id, monitor.width, monitor.height);
     } else {
-      this.monitors.current().workspaces.current().rearrange();
+      workspace.rearrange();
     }
   }
 };
@@ -434,7 +466,12 @@ NWM.prototype.start = function(callback) {
   this.wm.on('configureRequest', function(event) { self.event.window.reconfigure.call(self, event); });
 
   // Screen events
-  this.wm.on('rearrange', function() { self.monitors.current().workspaces.current().rearrange(); }); 
+  this.wm.on('rearrange', function() { 
+    var monitor = self.monitors.get(self.monitors.current);
+    console.log(self.monitors.current, monitor);
+    console.log(monitor.workspaces);
+    monitor.workspaces.get(monitor.workspaces.current).rearrange();
+  });
 
   // Mouse events
   this.wm.on('mouseDown', function(event) { self.event.mouse.down.call(self, event); });
@@ -453,6 +490,7 @@ NWM.prototype.start = function(callback) {
   });
 
   var grab_keys = [];
+  console.log(this.shortcuts);
   this.shortcuts.forEach(function(shortcut) {
     grab_keys.push( { key: shortcut.key, modifier: shortcut.modifier });
   });
@@ -520,20 +558,8 @@ NWM.prototype.require = function(filename) {
   }
 };
 
-// if this module is the script being run, then run the window manager
 if (module == require.main) {
-  var nwm = new NWM();
-  // add layouts from external hash/object
-  var layouts = require('./nwm-layouts.js');
-  Object.keys(layouts).forEach(function(name){
-    var callback = layouts[name];
-    nwm.addLayout(name, layouts[name]);
-  });
-  nwm.start(function() {
-    var re = require('repl').start();
-    re.context.nwm = nwm;
-    re.context.Xh = Xh;
-  });
+  console.log('Please run nwm via "node nwm-user-sample.js" (or some other custom config file).');
 }
 
 module.exports = NWM;
