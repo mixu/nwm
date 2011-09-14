@@ -6,6 +6,53 @@
 // Modules
 // -------
 
+/*
+{ '0': 
+   { nwm: 
+      { wm: {},
+        layouts: [Object],
+        shortcuts: [Object],
+        monitors: [Object],
+        windows: [Object],
+        _events: [Object],
+        focused_window: 2 },
+     id: 0,
+     width: 1440,
+     height: 900,
+     x: 0,
+     y: 0,
+     window_ids: [ 2 ],
+     workspaces: 
+      { items: [Object],
+        parent: [Object],
+        name: 'workspace',
+        current: '3',
+        lazyInit: [Function] },
+     focused_window: null },
+  '1': 
+   { nwm: 
+      { wm: {},
+        layouts: [Object],
+        shortcuts: [Object],
+        monitors: [Object],
+        windows: [Object],
+        _events: [Object],
+        focused_window: 2 },
+     id: 1,
+     width: 2560,
+     height: 1440,
+     x: 1440,
+     y: 0,
+     window_ids: [ 3, 4 ],
+     workspaces: 
+      { items: [Object],
+        parent: [Object],
+        name: 'workspace',
+        current: 1,
+        lazyInit: [Function] },
+     focused_window: null } }
+*/
+
 // Native extension
 var X11wm = require('./build/default/nwm.node').NodeWM;
 
@@ -245,6 +292,7 @@ Workspace.prototype.visible = function() {
   return this.monitor.filter(function(window){
     return (window.visible  // is visible
       && window.workspace == self.id // on current workspace
+      && window.monitor == self.monitor.id // on current monitor
     );    
   });
 };
@@ -413,7 +461,9 @@ NWM.prototype.event.mouse.drag = function(event) {
 
 NWM.prototype.event.mouse.enter = function(event){
   console.log('focusing to window', event.id);
-  this.focused_window = event.id;
+  var window = this.windows.get(event.id);
+  console.log('focused monitor is ', window.monitor);
+  this.monitors.get(window.monitor).focused_window = event.id;
   this.wm.focusWindow(event.id);
 };
 

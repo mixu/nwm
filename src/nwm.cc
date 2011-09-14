@@ -827,20 +827,26 @@ public:
     // emit a remove
     Local<Value> argv[1];
     argv[0] = Integer::New(id);
+    fprintf( stderr, "EmitRemove - emit onRemovewindow, %d\n", id);
     hw->Emit(onRemoveWindow, 1, argv);
     if(!destroyed) {
+      fprintf( stderr, "X11 cleanup\n");
       XGrabServer(hw->dpy);
       XUngrabButton(hw->dpy, AnyButton, AnyModifier, c->getWin());
       XSync(hw->dpy, False);
       XUngrabServer(hw->dpy);
     }
     // remove from monitor
+    fprintf( stderr, "Remove window from monitor\n");
     for(i = 0; i < c->mon->clients.size(); i++) {
       if(c->mon->clients[i].id == id) {
+      fprintf( stderr, "Perform erase\n");
         c->mon->clients.erase(c->mon->clients.begin() + i);
       }
     }
+    fprintf( stderr, "Focusing to root window\n");
     RealFocus(hw, -1);
+    fprintf( stderr, "Emitting rearrange\n");
     hw->Emit(onRearrange, 0, 0);
   }
 
