@@ -6,53 +6,6 @@
 // Modules
 // -------
 
-/*
-{ '0': 
-   { nwm: 
-      { wm: {},
-        layouts: [Object],
-        shortcuts: [Object],
-        monitors: [Object],
-        windows: [Object],
-        _events: [Object],
-        focused_window: 2 },
-     id: 0,
-     width: 1440,
-     height: 900,
-     x: 0,
-     y: 0,
-     window_ids: [ 2 ],
-     workspaces: 
-      { items: [Object],
-        parent: [Object],
-        name: 'workspace',
-        current: '3',
-        lazyInit: [Function] },
-     focused_window: null },
-  '1': 
-   { nwm: 
-      { wm: {},
-        layouts: [Object],
-        shortcuts: [Object],
-        monitors: [Object],
-        windows: [Object],
-        _events: [Object],
-        focused_window: 2 },
-     id: 1,
-     width: 2560,
-     height: 1440,
-     x: 1440,
-     y: 0,
-     window_ids: [ 3, 4 ],
-     workspaces: 
-      { items: [Object],
-        parent: [Object],
-        name: 'workspace',
-        current: 1,
-        lazyInit: [Function] },
-     focused_window: null } }
-*/
-
 // Native extension
 var X11wm = require('./build/default/nwm.node').NodeWM;
 
@@ -105,12 +58,26 @@ Collection.prototype.exists = function(id) {
 Collection.prototype.get = function(id) {
   if(!this.items[id]) {
     if(this.lazyInit) {
-      this.items[id] = this.lazyInit(id);            
+      this.items[id] = this.lazyInit(id);
     } else {
       return null;
     }
   }
   return this.items[id];
+};
+
+Collection.prototype.next = function(id) {
+  var keys = Object.keys(this.items);
+  var pos = keys.indexOf(id);
+  // Wrap around the array
+  return (keys[pos+1] ? keys[pos+1] : keys[0] );
+};
+
+Collection.prototype.prev = function(id) {
+  var keys = Object.keys(this.items);
+  var pos = keys.indexOf(id);
+  // Wrap around the array
+  return (keys[pos-1] ? keys[pos-1] : keys[keys.length-1] );
 };
 
 // Windows
@@ -120,7 +87,7 @@ var Window = function(nwm, window) {
   this.id = window.id;
   this.x = window.x;
   this.y = window.y;
-  this.monitor = window.monitor;
+  this._monitor = window.monitor;
   this.width = window.width;
   this.height = window.height;
   this.title = window.title;
@@ -129,6 +96,21 @@ var Window = function(nwm, window) {
   this.isfloating = window.isfloating;
   this.visible = true;
   this.workspace =  window.workspace;
+};
+
+Window.prototype = {
+  get monitor(){
+    return this._monitor;
+  },
+  set monitor(id){
+    // when the monitor_id changes, the monitors should be notified of the change
+    if(this._monitor != id) {
+      var from = this._monitor;
+      this._monitor = id;
+      console.log('change window monitor', this.id, from, this._monitor);
+      this.nwm.emit('change window monitor', this.id, from, this._monitor);
+    }
+  }
 };
 
 // Move a window
@@ -189,9 +171,21 @@ var Monitor = function(nwm, monitor) {
       return new Workspace(self.nwm, id, layout_names[0], self);
     }
   };
-
   // Currently focused window
   this.focused_window = null;
+
+  function inExactIndexOf(arr, needle) {
+    var index = -1;
+    arr.some(function(item, inx) {
+      if(item == needle) {
+        index = inx;
+        return true;
+      }
+      return false;
+    });
+    return index;
+  };
+
   // Listen to events
   var self = this;
   nwm.on('add window', function(window) {
@@ -204,19 +198,31 @@ var Monitor = function(nwm, monitor) {
     Object.keys(self.workspaces.items).forEach(function(ws_id) {
       self.workspaces.get(ws_id).rearrange();
     });
-
+  });
+  nwm.on('change window monitor', function(window_id, from_id, to_id) {
+    if(from_id == self.id) {
+      // pop from window_ids
+      var index = inExactIndexOf(self.window_ids, id);
+      if(index != -1) {
+        self.window_ids.splice(index, 1);
+      }
+      // if the window was focused, then pick another window to focus
+      if(self.focused_window == window_id) {
+        console.log('Take largest', self.window_ids);
+        self.focused_window = Math.max.apply(Math, self.window_ids);
+      }
+      self.workspaces.get(self.workspaces.current).rearrange();
+    }
+    if(to_id == self.id) {
+      // push to window_ids
+      self.window_ids.push(window_id);
+      self.workspaces.get(self.workspaces.current).rearrange();
+    }
   });
   nwm.on('remove window', function(id) {
     console.log('Monitor remove window', id);
-    var index = -1;
-    self.window_ids.some(function(tid, inx) {
-      if(tid == id) {
-        index = inx;
-        return true;
-      }
-      return false;
-    });
-    if(index != -1) {      
+    var index = inExactIndexOf(self.window_ids, id);
+    if(index != -1) {
       self.window_ids.splice(index, 1);
       self.workspaces.get(self.workspaces.current).rearrange();
     }
@@ -229,6 +235,7 @@ Monitor.prototype.filter = function(filtercb) {
   var results = {};
   this.window_ids.forEach(function(id){
     var window = self.nwm.windows.get(id);
+    console.log('filter', id, self.nwm.windows, window);
     // If a filter callback is not set, then take all items
     if(!filtercb) {
       results[window.id] = window;
@@ -321,6 +328,7 @@ Workspace.prototype = {
 Workspace.prototype.visible = function() {
   var self = this;
   return this.monitor.filter(function(window){
+    console.log('visible?', window);
     return (window.visible  // is visible
       && window.workspace == self.id // on current workspace
       && window.monitor == self.monitor.id // on current monitor
@@ -364,116 +372,128 @@ require('util').inherits(NWM, require('events').EventEmitter);
 
 // Events
 // ------
-NWM.prototype.event = {};
+NWM.prototype.events = {
+  // Monitor events
+  // --------------
+  // A new monitor is added
+  addMonitor: function(monitor) {
+    this.monitors.add(new Monitor(this, monitor));
+  },
 
-// Monitor events
-// --------------
-NWM.prototype.event.monitor = {};
+  // A monitor is updated
+  updateMonitor: function(monitor) {
+    this.monitors.update(monitor.id, monitor);
+  },
 
-// A new monitor is added
-NWM.prototype.event.monitor.add = function(monitor) {
-  console.log('add monitor', monitor);
-  this.monitors.add(new Monitor(this, monitor));
-};
+  // A monitor is removed
+  removeMonitor: function(id) {
+    this.monitors.remove(function(monitor){ return (monitor.id != id); });
+  },
 
-// A monitor is updated
-NWM.prototype.event.monitor.update = function(monitor) {
-  console.log('update monitor', monitor);  
-  this.monitors.update(monitor.id, monitor);
-};
-
-// A monitor is removed
-NWM.prototype.event.monitor.remove = function(id) {
-  console.log('remove monitor', id);
-  this.monitors.remove(function(monitor){ return (monitor.id != id); });
-};
-
-// Window events
-// -------------
-NWM.prototype.event.window = {};
-
-// A new window is added
-NWM.prototype.event.window.add = function(window) {
-  if(window.id) {
-    var monitor = this.monitors.get(window.monitor);
-    window.workspace = monitor.workspaces.current;
-    // do not add floating windows
-    if(window.isfloating) {
-      console.log('Ignoring floating window: ', window);
-      return;
+  // Window events
+  // -------------
+  // A new window is added
+  addWindow: function(window) {
+    if(window.id) {
+      var monitor = this.monitors.get(window.monitor);
+      window.workspace = monitor.workspaces.current;
+      // do not add floating windows
+      if(window.isfloating) {
+        console.log('Ignoring floating window: ', window);
+        return;
+      }
+      var window = new Window(this, window);
+      // windows might be placed outside the screen if the wm was terminated
+      if(window.x > monitor.width || window.y > monitor.height) {
+        window.move(1, 1);
+      }
+      console.log('Add window', window);
+      this.windows.add(window);
     }
-    var window = new Window(this, window);
-    // windows might be placed outside the screen if the wm was terminated
-    if(window.x > monitor.width || window.y > monitor.height) {
-      window.move(1, 1);
+  },
+
+  // When a window is removed
+  removeWindow: function(id) {
+    this.windows.remove(function(window) { return (window.id != id); });
+  },
+
+  // When a window is updated
+  updateWindow: function(window) {
+    this.windows.update(window.id, window);
+  },
+
+  // When a window requests full screen mode
+  fullscreen: function(id, status) {
+    if(this.windows.exists(id)) {
+      var monitor = this.monitors.get(this.monitors.current);
+      var workspace = monitor.workspaces.get(monitor.workspaces.current);
+      if(status) {
+        this.wm.moveWindow(id, 0, 0);
+        this.wm.resizeWindow(id, monitor.width, monitor.height);
+      } else {
+        workspace.rearrange();
+      }
     }
-    this.windows.add(window);
-  }
-};
+  },
 
-// When a window is removed
-NWM.prototype.event.window.remove = function(id) {
-  console.log('onRemove', id);
-  this.windows.remove(function(window) { return (window.id != id); });
-};
+  // TODO - NOT IMPLEMENTED: A window is requesting to be configured to particular dimensions
+  configureRequest: function(event){
+    return event;
+  },
 
-// When a window is updated
-NWM.prototype.event.window.update = function(window) {
-  console.log('Window has been updated', window);
-  this.windows.update(window.id, window);
-};
-
-// When a window requests full screen mode
-NWM.prototype.event.window.fullscreen = function(id, status) {
-  console.log('Window requested full screen', id, status);
-  if(this.windows.exists(id)) {
-    var monitor = this.monitors.get(this.monitors.current);
-    var workspace = monitor.workspaces.get(monitor.workspaces.current);
-    if(status) {
-      this.wm.moveWindow(id, 0, 0);
-      this.wm.resizeWindow(id, monitor.width, monitor.height);
-    } else {
-      workspace.rearrange();
-    }
-  }
-};
-
-// TODO - NOT IMPLEMENTED: A window is requesting to be configured to particular dimensions
-NWM.prototype.event.window.reconfigure = function(event){
-  return event;
-};
-
-// Mouse events
-// ------------
-NWM.prototype.event.mouse = {};
-
-// A mouse button has been clicked
-NWM.prototype.event.mouse.down = function(event) {
-  console.log('Mouse button pressed', event);
-  this.wm.focusWindow(event.id);
-};
-
-// A mouse drag is in progress
-NWM.prototype.event.mouse.drag = function(event) {
-  console.log('Mouse drag event', event);
-  // move when drag is triggered
-  var change_x = event.move_x - event.x;
-  var change_y = event.move_y - event.y;
-  var window = this.windows.exists(event.id) && this.windows.get(event.id);
-  if(window) {
-    this.wm.moveWindow(event.id, window.x+change_x, window.y+change_y);      
-  }
-};
-
-NWM.prototype.event.mouse.enter = function(event){
-  console.log('focusing to window', event.id);
-  if(this.windows.exists(event.id)) {
-    var window = this.windows.get(event.id);
-    console.log('focused monitor is ', window.monitor);
-    this.monitors.get(window.monitor).focused_window = event.id;
+  // Mouse events
+  // ------------
+  // A mouse button has been clicked
+  mouseDown: function(event) {
     this.wm.focusWindow(event.id);
-  } else {
-    console.log('WARNING got focus event for nonexistent (transient) window', event);
+  },
+
+  // A mouse drag is in progress
+  mouseDrag: function(event) {
+    // move when drag is triggered
+    var change_x = event.move_x - event.x;
+    var change_y = event.move_y - event.y;
+    var window = this.windows.exists(event.id) && this.windows.get(event.id);
+    if(window) {
+      this.wm.moveWindow(event.id, window.x+change_x, window.y+change_y);
+    }
+  },
+
+  // Mouse enters a window
+  enterNotify: function(event){
+    if(this.windows.exists(event.id)) {
+      var window = this.windows.get(event.id);
+      console.log('focused monitor is ', window.monitor);
+      this.monitors.get(window.monitor).focused_window = event.id;
+      this.wm.focusWindow(event.id);
+    } else {
+      console.log('WARNING got focus event for nonexistent (transient) window', event);
+    }
+  },
+
+  // Screen events
+  // -------------
+  rearrange: function() {
+    var self = this;
+    // rearrange current workspace on all monitors
+    var monitors = Object.keys(this.monitors.items);
+    monitors.forEach(function(id) {
+      var monitor = self.monitors.get(id);
+      monitor.workspaces.get(monitor.workspaces.current).rearrange();
+    });
+  },
+
+  // Keyboard events
+  // ---------------
+  // A key has been pressed
+  keyPress: function(event) {
+    console.log('keyPress', event, String.fromCharCode(event.keysym));
+    // find the matching callback and emit it
+    this.shortcuts.forEach(function(shortcut) {
+      if(event.keysym == shortcut.key && event.modifier == shortcut.modifier ) {
+        shortcut.callback(event);
+      };
+    });
   }
 };
 
@@ -505,40 +525,12 @@ NWM.prototype.addKey = function(keyobj, callback) {
 NWM.prototype.start = function(callback) {
   this.wm = new X11wm();
   var self = this;
-
-  // Monitor events
-  this.wm.on('addMonitor', function(monitor) { self.event.monitor.add.call(self, monitor); });
-  this.wm.on('removeMonitor', function(id) { self.event.monitor.remove.call(self, id); });
-  this.wm.on('updateMonitor', function(monitor) { self.event.monitor.update.call(self, monitor); });
-
-  // Window events
-  this.wm.on('addWindow', function(window) { self.event.window.add.call(self, window); });
-  this.wm.on('removeWindow', function(id) { self.event.window.remove.call(self, id); });
-  this.wm.on('updateWindow', function(window) { self.event.window.update.call(self, window); });
-  this.wm.on('fullscreen', function(id, status) { self.event.window.fullscreen.call(self, id, status); });
-  this.wm.on('configureRequest', function(event) { self.event.window.reconfigure.call(self, event); });
-
-  // Screen events
-  this.wm.on('rearrange', function() { 
-    var monitor = self.monitors.get(self.monitors.current);
-    console.log(self.monitors.current, monitor);
-    console.log(monitor.workspaces);
-    monitor.workspaces.get(monitor.workspaces.current).rearrange();
-  });
-
-  // Mouse events
-  this.wm.on('mouseDown', function(event) { self.event.mouse.down.call(self, event); });
-  this.wm.on('mouseDrag', function(event) { self.event.mouse.drag.call(self, event); });
-  this.wm.on('enterNotify', function(event) { self.event.mouse.enter.call(self, event); }); 
-
-  // A key has been pressed
-  this.wm.on('keyPress', function(event) {
-    console.log('keyPress', event, String.fromCharCode(event.keysym));
-    // find the matching callback and emit it
-    self.shortcuts.forEach(function(shortcut) {
-      if(event.keysym == shortcut.key && event.modifier == shortcut.modifier ) {
-        shortcut.callback(event);
-      };
+  // Initialize event handlers, bind this in the functions to nwm
+  Object.keys(this.events).forEach(function(eventname) {
+    self.wm.on(eventname, function() {
+      var args = Array.prototype.slice.call(arguments);
+      console.log('JS: ', eventname, args);
+      self.events[eventname].apply(self, args);
     });
   });
 

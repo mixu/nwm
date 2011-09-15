@@ -187,7 +187,7 @@ Done:
 - Keyboard shortcut for making the currently focused window the main window (DONE)
 - Resize main window area with shortcut (DONE)
 - Newly mapped window should become the main window (DONE)
-- Support for loading configuration files (PARTIAL)
+- Support for loading configuration files (DONE)
     - Ability to customize keyboard shortcuts from conf file
     - Add new key bindings (e.g. to launch apps or change layouting) from conf file
     - git clone + npm installation of personalized config
@@ -195,15 +195,13 @@ Done:
 - Setting main focus should move that window to the first window in grid layout (DONE)
 - Multi-monitor bug fixes:
     - GetMainWindow() should take into account whether the window is on the same monitor as the workspace (JS)
-    - Rearrange should apply to all windows (e.g. when a new window is mapped it is put at 0,0 but is associated with the focused monitor in C) (TESTME)
+    - Rearrange should apply to all windows (e.g. when a new window is mapped it is put at 0,0 but is associated with the focused monitor in C) (DONE)
     - Window termination relies on nwm.focused_window which is deprecated (JS)
+    - Need a key to reassign a window to a different monitor (JS)
+    - The window_ids set of Monitors is not updated when a window's monitor_id is changed (JS)
 
 Todo:
 
-- Multi-monitor bug fixes:
-    - Need a key to reassign a window to a different monitor (JS)
-    - The window_ids set of Monitors is not updated when a window's monitor_id is changed (JS)
-    - Focused_window is funky, probably because window.monitor is not updated.
 - TCP or HTTP configuration interface (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)
