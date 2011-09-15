@@ -8,6 +8,7 @@
 #include <ev.h>
 
 #include <vector>
+#include <algorithm>
 #include <errno.h>
 #include <locale.h>
 #include <stdarg.h>
@@ -65,6 +66,7 @@ enum callback_map {
   onKeyPress,
   onEnterNotify,
   onFullscreen,
+  onFocusIn,
   onLast
 };
 
@@ -173,7 +175,8 @@ public:
         v8::String::New("configureRequest"),
         v8::String::New("keyPress"),
         v8::String::New("enterNotify"),
-        v8::String::New("fullscreen")
+        v8::String::New("fullscreen"),
+        v8::String::New("focusIn")
       };
 
     v8::Local<v8::String> value  = Local<v8::String>::Cast(args[0]);
@@ -219,25 +222,30 @@ public:
     Client *c;
     if(w == root && getrootptr(&x, &y))
       return ptrtomon(x, y);
-    if((c = Client::getByWindow(&this->monits, w)))
-      return c->mon;
+    if((c = Client::getByWindow(&this->monits, w))) {
+      fprintf( stderr, "wintomon by client %d, monitor id %d\n", c->getId(), this->monits[c->mon_id].getId());
+      return &(this->monits[c->mon_id]);
+    }
     // ERROR!
-    return NULL;
+    fprintf( stderr, "wintomon default, monitor id %d\n", this->monits[0].getId());
+    return &(this->monits[0]);
   }
 
   Monitor * ptrtomon(int x, int y) {
     unsigned int i;
     for(i = 0; i < this->monits.size(); i++) {
-      int mx = monits[i].getX();
-      int my = monits[i].getY();
-      int mw = monits[i].getWidth();
-      int mh = monits[i].getHeight();
+      int mx = this->monits[i].getX();
+      int my = this->monits[i].getY();
+      int mw = this->monits[i].getWidth();
+      int mh = this->monits[i].getHeight();
       if ((x) >= (mx) && (x) < (mx) + (mw) && (y) >= (my) && (y) < (my) + (mh)) {
-        return &monits[i];        
+        fprintf( stderr, "ptrtomon %d, monitor id %d\n", i, this->monits[i].getId());
+        return &(this->monits[i]);
       }
     }
     // ERROR!
-    return NULL;
+    fprintf( stderr, "ptrtomon default, monitor id %d\n", this->monits[0].getId());
+    return &(this->monits[0]);
   }
 
   static void updateGeometry(NodeWM* hw) {
@@ -338,6 +346,7 @@ public:
       }
     }
     hw->selmon = hw->wintomon(hw->root);
+    fprintf( stderr, "Done with updategeom\n");
     return;
   }
 
@@ -353,7 +362,7 @@ public:
     // check whether the window is transient
     XGetTransientForHint(hw->dpy, win, &trans);
     isfloating = (trans != None);
-    Client* c = new Client(win, hw->selmon, hw->selmon->getId(), hw->next_index, wa->x, wa->y, wa->height, wa->width, isfloating);
+    Client* c = new Client(win, hw->selmon->getId(), hw->next_index, wa->x, wa->y, wa->height, wa->width, isfloating);
     c->updatetitle(hw->dpy);
     c->updateclass(hw->dpy);
     // attach to monitor
@@ -724,7 +733,6 @@ public:
     fprintf(stderr, "EmitEnterNotify\n");
 
     Client* c = Client::getByWindow(&hw->monits, ev->window);
-    fprintf(stderr, "EmitEnterNotify got client\n");
     if(c) {
       int id = c->getId();
       argv[0] = NodeWM::makeEvent(id);
@@ -735,10 +743,17 @@ public:
 
   static void EmitFocusIn(NodeWM* hw, XEvent *e) {
     XFocusChangeEvent *ev = &e->xfocus;
+    Local<Value> argv[1];
     Client* c = Client::getByWindow(&hw->monits, ev->window);
     if(c) {
       int id = c->getId();
-      RealFocus(hw, id);
+      fprintf(stderr, "EmitFocusIn found client %d by window\n", id);
+      // Don't do this yet, results in another FocusIn --> loop: RealFocus(hw, id);
+      // call the callback in Node.js, passing the window object...
+      argv[0] = NodeWM::makeEvent(id);
+      hw->Emit(onFocusIn, 1, argv);
+    } else {
+      fprintf(stderr, "EmitFocusIn could not find client by window\n");
     }
   }
 
@@ -759,7 +774,6 @@ public:
 
   static void EmitConfigureNotify(NodeWM* hw, XEvent *e) {
     XConfigureEvent *ev = &e->xconfigure;
-    Local<Value> argv[1];
 
     if(ev->window == hw->root) {
       hw->screen_width = ev->width;
@@ -823,7 +837,6 @@ public:
   static void EmitRemove(NodeWM* hw, Client *c, Bool destroyed) {
     fprintf( stderr, "EmitRemove\n");
     int id = c->getId();
-    unsigned int i;
     // emit a remove
     Local<Value> argv[1];
     argv[0] = Integer::New(id);
@@ -837,11 +850,23 @@ public:
       XUngrabServer(hw->dpy);
     }
     // remove from monitor
+    fprintf( stderr, "Iterate monitor %d\n", hw->monits[c->mon_id].getId());
+    std::vector<Client>& vec = hw->monits[c->mon_id].clients; // use shorter name
+    std::vector<Client>::iterator iter = vec.begin();
+    while (iter != vec.end()) {
+      fprintf( stderr, "Monitor has client %d.\n", iter->getId());
+      ++iter;
+    }
     fprintf( stderr, "Remove window from monitor\n");
-    for(i = 0; i < c->mon->clients.size(); i++) {
-      if(c->mon->clients[i].id == id) {
-      fprintf( stderr, "Perform erase\n");
-        c->mon->clients.erase(c->mon->clients.begin() + i);
+    iter = vec.begin();
+    while (iter != vec.end()) {
+      int vid = iter->getId();
+      if (vid == id) {
+        fprintf( stderr, "Perform erase as item %d is equal to needle %d.\n", vid, id);
+        iter = vec.erase(iter);
+      } else {
+        fprintf( stderr, "Not perform erase as item %d is not equal to needle %d.\n", vid, id);
+        ++iter;
       }
     }
     fprintf( stderr, "Focusing to root window\n");
@@ -1006,9 +1031,9 @@ public:
             break;
 //        case Expose:
 //            break;
-//        case FocusIn:
-         //   NodeWM::EmitFocusIn(hw, &event);
-//            break;
+        case FocusIn:
+            NodeWM::EmitFocusIn(hw, &event);
+            break;
         case KeyPress:
           {
             fprintf(stderr, "EmitKeyPress\n");
@@ -1049,9 +1074,8 @@ public:
             NodeWM::EmitUnmapNotify(hw, &event);
             break;
         default:
-          fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);      
-          fprintf(stderr, "Did nothing\n");
-            break;
+          fprintf(stderr, "Did nothing with %s (%d)\n", event_names[event.type], event.type);
+          break;
       }
     }
     return;

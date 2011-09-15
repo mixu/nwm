@@ -32,10 +32,10 @@ Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int siz
 class Client {
 public:
   int id;
-  Monitor *mon;  
-  Client(Window win, Monitor* monitor, int mon_id, int id, int x, int y, int width, int height, Bool isfloating) {
+  int mon_id;
+  Client(Window win, int mon_id, int id, int x, int y, int width, int height, Bool isfloating) {
+    fprintf( stderr, "Create client %d on monitor %d (x %d, y %d, w %d, h %d, float %d)\n", id, mon_id, x, y, width, height, isfloating);
     this->win = win;
-    this->mon = monitor;
     this->mon_id = mon_id;
     this->id = id;
     this->x = x;
@@ -135,7 +135,6 @@ public:
     char klass[256];
     char instance[256];
     int x, y, width, height;
-    int mon_id;
     Client *next;
     Client *snext;
     Window win;

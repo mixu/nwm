@@ -134,7 +134,14 @@ Window.prototype.hide = function() {
   if(this.visible) {
     this.visible = false;
     console.log('hide', this.id);
-    this.nwm.wm.moveWindow(this.id, this.x + 2 * this.nwm.monitors.get(this.monitor).width, this.y);
+    // window should be moved to twice the total monitor width
+    var total = 0;
+    var monitors = Object.keys(this.nwm.monitors.items);
+    var self = this;
+    monitors.forEach(function(id) {
+      total += self.nwm.monitors.get(id).width;
+    })
+    this.nwm.wm.moveWindow(this.id, this.x + 2 * total, this.y);
   }
 };
 
@@ -202,7 +209,7 @@ var Monitor = function(nwm, monitor) {
   nwm.on('change window monitor', function(window_id, from_id, to_id) {
     if(from_id == self.id) {
       // pop from window_ids
-      var index = inExactIndexOf(self.window_ids, id);
+      var index = inExactIndexOf(self.window_ids, window_id);
       if(index != -1) {
         self.window_ids.splice(index, 1);
       }
@@ -235,7 +242,6 @@ Monitor.prototype.filter = function(filtercb) {
   var results = {};
   this.window_ids.forEach(function(id){
     var window = self.nwm.windows.get(id);
-    console.log('filter', id, self.nwm.windows, window);
     // If a filter callback is not set, then take all items
     if(!filtercb) {
       results[window.id] = window;
@@ -328,7 +334,6 @@ Workspace.prototype = {
 Workspace.prototype.visible = function() {
   var self = this;
   return this.monitor.filter(function(window){
-    console.log('visible?', window);
     return (window.visible  // is visible
       && window.workspace == self.id // on current workspace
       && window.monitor == self.monitor.id // on current monitor
@@ -397,6 +402,8 @@ NWM.prototype.events = {
     if(window.id) {
       var monitor = this.monitors.get(window.monitor);
       window.workspace = monitor.workspaces.current;
+      // ignore monitor number from binding as windows should open on the focused monitor
+      window.monitor = this.monitors.current;
       // do not add floating windows
       if(window.isfloating) {
         console.log('Ignoring floating window: ', window);
@@ -419,7 +426,11 @@ NWM.prototype.events = {
 
   // When a window is updated
   updateWindow: function(window) {
-    this.windows.update(window.id, window);
+    if(this.windows.exists(window.id)) {
+      // ignore monitor number from binding as it will go out of date if the window is moved
+      window.monitor = this.windows.get(window.id).monitor;
+      this.windows.update(window.id, window);      
+    }
   },
 
   // When a window requests full screen mode
@@ -463,11 +474,26 @@ NWM.prototype.events = {
   enterNotify: function(event){
     if(this.windows.exists(event.id)) {
       var window = this.windows.get(event.id);
-      console.log('focused monitor is ', window.monitor);
+      console.log('focused monitor is ', this.monitors.current, 'focusing to', window.monitor);
+      if(this.monitors.exists(window.monitor)) {
+        this.monitors.current = window.monitor;
+      }
       this.monitors.get(window.monitor).focused_window = event.id;
       this.wm.focusWindow(event.id);
     } else {
       console.log('WARNING got focus event for nonexistent (transient) window', event);
+    }
+  },
+
+  focusIn: function(event) {
+    console.log('Focus to ', event.id);
+    if(this.windows.exists(event.id)) {
+      var window = this.windows.get(event.id);
+      console.log('focused monitor is ', this.monitors.current, 'focusing to', window.monitor);
+      if(this.monitors.exists(window.monitor)) {
+        this.monitors.current = window.monitor;
+      }
+      this.monitors.get(window.monitor).focused_window = event.id;
     }
   },
 
@@ -541,8 +567,11 @@ NWM.prototype.start = function(callback) {
   });
   this.wm.keys(grab_keys);
   this.wm.setup();
+  console.error('Finish SETUP');
   this.wm.scan();
+  console.error('Finish SCAN');
   this.wm.loop();
+  console.error('Finish LOOP');
   if(callback) {
     callback();
   }
