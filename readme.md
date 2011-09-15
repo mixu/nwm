@@ -199,9 +199,11 @@ Done:
     - Window termination relies on nwm.focused_window which is deprecated (JS)
     - Need a key to reassign a window to a different monitor (JS)
     - The window_ids set of Monitors is not updated when a window's monitor_id is changed (JS)
+- Transients still need to get focus on mouseEnter for transient dialogs with text entry to work (DONE)
 
 Todo:
 
+- Focusing on a monitor requires that there is at least one window on the screen, as monitors.current is updated based on window info (JS)
 - TCP or HTTP configuration interface (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)

@@ -482,6 +482,8 @@ NWM.prototype.events = {
       this.wm.focusWindow(event.id);
     } else {
       console.log('WARNING got focus event for nonexistent (transient) window', event);
+      // transients need this to happen to get keyboard focus
+      this.wm.focusWindow(event.id);
     }
   },
 

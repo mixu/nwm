@@ -27,7 +27,7 @@ var baseModifier = Xh.Mod4Mask|Xh.ControlMask;
   // moving windows between workspaces
   nwm.addKey({ key: key, modifier: baseModifier|Xh.ShiftMask }, function(event) { 
     var monitor = nwm.monitors.get(nwm.monitors.current);
-    nwm.focused_window && monitor.windowTo(nwm.focused_window, String.fromCharCode(event.keysym));
+    monitor.focused_window && monitor.windowTo(monitor.focused_window, String.fromCharCode(event.keysym));
   });
 });
 
@@ -41,8 +41,9 @@ nwm.addKey({ key: XK.XK_Return, modifier: baseModifier }, function(event) {
 });
 
 // c key is used to close a window (OK)
-nwm.addKey({ key: XK.XK_c, modifier: baseModifier }, function(event) {
-  nwm.focused_window && nwm.wm.killWindow(nwm.focused_window);
+nwm.addKey({ key: XK.XK_c, modifier: baseModifier|Xh.ShiftMask }, function(event) {
+  var monitor = nwm.monitors.get(nwm.monitors.current);
+  monitor.focused_window && nwm.wm.killWindow(monitor.focused_window);
 });
 
 // space switches between layout modes (OK)
@@ -81,9 +82,31 @@ nwm.addKey({ key: XK.XK_space, modifier: baseModifier }, function(event) {
 nwm.addKey({ key: XK.XK_Tab, modifier: baseModifier }, function(event) {
   var monitor = nwm.monitors.get(nwm.monitors.current);
   var workspace = monitor.workspaces.get(monitor.workspaces.current);
-  console.log('Set main window', nwm.focused_window);
-  workspace.setMainWindow(nwm.focused_window);
+  console.log('Set main window', monitor.focused_window);
+  workspace.setMainWindow(monitor.focused_window);
   workspace.rearrange();  
+});
+
+// moving windows between monitors
+nwm.addKey({ key: XK.XK_comma, modifier: baseModifier|Xh.ShiftMask }, function(event) {
+  console.log('Current monitor is', nwm.monitors.current);
+  var monitor = nwm.monitors.get(nwm.monitors.current);
+  if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+    var window = nwm.windows.get(monitor.focused_window);
+    console.log('Set window monitor from', window.monitor, 'to', nwm.monitors.next(window.monitor));
+    window.monitor = nwm.monitors.next(window.monitor);
+  }
+});
+
+// moving windows between monitors
+nwm.addKey({ key: XK.XK_period, modifier: baseModifier|Xh.ShiftMask }, function(event) {
+  console.log('Current monitor is', nwm.monitors.current);
+  var monitor = nwm.monitors.get(nwm.monitors.current);
+  if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+    var window = nwm.windows.get(monitor.focused_window);
+    console.log('Set window monitor from', window.monitor, 'to', nwm.monitors.next(window.monitor));
+    window.monitor = nwm.monitors.prev(window.monitor);
+  }
 });
 
 // TODO: moving focus 
