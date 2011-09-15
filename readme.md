@@ -204,6 +204,7 @@ Done:
 Todo:
 
 - Focusing on a monitor requires that there is at least one window on the screen, as monitors.current is updated based on window info (JS)
+- Transient windows should be repositioned to the current screen when they open (JS)
 - TCP or HTTP configuration interface (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)
