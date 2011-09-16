@@ -30,10 +30,21 @@ var baseModifier = Xh.Mod4Mask|Xh.ControlMask;
   });
 });
 
+var rainbow_index = -1;
+var rainbow_bg = [ 'DarkRed', 'salmon', 'yellow1', 'green3', 'LightSkyBlue', 'MidnightBlue', 'purple4'];
+var rainbow_fg = [ 'snow1', 'grey0', 'grey0', 'grey0', 'grey0', 'snow1', 'snow1'];
+
 // enter key is used to launch xterm (OK)
 nwm.addKey({ key: XK.XK_Return, modifier: baseModifier }, function(event) {
-  // check for whether we are running in a different display
-  var term = require('child_process').spawn('xterm', ['-lc'], { env: process.env });
+  // run using the same env as the current process.
+  // Also, use the colors of the rainbow...
+  rainbow_index++;
+  if(!rainbow_bg[rainbow_index]) {
+    rainbow_index = 0;
+  }
+  var term = require('child_process').spawn('xterm', ['-lc', 
+    '-fg', rainbow_fg[rainbow_index], 
+    '-bg', rainbow_bg[rainbow_index]], { env: process.env });
   term.on('exit', function (code) {
     console.log('child process exited with code ', code);
   });  
