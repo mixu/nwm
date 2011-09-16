@@ -14,7 +14,7 @@ nwm.hotLoad(__dirname+'/layouts/grid.js');
 
 // KEYBOARD SHORTCUTS
 // Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
-var baseModifier = ( process.env.DISPLAY ? Xh.Mod4Mask|Xh.ControlMask : Xh.Mod4Mask); // to make it easier to reassign the "base" modifier combination
+var baseModifier = ( process.env.DISPLAY && process.env.DISPLAY == ':1' ? Xh.Mod4Mask|Xh.ControlMask : Xh.Mod4Mask); // to make it easier to reassign the "base" modifier combination
 
 // Workspace management keys (OK)
 [XK.XK_1, XK.XK_2, XK.XK_3, XK.XK_4, XK.XK_5, XK.XK_6, XK.XK_7, XK.XK_8, XK.XK_9].forEach(function(key) {
@@ -35,7 +35,7 @@ var rainbow_bg = [ 'DarkRed', 'salmon', 'yellow1', 'green3', 'LightSkyBlue', 'Mi
 var rainbow_fg = [ 'snow1', 'grey0', 'grey0', 'grey0', 'grey0', 'snow1', 'snow1'];
 
 // enter key is used to launch xterm (OK)
-nwm.addKey({ key: XK.XK_Return, modifier: baseModifier }, function(event) {
+nwm.addKey({ key: XK.XK_Return, modifier: baseModifier|Xh.ShiftMask }, function(event) {
   // run using the same env as the current process.
   // Also, use the colors of the rainbow...
   rainbow_index++;
