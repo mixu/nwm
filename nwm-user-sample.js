@@ -14,7 +14,7 @@ nwm.hotLoad(__dirname+'/layouts/grid.js');
 
 // KEYBOARD SHORTCUTS
 // Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
-var baseModifier = Xh.Mod4Mask|Xh.ControlMask; 
+var baseModifier = ( process.env.DISPLAY ? Xh.Mod4Mask|Xh.ControlMask : Xh.Mod4Mask); // to make it easier to reassign the "base" modifier combination
 
 // Workspace management keys (OK)
 [XK.XK_1, XK.XK_2, XK.XK_3, XK.XK_4, XK.XK_5, XK.XK_6, XK.XK_7, XK.XK_8, XK.XK_9].forEach(function(key) {

@@ -10,7 +10,7 @@ I wrote the code in this repo during Node Knockout 2011 ([old repo](https://gith
 
 The underlying X11 bindings are written as a Node native extension in C++/C. 
 
-My plan is to dogfood this in the near future to bring it to a more useful state. Right now, I recommend you run it in a secondary X server using Xephyr.
+I'm now actively using this as my primary window manager, as multi-monitor support is finally OK. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr.
 
 # Features
 
@@ -22,11 +22,7 @@ Cpp bindings:
 Nwm.js:
 
 - Layout decisions are done in Javascript, not C++.
-- Write your own layout, or use one of the built-in layouts:
-    - Vertical Stack Tiling (e.g. DWM's tiling)
-    - Monocle (a.k.a. fullscreen)
-    - Bottom Stack Tiling (a.k.a. wide)
-    - Grid (a.k.a fair)
+- Write your own layout, or use one of the built-in layouts (screenshots below)
 - Support for workspaces:
     - Access workspaces 0-9 via keyboard (and max int via JS)
     - Each workspace can have it's own layout
@@ -35,6 +31,24 @@ Nwm.js:
     - That window usually gets more space depending on the layout
     - Each workspace has it's own main window scale setting
 - REPL, so you can issue commands to it interactively
+
+# Layouts
+
+## Vertical Stack Tiling (e.g. DWM's tiling)
+
+![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/tile.png)
+
+## Monocle (a.k.a. fullscreen)
+
+![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/fullscreen.png)
+
+## Bottom Stack Tiling (a.k.a. wide)
+
+![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/wide.png)
+
+## Grid (a.k.a fair)
+
+![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/grid.png)
 
 # Installing and running under a secondary X11 server (Xephyr)
 
@@ -153,70 +167,3 @@ You should bind to the following events from the native extension:
 
 See nwm.js for a full example.
 
-# Todo (C++ bindings)
-
-Done:
-
-- Monitor dimension change notifications (DONE)
-- Expose window titles to JS (DONE)
-- Support switch to full screen requests (DONE)
-- Expose window classes to JS (DONE)
-- Ignore numlock (DONE)
-- Ignore transient windows (DONE)
-- Multi-monitor support (DONE)
-
-Todo:
-
-- Ignore popup windows (C)
-- Expose stacking order and stacking operations (C)
-- Display full info of PropertyNotify, ClientMessage, ConfigureRequest and ConfigureNotify as nwm should not honor some requests e.g. guake Ctrl+shift+t.
-- Test reloading key bindings on the fly (C)
-- Customizable mouse key bindings (C)
-- Graceful exit support (C)
-
-# Todo (Nwm.js)
-
-Done:
-
-- More layouts: (DONE)
-    - Wide (upper half for main, lower half for others)
-    - Monocle (full screen)
-    - Grid (close to equal size)
-- Shortcut for switching between layouts (DONE)
-- Per-workspace layouts (DONE)
-- Keyboard shortcut for making the currently focused window the main window (DONE)
-- Resize main window area with shortcut (DONE)
-- Newly mapped window should become the main window (DONE)
-- Support for loading configuration files (DONE)
-    - Ability to customize keyboard shortcuts from conf file
-    - Add new key bindings (e.g. to launch apps or change layouting) from conf file
-    - git clone + npm installation of personalized config
-    - Code hot loading from file
-- Setting main focus should move that window to the first window in grid layout (DONE)
-- Multi-monitor bug fixes:
-    - GetMainWindow() should take into account whether the window is on the same monitor as the workspace (JS)
-    - Rearrange should apply to all windows (e.g. when a new window is mapped it is put at 0,0 but is associated with the focused monitor in C) (DONE)
-    - Window termination relies on nwm.focused_window which is deprecated (JS)
-    - Need a key to reassign a window to a different monitor (JS)
-    - The window_ids set of Monitors is not updated when a window's monitor_id is changed (JS)
-- Transients still need to get focus on mouseEnter for transient dialogs with text entry to work (DONE)
-
-Todo:
-
-- Multi-monitor bug fixes:
-  - Focusing on a monitor requires that there is at least one window on the screen, as monitors.current is updated based on window info (JS)
-  - Transient windows should be repositioned to the current screen when they open (JS)
-  - After swapping to a new workspace on screen 0, creating new terms causes them to go to workspace that was last active rather than the current workspace -- e.g. if last oper was to swap screen 1 to ws 3, ws 3 will be used; if previous ws was screen 0 ws 1, then ws 1 will be used (JS)
-  - When a pre-existing window is shown again, it gets visible but is not assigned to the current workspace (JS)
-- TCP interface (JS)
-- Website and tutorial e.g. http://xmonad.org/tour.html
-- Saving state on exit (JS)
-- Floating window mode (JS)
-
-Long term plans (likely to be separate projects):
-
-- Drawing window borders and titlebars
-- App launcher
-- App switcher
-- Expose clone (e.g. show all windows, monocle selected window)
-- Even more layouts e.g. http://haskell.org/haskellwiki/Xmonad/Screenshots
