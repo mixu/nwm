@@ -26,15 +26,12 @@ Nwm.js:
 - Layout decisions are done in Javascript, not C++.
 - Write your own layout, or use one of the built-in layouts (screenshots below)
 - Support for workspaces (0 - 9 by default), each workspace can have it's own layout
-- Support for "main window":
-    - One window is considered to be the "main window"
-    - That window usually gets more space depending on the layout
-    - Each workspace has it's own main window scale setting
+- Support for "main window", allowing for dynamic resizing. Each workspace has it's own main window scale setting.
 - REPL, so you can issue commands to it interactively
 
 # Installing
 
-You need to use a 0.4.x branch of Node for now, since the 0.5.x branch does not have libev bundled. For instance v0.4.11 works (git checkout v0.4.11 after cloning the node repo).
+You need to use a 0.4.x branch of Node for now, since the 0.5.x branch does not have libev bundled. For instance v0.4.11 works (git checkout v0.4.11 after cloning Joyent's node.js repo).
 
 From github:
 
@@ -90,11 +87,7 @@ Some notes:
 
 The keyboard shortcuts use a different base key combination depending on whether you are running nwm on Xephyr / running nwm as the primary WM.
 
-Under Xephyr, the base key combination is Ctrl+Meta (e.g. Ctrl+Win).
-
-When running natively, the base key is Meta (Win).
-
-This is so that I can test nwm inside itself, yet have decent shortcuts natively:
+Under Xephyr, the base key combination is Ctrl+Meta (e.g. Ctrl+Win). When running natively, the base key is Meta (Win). This is so that I can test nwm inside itself, yet have decent shortcuts:
 
     # Launching programs
     Meta + Shift + Enter -- Start xterm
