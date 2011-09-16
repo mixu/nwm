@@ -12,6 +12,8 @@ The underlying X11 bindings are written as a Node native extension in C++/C.
 
 I'm now actively using this as my primary window manager, as multi-monitor support is finally OK. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr.
 
+I'm looking for co-maintainers (e.g. interested in improving the nwm core, including the C++ stuff) and contributors (writing layouts and other JS code). Send pull requests :).
+
 # Features
 
 Cpp bindings:
@@ -23,9 +25,7 @@ Nwm.js:
 
 - Layout decisions are done in Javascript, not C++.
 - Write your own layout, or use one of the built-in layouts (screenshots below)
-- Support for workspaces:
-    - Access workspaces 0-9 via keyboard (and max int via JS)
-    - Each workspace can have it's own layout
+- Support for workspaces (0 - 9 by default), each workspace can have it's own layout
 - Support for "main window":
     - One window is considered to be the "main window"
     - That window usually gets more space depending on the layout
@@ -53,12 +53,7 @@ Find out what your login manager is:
 
 If it is GDM:
 
-1: Create log directory and copy files
-
-    sudo mkdir /nwm-log
-    sudo chmod 777 /nwm-log
-    sudo cp -R ./mnt/nwm/ /usr/local/lib/
-    sudo chmod +x /usr/local/lib/nwm/nwm.sh
+1: Fix the paths in nwm.sh to match your configuration. You have to specify full paths, as GDM is picky about what it will launch successfully.
 
 2: add the following as nwm.desktop to /usr/share/xsessions:
 
@@ -66,7 +61,7 @@ If it is GDM:
     Encoding=UTF-8
     Name=nwm
     Comment=This session starts nwm 
-    Exec=/usr/local/lib/nwm.sh
+    Exec=/PATH/TO/REPOSITORY/nwm.sh
     Type=Application
 
 Select "nwm" from the Sessions menu when logging in.
@@ -84,7 +79,7 @@ Some tips for running nwm in a VM:
     DISPLAY=:1 gedit
     DISPLAY=:1 gnome-terminal
     # now start nwm.js on display 1
-    DISPLAY=:1 node nwm.js
+    DISPLAY=:1 node nwm-user-sample.js
 
 Some notes:
 
@@ -128,7 +123,15 @@ This is so that I can test nwm inside itself, yet have decent shortcuts natively
     # Multi-monitor keys
     Meta + Shift + , -- Send focused window to previous screen
     Meta + Shift + . -- Send focused window to next screen
-    
+
+## Writing new layouts and reassigning keyboard shortcuts
+
+Have a look at the files in ./layouts to see how a new layout can be implemented.
+
+To customize the keyboard shortcuts, change nwm-user-sample.js.
+
+For more extensive customization, see https://github.com/mixu/nwm-user which has a package.json file and hence makes it possible to git clone + npm install your window manager.
+
 ## Vertical Stack Tiling (e.g. DWM's tiling)
 
 ![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/tile.png)
