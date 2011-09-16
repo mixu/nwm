@@ -385,6 +385,7 @@ NWM.prototype.events = {
   // A new monitor is added
   addMonitor: function(monitor) {
     this.monitors.add(new Monitor(this, monitor));
+    this.monitors.current = monitor.id;
   },
 
   // A monitor is updated
