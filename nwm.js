@@ -69,6 +69,7 @@ Collection.prototype.get = function(id) {
 Collection.prototype.next = function(id) {
   var keys = Object.keys(this.items);
   var pos = keys.indexOf(id);
+  pos = (pos == -1 ? keys.indexOf(''+id) : pos);
   // Wrap around the array
   return (keys[pos+1] ? keys[pos+1] : keys[0] );
 };
@@ -76,6 +77,7 @@ Collection.prototype.next = function(id) {
 Collection.prototype.prev = function(id) {
   var keys = Object.keys(this.items);
   var pos = keys.indexOf(id);
+  pos = (pos == -1 ? keys.indexOf(''+id) : pos);
   // Wrap around the array
   return (keys[pos-1] ? keys[pos-1] : keys[keys.length-1] );
 };
@@ -474,11 +476,11 @@ NWM.prototype.events = {
   enterNotify: function(event){
     if(this.windows.exists(event.id)) {
       var window = this.windows.get(event.id);
-      console.log('focused monitor is ', this.monitors.current, 'focusing to', window.monitor);
+      console.log('focused monitor is ', this.monitors.current, 'focusing to', window.monitor, window.title);
       if(this.monitors.exists(window.monitor)) {
         this.monitors.current = window.monitor;
       }
-      this.monitors.get(window.monitor).focused_window = event.id;
+      this.monitors.get(window.monitor).focused_window = event.id;      
       this.wm.focusWindow(event.id);
     } else {
       console.log('WARNING got focus event for nonexistent (transient) window', event);
@@ -488,14 +490,15 @@ NWM.prototype.events = {
   },
 
   focusIn: function(event) {
-    console.log('Focus to ', event.id);
     if(this.windows.exists(event.id)) {
       var window = this.windows.get(event.id);
-      console.log('focused monitor is ', this.monitors.current, 'focusing to', window.monitor);
+      console.log('Change focused monitor ', this.monitors.current, '=>', window.monitor, '(but not window)');
       if(this.monitors.exists(window.monitor)) {
         this.monitors.current = window.monitor;
       }
-      this.monitors.get(window.monitor).focused_window = event.id;
+      // Important: Don't change window focus here, as focusIn events get emitted after focusWindow() is called,
+      // and the focus is already set correctly when we do it ourself. And calling focusWindow() again here is a bad idea,
+      // as it will generate another focusIn event. Generally, you want enterNotify above.
     }
   },
 

@@ -203,13 +203,14 @@ Done:
 
 Todo:
 
-- Focusing on a monitor requires that there is at least one window on the screen, as monitors.current is updated based on window info (JS)
-- Transient windows should be repositioned to the current screen when they open (JS)
-- TCP or HTTP configuration interface (JS)
+- Multi-monitor bug fixes:
+  - Focusing on a monitor requires that there is at least one window on the screen, as monitors.current is updated based on window info (JS)
+  - Transient windows should be repositioned to the current screen when they open (JS)
+  - After swapping to a new workspace on screen 0, creating new terms causes them to go to workspace that was last active rather than the current workspace -- e.g. if last oper was to swap screen 1 to ws 3, ws 3 will be used; if previous ws was screen 0 ws 1, then ws 1 will be used (JS)
+  - When a pre-existing window is shown again, it gets visible but is not assigned to the current workspace (JS)
+- TCP interface (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)
-- Media key bindings (JS)
-- Dropdown Chrome (JS)
 - Floating window mode (JS)
 
 Long term plans (likely to be separate projects):

@@ -747,8 +747,8 @@ public:
     Client* c = Client::getByWindow(&hw->monits, ev->window);
     if(c) {
       int id = c->getId();
-      fprintf(stderr, "EmitFocusIn found client %d by window\n", id);
-      // Don't do this yet, results in another FocusIn --> loop: RealFocus(hw, id);
+      fprintf(stderr, "EmitFocusIn for client %d by window\n", id);
+      // Don't do this yet, results in another FocusIn --> loop
       // call the callback in Node.js, passing the window object...
       argv[0] = NodeWM::makeEvent(id);
       hw->Emit(onFocusIn, 1, argv);

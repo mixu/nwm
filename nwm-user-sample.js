@@ -1,17 +1,16 @@
 // modules
 var NWM = require('./nwm.js');
-var XK = require('./lib/keysymdef.js').keysyms;
-var Xh = require('./lib/x.js').masks;
+var XK = require('./lib/keysymdef.js');
+var Xh = require('./lib/x.js');
 
 // instantiate nwm and configure it
 var nwm = new NWM();
 
 // LAYOUTS: add layouts from external hash/object
-var layouts = require('./nwm-layouts.js');
-Object.keys(layouts).forEach(function(name){
-  var callback = layouts[name];
-  nwm.addLayout(name, layouts[name]);
-});
+nwm.hotLoad(__dirname+'/layouts/tile.js');
+nwm.hotLoad(__dirname+'/layouts/monocle.js');
+nwm.hotLoad(__dirname+'/layouts/wide.js');
+nwm.hotLoad(__dirname+'/layouts/grid.js');
 
 // KEYBOARD SHORTCUTS
 // Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
@@ -109,8 +108,28 @@ nwm.addKey({ key: XK.XK_period, modifier: baseModifier|Xh.ShiftMask }, function(
   }
 });
 
-// TODO: moving focus 
-nwm.addKey({ key: XK.XK_j, modifier: baseModifier }, function() {});
+// moving focus 
+nwm.addKey({ key: XK.XK_j, modifier: baseModifier }, function() {
+  var monitor = nwm.monitors.get(nwm.monitors.current);
+  if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+    var previous = nwm.windows.prev(monitor.focused_window);
+    var window = nwm.windows.get(previous);
+    console.log('Current', monitor.focused_window, 'previous', window.id);
+    monitor.focused_window = window.id;
+    nwm.wm.focusWindow(window.id);
+  }  
+});
+nwm.addKey({ key: XK.XK_k, modifier: baseModifier }, function() {
+  var monitor = nwm.monitors.get(nwm.monitors.current);
+  if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+    var next = nwm.windows.next(monitor.focused_window);
+    var window = nwm.windows.get(next);
+    console.log('Current', monitor.focused_window, 'next', window.id);
+    monitor.focused_window = window.id;
+    nwm.wm.focusWindow(monitor.focused_window);
+  }    
+});
+
 // TODO: graceful shutdown
 nwm.addKey({ key: XK.XK_q, modifier: baseModifier|Xh.ShiftMask }, function() {});
 
