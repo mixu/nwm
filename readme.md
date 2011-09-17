@@ -1,14 +1,14 @@
 # nwm - node window manager
 
-nwm is a dynamic window manager for X written at NodeKO 2011. 
+nwm is a dynamic window manager for X written at NodeKO 2011.
 
 It uses libev to interface with X11, and allows you to lay out windows in Node.
 
-I wrote the code in this repo during Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)). Unfortunately I'm not in the competition since I forgot to confirm my initial team registration (click accept). Not a big deal.
+I started writing nww at Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)), though it was not in the competition itself.
 
 **This is the repo you should watch/fork for future updates.**
 
-The underlying X11 bindings are written as a Node native extension in C++/C. 
+The underlying X11 bindings are written as a Node native extension in C++/C.
 
 I'm now actively using this as my primary window manager, as multi-monitor support is finally OK. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr.
 
@@ -16,15 +16,15 @@ I'm looking for co-maintainers (e.g. interested in improving the nwm core, inclu
 
 # Features
 
-Cpp bindings:
+C++ binding:
 
-- Uses X11 via libev
+- Use X11 via libev
 - API abstracts over X11 so you don't need to learn X11 just to customize your layout
 
 Nwm.js:
 
 - Layout decisions are done in Javascript, not C++.
-- Write your own layout, or use one of the built-in layouts (screenshots below)
+- Write your own layout, or use one of the built-in layouts (**see screenshots below**)
 - Support for workspaces (0 - 9 by default), each workspace can have it's own layout
 - Support for "main window", allowing for dynamic resizing. Each workspace has it's own main window scale setting.
 - REPL, so you can issue commands to it interactively
@@ -35,12 +35,13 @@ You need to use a 0.4.x branch of Node for now, since the 0.5.x branch does not 
 
 From github:
 
-    node-waf clean
-    node-waf configure build
+    node-waf clean || true && node-waf configure build
+    node nwm-user-sample.js
 
 From npm (less frequently updated):
 
     npm install nwm
+    node nwm-user-sample.js
 
 # Installing as a primary window manager
 
@@ -57,7 +58,7 @@ If it is GDM:
     [Desktop Entry]
     Encoding=UTF-8
     Name=nwm
-    Comment=This session starts nwm 
+    Comment=This session starts nwm
     Exec=/PATH/TO/REPOSITORY/nwm.sh
     Type=Application
 
@@ -96,12 +97,12 @@ Under Xephyr, the base key combination is Ctrl+Meta (e.g. Ctrl+Win). When runnin
     Meta + Space -- Switch between tile, monocle, wide and grid layouts
 
     # Focus
-    TODO Meta + j -- Focus next window
-    TODO Meta + k -- Focus previous window
+    Meta + j -- Focus next window
+    Meta + k -- Focus previous window
 
     # Main window
     Meta + h -- Decrease master area size
-    Meta + F10 
+    Meta + F10
     Meta + l -- Increase master area size
     Meta + F11
     Meta + Enter -- Sets currently focused window as main window
@@ -119,7 +120,7 @@ Under Xephyr, the base key combination is Ctrl+Meta (e.g. Ctrl+Win). When runnin
 
 ## Writing new layouts and reassigning keyboard shortcuts
 
-Have a look at the files in ./layouts to see how a new layout can be implemented.
+Have a look at the files in ./lib/layouts to see how a new layout can be implemented.
 
 To customize the keyboard shortcuts, change nwm-user-sample.js.
 
@@ -127,19 +128,19 @@ For more extensive customization, see https://github.com/mixu/nwm-user which has
 
 ## Vertical Stack Tiling (e.g. DWM's tiling)
 
-![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/tile.png)
+![screenshot](https://github.com/mixu/nwm/raw/master/docs/screenshots/tile.png)
 
 ## Monocle (a.k.a. fullscreen)
 
-![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/fullscreen.png)
+![screenshot](https://github.com/mixu/nwm/raw/master/docs/screenshots/fullscreen.png)
 
 ## Bottom Stack Tiling (a.k.a. wide)
 
-![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/wide.png)
+![screenshot](https://github.com/mixu/nwm/raw/master/docs/screenshots/wide.png)
 
 ## Grid (a.k.a fair)
 
-![screenshot](https://github.com/mixu/nwm/raw/master/screenshots/grid.png)
+![screenshot](https://github.com/mixu/nwm/raw/master/docs/screenshots/grid.png)
 
 # Using from the console
 

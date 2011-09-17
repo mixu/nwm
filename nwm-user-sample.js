@@ -7,10 +7,10 @@ var Xh = require('./lib/x.js');
 var nwm = new NWM();
 
 // LAYOUTS: add layouts from external hash/object
-nwm.hotLoad(__dirname+'/layouts/tile.js');
-nwm.hotLoad(__dirname+'/layouts/monocle.js');
-nwm.hotLoad(__dirname+'/layouts/wide.js');
-nwm.hotLoad(__dirname+'/layouts/grid.js');
+nwm.hotLoad(__dirname+'/lib/layouts/tile.js');
+nwm.hotLoad(__dirname+'/lib/layouts/monocle.js');
+nwm.hotLoad(__dirname+'/lib/layouts/wide.js');
+nwm.hotLoad(__dirname+'/lib/layouts/grid.js');
 
 // KEYBOARD SHORTCUTS
 // Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
@@ -19,12 +19,12 @@ var baseModifier = ( process.env.DISPLAY && process.env.DISPLAY == ':1' ? Xh.Mod
 // Workspace management keys (OK)
 [XK.XK_1, XK.XK_2, XK.XK_3, XK.XK_4, XK.XK_5, XK.XK_6, XK.XK_7, XK.XK_8, XK.XK_9].forEach(function(key) {
   // number keys are used to move between screens
-  nwm.addKey({ key: key, modifier: baseModifier }, function(event) { 
+  nwm.addKey({ key: key, modifier: baseModifier }, function(event) {
     var monitor = nwm.monitors.get(nwm.monitors.current);
-    monitor.go(String.fromCharCode(event.keysym)); 
-  });  
+    monitor.go(String.fromCharCode(event.keysym));
+  });
   // moving windows between workspaces
-  nwm.addKey({ key: key, modifier: baseModifier|Xh.ShiftMask }, function(event) { 
+  nwm.addKey({ key: key, modifier: baseModifier|Xh.ShiftMask }, function(event) {
     var monitor = nwm.monitors.get(nwm.monitors.current);
     monitor.focused_window && monitor.windowTo(monitor.focused_window, String.fromCharCode(event.keysym));
   });
@@ -42,12 +42,12 @@ nwm.addKey({ key: XK.XK_Return, modifier: baseModifier|Xh.ShiftMask }, function(
   if(!rainbow_bg[rainbow_index]) {
     rainbow_index = 0;
   }
-  var term = require('child_process').spawn('xterm', ['-lc', 
-    '-fg', rainbow_fg[rainbow_index], 
+  var term = require('child_process').spawn('xterm', ['-lc',
+    '-fg', rainbow_fg[rainbow_index],
     '-bg', rainbow_bg[rainbow_index]], { env: process.env });
   term.on('exit', function (code) {
     console.log('child process exited with code ', code);
-  });  
+  });
 });
 
 // c key is used to close a window (OK)
@@ -73,7 +73,7 @@ nwm.addKey({ key: XK.XK_space, modifier: baseModifier }, function(event) {
     var workspace = monitor.workspaces.get(monitor.workspaces.current);
     workspace.setMainWindowScale(workspace.getMainWindowScale() - 5);
     console.log('Set main window scale', workspace.getMainWindowScale());
-    workspace.rearrange();    
+    workspace.rearrange();
   });
 });
 
@@ -84,8 +84,8 @@ nwm.addKey({ key: XK.XK_space, modifier: baseModifier }, function(event) {
     var workspace = monitor.workspaces.get(monitor.workspaces.current);
     workspace.setMainWindowScale(workspace.getMainWindowScale() + 5);
     console.log('Set main window scale', workspace.getMainWindowScale());
-    workspace.rearrange();    
-  });  
+    workspace.rearrange();
+  });
 });
 
 // tab makes the current window the main window
@@ -94,7 +94,7 @@ nwm.addKey({ key: XK.XK_Tab, modifier: baseModifier }, function(event) {
   var workspace = monitor.workspaces.get(monitor.workspaces.current);
   console.log('Set main window', monitor.focused_window);
   workspace.setMainWindow(monitor.focused_window);
-  workspace.rearrange();  
+  workspace.rearrange();
 });
 
 // moving windows between monitors
@@ -119,7 +119,7 @@ nwm.addKey({ key: XK.XK_period, modifier: baseModifier|Xh.ShiftMask }, function(
   }
 });
 
-// moving focus 
+// moving focus
 nwm.addKey({ key: XK.XK_j, modifier: baseModifier }, function() {
   var monitor = nwm.monitors.get(nwm.monitors.current);
   if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
@@ -128,7 +128,7 @@ nwm.addKey({ key: XK.XK_j, modifier: baseModifier }, function() {
     console.log('Current', monitor.focused_window, 'previous', window.id);
     monitor.focused_window = window.id;
     nwm.wm.focusWindow(window.id);
-  }  
+  }
 });
 nwm.addKey({ key: XK.XK_k, modifier: baseModifier }, function() {
   var monitor = nwm.monitors.get(nwm.monitors.current);
@@ -138,7 +138,7 @@ nwm.addKey({ key: XK.XK_k, modifier: baseModifier }, function() {
     console.log('Current', monitor.focused_window, 'next', window.id);
     monitor.focused_window = window.id;
     nwm.wm.focusWindow(monitor.focused_window);
-  }    
+  }
 });
 
 // TODO: graceful shutdown
@@ -149,5 +149,5 @@ nwm.start(function() {
   // Expose via stdout
   var repl_stdout = require('repl').start();
   repl_stdout.context.nwm = nwm;
-  repl_stdout.context.Xh = Xh;  
+  repl_stdout.context.Xh = Xh;
 });
