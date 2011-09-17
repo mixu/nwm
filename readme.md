@@ -1,33 +1,22 @@
 # nwm - node window manager
 
-nwm is a dynamic window manager for X written at NodeKO 2011.
-
-It uses libev to interface with X11, and allows you to lay out windows in Node.
-
-I started writing nww at Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)), though it was not in the competition itself.
+nwm is a dynamic window manager for X written at NodeKO 2011. It uses libev to interface with X11, and allows you to lay out windows in Node. I started writing nwm at Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)), though it was not in the competition itself.
 
 **This is the repo you should watch/fork for future updates.**
 
 The underlying X11 bindings are written as a Node native extension in C++/C.
 
-I'm now actively using this as my primary window manager, as multi-monitor support is finally OK. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr.
+I'm now actively using this as my primary window manager, as multi-monitor support is finally OK. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr. I'm looking for co-maintainers (e.g. interested in improving the nwm core, including the C++ stuff) and contributors (writing layouts and other JS code). Send pull requests :).
 
-I'm looking for co-maintainers (e.g. interested in improving the nwm core, including the C++ stuff) and contributors (writing layouts and other JS code). Send pull requests :).
+# Major features
 
-# Features
-
-C++ binding:
-
-- Use X11 via libev
-- API abstracts over X11 so you don't need to learn X11 just to customize your layout
-
-Nwm.js:
-
-- Layout decisions are done in Javascript, not C++.
-- Write your own layout, or use one of the built-in layouts (**see screenshots below**)
+- Layouts, key bindings, window positions, workspaces - all the major stuff is in Javascript, not C++ (or Haskell, or Lisp :D)
+- 4 built-in layouts (**see screenshots below**)
+- Support for multi-monitor systems (via Xinerama)
 - Support for workspaces (0 - 9 by default), each workspace can have it's own layout
-- Support for "main window", allowing for dynamic resizing. Each workspace has it's own main window scale setting.
-- REPL, so you can issue commands to it interactively
+- Support for a "main window", allowing for dynamic resizing. Each workspace has it's own main window scale setting.
+- C++ API abstracts over X11 (w/libev) so you don't need to learn X11 just to customize your layout
+- REPL, so you can issue commands to nwm interactively, or expose and control it over TCP/HTTP/whatever
 
 # Installing
 
