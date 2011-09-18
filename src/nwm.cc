@@ -1,5 +1,5 @@
 /* This code is PUBLIC DOMAIN, and is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND. See the accompanying 
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND. See the accompanying
  * LICENSE file.
  */
 
@@ -52,7 +52,7 @@ typedef struct NodeWM NodeWM;
 
 // make these classes of their own
 
-enum callback_map { 
+enum callback_map {
   onAddMonitor,
   onUpdateMonitor,
   onRemoveMonitor,
@@ -67,6 +67,7 @@ enum callback_map {
   onEnterNotify,
   onFullscreen,
   onFocusIn,
+  onFocusMonitor,
   onLast
 };
 
@@ -176,7 +177,8 @@ public:
         v8::String::New("keyPress"),
         v8::String::New("enterNotify"),
         v8::String::New("fullscreen"),
-        v8::String::New("focusIn")
+        v8::String::New("focusIn"),
+        v8::String::New("focusMonitor")
       };
 
     v8::Local<v8::String> value  = Local<v8::String>::Cast(args[0]);
@@ -184,7 +186,7 @@ public:
     for(int i = 0; i < onLast; i++) {
       if( strcmp(*v8::String::AsciiValue(value),  *v8::String::AsciiValue(map[i])) == 0 ) {
         selected = i;
-        break;        
+        break;
       }
     }
     if(selected == -1) {
@@ -200,7 +202,7 @@ public:
     TryCatch try_catch;
     if(this->callbacks[event] != NULL) {
       Handle<Function> *callback = cb_unwrap(this->callbacks[event]);
-      (*callback)->Call(Context::GetCurrent()->Global(), argc, argv);                
+      (*callback)->Call(Context::GetCurrent()->Global(), argc, argv);
       if (try_catch.HasCaught()) {
         FatalException(try_catch);
       }
@@ -302,9 +304,9 @@ public:
             if(i >= n) {
               hw->Emit(onAddMonitor, 1, argv);
             } else {
-              hw->Emit(onUpdateMonitor, 1, argv);              
+              hw->Emit(onUpdateMonitor, 1, argv);
             }
-          }          
+          }
         }
       }
       else { /* less monitors available nn < n */
@@ -316,7 +318,7 @@ public:
             hw->monits[i].clients.pop_back();
           }
           // emit REMOVE MONITOR (i)
-          // remove monitor          
+          // remove monitor
           hw->monits.pop_back();
         }
       }
@@ -346,6 +348,15 @@ public:
       }
     }
     hw->selmon = hw->wintomon(hw->root);
+    // update the selected monitor on Node.js side
+    int x, y;
+    Local<Value> argv[2];
+    if(hw->getrootptr(&x, &y)) {
+      argv[0] = Integer::New(x);
+      argv[1] = Integer::New(y);
+      hw->Emit(onFocusMonitor, 2, argv);
+    }
+
     fprintf( stderr, "Done with updategeom\n");
     return;
   }
@@ -367,12 +378,12 @@ public:
     c->updateclass(hw->dpy);
     // attach to monitor
     hw->selmon->clients.push_back(*c);
-    argv[0] = c->toNode(); 
+    argv[0] = c->toNode();
     hw->next_index++;
 
     // call the callback in Node.js, passing the window object...
     hw->Emit(onAddWindow, 1, argv);
-      
+
     // configure the window
     XConfigureEvent ce;
 
@@ -392,7 +403,7 @@ public:
 
     XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
 
-  
+
     // subscribe to window events
     XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     hw->GrabButtons(win, False);
@@ -402,7 +413,7 @@ public:
     }
 
     // move and (finally) map the window
-    XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);    
+    XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);
     XMapWindow(hw->dpy, win);
 
     delete c;
@@ -421,7 +432,7 @@ public:
       c->resize(hw->dpy, width, height);
     }
     return Undefined();
-  } 
+  }
 
   static Handle<Value> MoveWindow(const Arguments& args) {
     HandleScope scope;
@@ -468,14 +479,14 @@ public:
     } else {
       win = hw->root;
     }
-    fprintf( stderr, "FocusWindow: id=%d\n", id);    
+    fprintf( stderr, "FocusWindow: id=%d\n", id);
     // do not focus on the same window... it'll cause a flurry of events...
     if(hw->selected && hw->selected != win) {
       hw->GrabButtons(win, True);
-      XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);    
+      XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);
       Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
       SendEvent(hw, win, atom);
-      XFlush(hw->dpy);      
+      XFlush(hw->dpy);
       hw->selected = win;
     }
   }
@@ -501,7 +512,7 @@ public:
       ev.xclient.data.l[1] = CurrentTime;
       XSendEvent(hw->dpy, wnd, False, NoEventMask, &ev);
     }
-    return exists;    
+    return exists;
   }
 
   /**
@@ -520,7 +531,7 @@ public:
 //            XGrabButton(dpy, Button1,
 //                              Mod4Mask|ControlMask|modifiers[i],
 //                              wnd, False, (ButtonPressMask|ButtonReleaseMask),
-//                              GrabModeAsync, GrabModeSync, None, None);            
+//                              GrabModeAsync, GrabModeSync, None, None);
 //          }
 //      } else {
 //        fprintf( stderr, "GRABBUTTONS - focused: false\n");
@@ -563,7 +574,7 @@ public:
     Key* curr;
     if(!(curr = (Key*)calloc(1, sizeof(Key)))) {
       fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
-      exit( -1 );         
+      exit( -1 );
     }
     curr->keysym = keysym;
     curr->mod = mod;
@@ -599,7 +610,7 @@ public:
         for(i = 0; i < 4; i++) {
           XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod | modifiers[i], hw->root, True, GrabModeAsync, GrabModeAsync);
         }
-      }      
+      }
     }
   }
 
@@ -629,16 +640,16 @@ public:
     unsigned int dui;
     Window dummy;
 
-    return XQueryPointer(dpy, root, &dummy, &dummy, x, y, &di, &di, &dui);
+    return XQueryPointer(this->dpy, this->root, &dummy, &dummy, x, y, &di, &di, &dui);
   }
 
   static void GrabMouseRelease(NodeWM* hw, int id) {
     XEvent ev;
     int x, y;
     Local<Value> argv[1];
-    
-    if(XGrabPointer(hw->dpy, hw->root, False, 
-      ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, 
+
+    if(XGrabPointer(hw->dpy, hw->root, False,
+      ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync,
       GrabModeAsync, None, XCreateFontCursor(hw->dpy, XC_fleur), CurrentTime) != GrabSuccess) {
       return;
     }
@@ -658,7 +669,7 @@ public:
           // handle normally
           break;
         case MotionNotify:
-          {          
+          {
             argv[0] = NodeWM::makeMouseDrag(id, x, y, ev.xmotion.x, ev.xmotion.y); // , ev.state);
             hw->Emit(onMouseDrag, 1, argv);
           }
@@ -735,9 +746,27 @@ public:
     Client* c = Client::getByWindow(&hw->monits, ev->window);
     if(c) {
       int id = c->getId();
-      argv[0] = NodeWM::makeEvent(id);
+      fprintf(stderr, "EmitEnterNotify wid = %d \n", id);
+      Local<Value> argv[1];
+      Local<Object> result = Object::New();
+      result->Set(String::NewSymbol("id"), Integer::New(id));
+      result->Set(String::NewSymbol("x"), Integer::New(ev->x));
+      result->Set(String::NewSymbol("y"), Integer::New(ev->y));
+      result->Set(String::NewSymbol("x_root"), Integer::New(ev->x_root));
+      result->Set(String::NewSymbol("y_root"), Integer::New(ev->y_root));
+      argv[0] = result;
       // call the callback in Node.js, passing the window object...
       hw->Emit(onEnterNotify, 1, argv);
+    }
+    if(ev->window == hw->root) {
+      int x, y;
+      Local<Value> argv[2];
+      if(hw->getrootptr(&x, &y)) {
+        fprintf(stderr, "Emit onFocusMonitor x %d y %d \n", x, y);
+        argv[0] = Integer::New(x);
+        argv[1] = Integer::New(y);
+        hw->Emit(onFocusMonitor, 2, argv);
+      }
     }
   }
 
@@ -769,7 +798,7 @@ public:
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
     if((c = Client::getByWindow(&hw->monits, ev->window)))
-      EmitRemove(hw, c, True);    
+      EmitRemove(hw, c, True);
   }
 
   static void EmitConfigureNotify(NodeWM* hw, XEvent *e) {
@@ -788,7 +817,7 @@ public:
     XPropertyEvent *ev = &e->xproperty;
     // could be used for tracking hints, transient status and window name
     if((ev->window == hw->root) && (ev->atom == XA_WM_NAME)) {
-      // the root window name has changed      
+      // the root window name has changed
     } else if(ev->state == PropertyDelete) {
       return; // ignore property deletes
     } else {
@@ -831,7 +860,7 @@ public:
         argv[1] = Integer::New(0);
         hw->Emit(onFullscreen, 2, argv);
       }
-    }    
+    }
   }
 
   static void EmitRemove(NodeWM* hw, Client *c, Bool destroyed) {
@@ -936,16 +965,16 @@ public:
     unsigned int i, num;
     Window d1, d2, *wins = NULL;
     XWindowAttributes wa;
-    // XQueryTree() function returns the root ID, the parent window ID, a pointer to 
-    // the list of children windows (NULL when there are no children), and 
-    // the number of children in the list for the specified window. 
+    // XQueryTree() function returns the root ID, the parent window ID, a pointer to
+    // the list of children windows (NULL when there are no children), and
+    // the number of children in the list for the specified window.
     if(XQueryTree(hw->dpy, hw->root, &d1, &d2, &wins, &num)) {
       for(i = 0; i < num; i++) {
-        // if we can't read the window attributes, 
+        // if we can't read the window attributes,
         // or the window is a popup (transient or override_redirect), skip it
         if(!XGetWindowAttributes(hw->dpy, wins[i], &wa)
         || wa.override_redirect || XGetTransientForHint(hw->dpy, wins[i], &d1)) {
-          continue;          
+          continue;
         }
         // visible or minimized window ("Iconic state")
         if(wa.map_state == IsViewable )//|| getstate(wins[i]) == IconicState)
@@ -976,7 +1005,7 @@ public:
 
     // use ev_io
 
-    // initiliaze and start 
+    // initiliaze and start
     XSync(hw->dpy, False);
     ev_io_init(&hw->watcher, EIO_RealLoop, XConnectionNumber(hw->dpy), EV_READ);
     hw->watcher.data = hw;
@@ -989,14 +1018,14 @@ public:
 
   static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents) {
 
-    NodeWM* hw = static_cast<NodeWM*>(watcher->data);    
-    
+    NodeWM* hw = static_cast<NodeWM*>(watcher->data);
+
     XEvent event;
-    // main event loop 
+    // main event loop
     while(XPending(hw->dpy)) {
       XNextEvent(hw->dpy, &event);
-      fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);      
-      // handle event internally --> calls Node if necessary 
+      fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);
+      // handle event internally --> calls Node if necessary
       switch (event.type) {
         case ButtonPress:
           {
@@ -1017,14 +1046,14 @@ public:
             wc.border_width = ev->border_width;
             wc.sibling = ev->above;
             wc.stack_mode = ev->detail;
-            XConfigureWindow(hw->dpy, ev->window, ev->value_mask, &wc);            
+            XConfigureWindow(hw->dpy, ev->window, ev->value_mask, &wc);
           }
           break;
         case ConfigureNotify:
             NodeWM::EmitConfigureNotify(hw, &event);
             break;
         case DestroyNotify:
-            NodeWM::EmitDestroyNotify(hw, &event);        
+            NodeWM::EmitDestroyNotify(hw, &event);
             break;
         case EnterNotify:
             NodeWM::EmitEnterNotify(hw, &event);
@@ -1048,7 +1077,7 @@ public:
             XWindowAttributes wa;
             XMapRequestEvent *ev = &event.xmaprequest;
             if(!XGetWindowAttributes(hw->dpy, ev->window, &wa)) {
-              fprintf(stderr, "XGetWindowAttributes failed\n");              
+              fprintf(stderr, "XGetWindowAttributes failed\n");
               return;
             }
             if(wa.override_redirect)
@@ -1063,7 +1092,7 @@ public:
               // emit a rearrange
               hw->Emit(onRearrange, 0, 0);
             } else {
-              fprintf(stderr, "Window is known\n");              
+              fprintf(stderr, "Window is known\n");
             }
           }
             break;
@@ -1084,7 +1113,7 @@ public:
 /*
   static Handle<Value> GetWindow(const Arguments& args) {
     HandleScope scope;
-    
+
     // how to return a new object
 //    Local<Object> result = Object::New();
 //    result->Set(String::NewSymbol("test"), Integer::New(123));
@@ -1092,7 +1121,7 @@ public:
 
     // how to return a new function
     Local<Object> result = Object::New();
-    result->Set(String::NewSymbol("test"), 
+    result->Set(String::NewSymbol("test"),
       v8::FunctionTemplate::New(WindowObject::Test)->GetFunction());
 
     return scope.Close(result);
