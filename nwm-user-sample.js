@@ -105,6 +105,12 @@ nwm.addKey({ key: XK.XK_comma, modifier: baseModifier|Xh.ShiftMask }, function(e
     var window = nwm.windows.get(monitor.focused_window);
     console.log('Set window monitor from', window.monitor, 'to', nwm.monitors.next(window.monitor));
     window.monitor = nwm.monitors.next(window.monitor);
+    // set the workspace to the current workspace on that monitor
+    var other_monitor = nwm.monitors.get(window.monitor);
+    window.workspace = other_monitor.workspaces.current;
+    // rearrange both monitors
+    monitor.workspaces.get(monitor.workspaces.current).rearrange();
+    other_monitor.workspaces.get(other_monitor.workspaces.current).rearrange();
   }
 });
 
@@ -116,6 +122,12 @@ nwm.addKey({ key: XK.XK_period, modifier: baseModifier|Xh.ShiftMask }, function(
     var window = nwm.windows.get(monitor.focused_window);
     console.log('Set window monitor from', window.monitor, 'to', nwm.monitors.next(window.monitor));
     window.monitor = nwm.monitors.prev(window.monitor);
+    // set the workspace to the current workspace on that monitor
+    var other_monitor = nwm.monitors.get(window.monitor);
+    window.workspace = other_monitor.workspaces.current;
+    // rearrange both monitors
+    monitor.workspaces.get(monitor.workspaces.current).rearrange();
+    other_monitor.workspaces.get(other_monitor.workspaces.current).rearrange();
   }
 });
 
