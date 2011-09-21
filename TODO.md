@@ -44,15 +44,18 @@ Done:
     - Window termination relies on nwm.focused_window which is deprecated (JS)
     - Need a key to reassign a window to a different monitor (JS)
     - The window_ids set of Monitors is not updated when a window's monitor_id is changed (JS)
+    - Focusing on a monitor requires that there is at least one window on the screen, as monitors.current is updated based on window info (JS)
+    - After swapping to a new workspace on screen 0, creating new terms causes them to go to workspace that was last active rather than the current workspace -- e.g. if last oper was to swap screen 1 to ws 3, ws 3 will be used; if previous ws was screen 0 ws 1, then ws 1 will be used (JS)
+    - When a pre-existing window is shown again, it gets visible but is not assigned to the current workspace (JS)
 - Transients still need to get focus on mouseEnter for transient dialogs with text entry to work (DONE)
 
 Todo:
 
 - Multi-monitor bug fixes:
-  - Focusing on a monitor requires that there is at least one window on the screen, as monitors.current is updated based on window info (JS)
+  - Maximizing a window on a secondary monitor causes it to maximize in the primary monitor instead (JS)
+  - Removing a monitor causes windows on that monitor to be inaccessible rather than being moved to the remaining monitor (JS)
+  - Transient windows which are too large to fit the current monitor should be resized (JS)
   - Transient windows should be repositioned to the current screen when they open (JS)
-  - After swapping to a new workspace on screen 0, creating new terms causes them to go to workspace that was last active rather than the current workspace -- e.g. if last oper was to swap screen 1 to ws 3, ws 3 will be used; if previous ws was screen 0 ws 1, then ws 1 will be used (JS)
-  - When a pre-existing window is shown again, it gets visible but is not assigned to the current workspace (JS)
 - TCP interface (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)
