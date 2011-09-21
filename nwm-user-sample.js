@@ -93,7 +93,7 @@ nwm.addKey({ key: XK.XK_Tab, modifier: baseModifier }, function(event) {
   var monitor = nwm.monitors.get(nwm.monitors.current);
   var workspace = monitor.workspaces.get(monitor.workspaces.current);
   console.log('Set main window', monitor.focused_window);
-  workspace.setMainWindow(monitor.focused_window);
+  workspace.mainWindow = monitor.focused_window;
   workspace.rearrange();
 });
 
