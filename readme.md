@@ -25,12 +25,11 @@ You need to use a 0.4.x branch of Node for now, since the 0.5.x branch does not 
 From github:
 
     node-waf clean || true && node-waf configure build
-    node nwm-user-sample.js
 
-From npm (less frequently updated):
+You may need the libev-dev packages (e.g. "/usr/bin/ld: cannot find -lev"):
 
-    npm install nwm
-    node nwm-user-sample.js
+- On Fedora: sudo yum install libev-devel
+- On Ubuntu: apt-get install libev-dev libev3
 
 # Installing as a primary window manager
 
