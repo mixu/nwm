@@ -1,15 +1,5 @@
 # Todo (C++ bindings)
 
-Done:
-
-- Monitor dimension change notifications (DONE)
-- Expose window titles to JS (DONE)
-- Support switch to full screen requests (DONE)
-- Expose window classes to JS (DONE)
-- Ignore numlock (DONE)
-- Ignore transient windows (DONE)
-- Multi-monitor support (DONE)
-
 Todo:
 
 - Ignore popup windows (C)
@@ -21,7 +11,29 @@ Todo:
 
 # Todo (Nwm.js)
 
-Done:
+- Multi-monitor bug fixes:
+  - Maximizing a window on a secondary monitor causes it to maximize in the primary monitor instead (JS)
+  - Removing a monitor causes windows on that monitor to be inaccessible rather than being moved to the remaining monitor (JS)
+  - Transient windows which are too large to fit the current monitor should be resized (JS)
+  - Transient windows should be repositioned to the current screen when they open (JS)
+- TCP interface (JS)
+- Test with conky and dzen, figure out how to make integration w/those easy (JS)
+- Website and tutorial e.g. http://xmonad.org/tour.html
+- Saving state on exit (JS)
+- Floating window mode (JS)
+
+
+# Done (C++ bindings)
+
+- Monitor dimension change notifications (DONE)
+- Expose window titles to JS (DONE)
+- Support switch to full screen requests (DONE)
+- Expose window classes to JS (DONE)
+- Ignore numlock (DONE)
+- Ignore transient windows (DONE)
+- Multi-monitor support (DONE)
+
+# Done (nwm.js)
 
 - More layouts: (DONE)
     - Wide (upper half for main, lower half for others)
@@ -49,15 +61,5 @@ Done:
     - When a pre-existing window is shown again, it gets visible but is not assigned to the current workspace (JS)
 - Transients still need to get focus on mouseEnter for transient dialogs with text entry to work (DONE)
 
-Todo:
 
-- Multi-monitor bug fixes:
-  - Maximizing a window on a secondary monitor causes it to maximize in the primary monitor instead (JS)
-  - Removing a monitor causes windows on that monitor to be inaccessible rather than being moved to the remaining monitor (JS)
-  - Transient windows which are too large to fit the current monitor should be resized (JS)
-  - Transient windows should be repositioned to the current screen when they open (JS)
-- TCP interface (JS)
-- Website and tutorial e.g. http://xmonad.org/tour.html
-- Saving state on exit (JS)
-- Floating window mode (JS)
 
