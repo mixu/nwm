@@ -91,10 +91,12 @@ NWM.prototype.events = {
   // When a window requests full screen mode
   fullscreen: function(id, status) {
     if(this.windows.exists(id)) {
-      var monitor = this.monitors.get(this.monitors.current);
+      var window = this.windows.get(id);
+      // use the monitor dimensions associated with the window
+      var monitor = this.monitors.get(window.monitor);
       var workspace = monitor.workspaces.get(monitor.workspaces.current);
       if(status) {
-        this.wm.moveWindow(id, 0, 0);
+        this.wm.moveWindow(id, monitor.x, monitor.y);
         this.wm.resizeWindow(id, monitor.width, monitor.height);
       } else {
         workspace.rearrange();
