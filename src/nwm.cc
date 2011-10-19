@@ -120,9 +120,7 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "killWindow", KillWindow);
 
     // Setting up
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "setup", Setup);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "scan", Scan);
-    NODE_SET_PROTOTYPE_METHOD(s_ct, "loop", Loop);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "start", Start);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "keys", SetGrabKeys);
 
     // FINALLY: export the current function template
@@ -681,60 +679,7 @@ public:
     return;
   }
 
-
-  static Local<Object> makeMouseDrag(int id, int x, int y, int movex, int movey //, unsigned int state
-  ) {
-    // window object to return
-    Local<Object> result = Object::New();
-
-    // read and set the window geometry
-    result->Set(String::NewSymbol("id"), Integer::New(id));
-    result->Set(String::NewSymbol("x"), Integer::New(x));
-    result->Set(String::NewSymbol("y"), Integer::New(y));
-    result->Set(String::NewSymbol("move_x"), Integer::New(movex));
-    result->Set(String::NewSymbol("move_y"), Integer::New(movey));
-//    result->Set(String::NewSymbol("state"), Integer::New(state));
-    return result;
-  }
-
-
-  static Local<Object> makeButtonPress(int id, int x, int y, unsigned int button, unsigned int state) {
-    // window object to return
-    Local<Object> result = Object::New();
-
-    // read and set the window geometry
-    result->Set(String::NewSymbol("id"), Integer::New(id));
-    result->Set(String::NewSymbol("x"), Integer::New(x));
-    result->Set(String::NewSymbol("y"), Integer::New(y));
-    result->Set(String::NewSymbol("button"), Integer::New(button));
-    result->Set(String::NewSymbol("state"), Integer::New(state));
-    return result;
-  }
-
-  static void EmitKeyPress(NodeWM* hw, XEvent *e) {
-    KeySym keysym;
-    XKeyEvent *ev;
-
-    ev = &e->xkey;
-    keysym = XKeycodeToKeysym(hw->dpy, (KeyCode)ev->keycode, 0);
-    Local<Value> argv[1];
-    // we always unset numlock and LockMask since those should not matter
-    argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, keysym, (ev->state & ~(hw->numlockmask|LockMask)));
-    // call the callback in Node.js, passing the window object...
-    hw->Emit(onKeyPress, 1, argv);
-  }
-
-  static Local<Object> makeKeyPress(int x, int y, unsigned int keycode, KeySym keysym, unsigned int mod) {
-    // window object to return
-    Local<Object> result = Object::New();
-    // read and set the window geometry
-    result->Set(String::NewSymbol("x"), Integer::New(x));
-    result->Set(String::NewSymbol("y"), Integer::New(y));
-    result->Set(String::NewSymbol("keysym"), Integer::New(keysym));
-    result->Set(String::NewSymbol("keycode"), Integer::New(keycode));
-    result->Set(String::NewSymbol("modifier"), Integer::New(mod));
-    return result;
-  }
+#include "return_values.cc"
 
   static void EmitEnterNotify(NodeWM* hw, XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
@@ -904,15 +849,7 @@ public:
     hw->Emit(onRearrange, 0, 0);
   }
 
-  static Local<Object> makeEvent(int id) {
-    // window object to return
-    Local<Object> result = Object::New();
-    result->Set(String::NewSymbol("id"), Integer::New(id));
-    return result;
-  }
-
-
-  static Handle<Value> Setup(const Arguments& args) {
+  static Handle<Value> Start(const Arguments& args) {
     HandleScope scope;
     // extract from args.this
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
@@ -949,22 +886,11 @@ public:
 
     GrabKeys(hw, hw->dpy, hw->root);
 
-    return Undefined();
-  }
-
-
-
-  /**
-   * Scan and layout current windows
-   */
-  static Handle<Value> Scan(const Arguments& args) {
-    HandleScope scope;
-    // extract from args.this
-    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
+    // Scan and layout current windows
 
     unsigned int i, num;
     Window d1, d2, *wins = NULL;
-    XWindowAttributes wa;
+    XWindowAttributes watt;
     // XQueryTree() function returns the root ID, the parent window ID, a pointer to
     // the list of children windows (NULL when there are no children), and
     // the number of children in the list for the specified window.
@@ -972,20 +898,20 @@ public:
       for(i = 0; i < num; i++) {
         // if we can't read the window attributes,
         // or the window is a popup (transient or override_redirect), skip it
-        if(!XGetWindowAttributes(hw->dpy, wins[i], &wa)
-        || wa.override_redirect || XGetTransientForHint(hw->dpy, wins[i], &d1)) {
+        if(!XGetWindowAttributes(hw->dpy, wins[i], &watt)
+        || watt.override_redirect || XGetTransientForHint(hw->dpy, wins[i], &d1)) {
           continue;
         }
         // visible or minimized window ("Iconic state")
-        if(wa.map_state == IsViewable )//|| getstate(wins[i]) == IconicState)
-          NodeWM::EmitAdd(hw, wins[i], &wa);
+        if(watt.map_state == IsViewable )//|| getstate(wins[i]) == IconicState)
+          NodeWM::EmitAdd(hw, wins[i], &watt);
       }
       for(i = 0; i < num; i++) { /* now the transients */
-        if(!XGetWindowAttributes(hw->dpy, wins[i], &wa))
+        if(!XGetWindowAttributes(hw->dpy, wins[i], &watt))
           continue;
         if(XGetTransientForHint(hw->dpy, wins[i], &d1)
-        && (wa.map_state == IsViewable )) //|| getstate(wins[i]) == IconicState))
-          NodeWM::EmitAdd(hw, wins[i], &wa);
+        && (watt.map_state == IsViewable )) //|| getstate(wins[i]) == IconicState))
+          NodeWM::EmitAdd(hw, wins[i], &watt);
       }
       if(wins) {
         // To free a non-NULL children list when it is no longer needed, use XFree()
@@ -995,23 +921,12 @@ public:
 
     // emit a rearrange
     hw->Emit(onRearrange, 0, 0);
-    return Undefined();
-  }
 
-  static Handle<Value> Loop(const Arguments& args) {
-    HandleScope scope;
-    // extract from args.this
-    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
-
-    // use ev_io
-
-    // initiliaze and start
+    // initialize and start
     XSync(hw->dpy, False);
     ev_io_init(&hw->watcher, EIO_RealLoop, XConnectionNumber(hw->dpy), EV_READ);
     hw->watcher.data = hw;
     ev_io_start(EV_DEFAULT_ &hw->watcher);
-
-//    hw->Ref();
 
     return Undefined();
   }
@@ -1110,23 +1025,6 @@ public:
     return;
   }
 
-/*
-  static Handle<Value> GetWindow(const Arguments& args) {
-    HandleScope scope;
-
-    // how to return a new object
-//    Local<Object> result = Object::New();
-//    result->Set(String::NewSymbol("test"), Integer::New(123));
-//    return scope.Close(result);
-
-    // how to return a new function
-    Local<Object> result = Object::New();
-    result->Set(String::NewSymbol("test"),
-      v8::FunctionTemplate::New(WindowObject::Test)->GetFunction());
-
-    return scope.Close(result);
-  }
-*/
   ev_io watcher;
 };
 

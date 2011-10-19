@@ -247,9 +247,7 @@ NWM.prototype.start = function(callback) {
     grab_keys.push( { key: shortcut.key, modifier: shortcut.modifier });
   });
   this.wm.keys(grab_keys);
-  this.wm.setup();
-  this.wm.scan();
-  this.wm.loop();
+  this.wm.start();
   if(callback) {
     callback();
   }
