@@ -257,6 +257,10 @@ NWM.prototype.start = function(callback) {
   }
 };
 
+NWM.prototype.currentMonitor = function() {
+  return this.monitors.get(this.monitors.current);
+};
+
 // Load, and watch a single file for changes.
 NWM.prototype.hotLoad = function(filename) {
   var self = this;
