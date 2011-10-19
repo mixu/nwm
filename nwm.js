@@ -14,9 +14,9 @@ var Window = require('./lib/window.js');
 
 // Node Window Manager
 // -------------------
-var NWM = function() {
+var NWM = function(binding) {
   // A reference to the nwm C++ X11 binding
-  this.wm = null;
+  this.wm = (binding ? binding : new X11wm());
   // Known layous
   this.layouts = {};
   // Keyboard shortcut lookup
@@ -59,6 +59,11 @@ NWM.prototype.events = {
       window.workspace = monitor.workspaces.current;
       // ignore monitor number from binding as windows should open on the focused monitor
       window.monitor = this.monitors.current;
+
+      var current_monitor = this.monitors.get(this.monitors.current);
+      if(current_monitor.focused_window == null) {
+        current_monitor.focused_window = window.id;
+      }
       // do not add floating windows
       if(window.isfloating) {
         console.log('Ignoring floating window: ', window);
@@ -230,7 +235,6 @@ NWM.prototype.addKey = function(keyobj, callback) {
 
 // Start the window manager
 NWM.prototype.start = function(callback) {
-  this.wm = new X11wm();
   var self = this;
   // Initialize event handlers, bind this in the functions to nwm
   Object.keys(this.events).forEach(function(eventname) {
