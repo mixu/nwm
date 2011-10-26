@@ -30,6 +30,12 @@ You may need the libev-dev packages (e.g. "/usr/bin/ld: cannot find -lev"):
 
 - On Fedora: sudo yum install libev-devel
 - On Ubuntu: apt-get install libev-dev libev3
+- On OSX:
+    - Install XQuartz
+    - brew install libev
+    - sudo brew link libev
+    - Edit ~/.xinitrc to: "/usr/bin/login -fp $USER /usr/X11/bin/xterm"
+    - Run node nwm-user-sample.js manually (segfaults for now)
 
 # Installing as a primary window manager
 
