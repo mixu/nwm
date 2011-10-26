@@ -1,2 +1,2 @@
 #!/bin/sh
-/usr/local/bin/node /usr/local/lib/nwm/nwm-user-sample.js 2> /nwm-log/nwm.err.log 1>/nwm-log/nwm.log
+/usr/local/bin/node /Users/mixu/nwm/nwm-user-sample.js 2> /Users/mixu/nwm.err.log 1> /Users/mixu/nwm.log
