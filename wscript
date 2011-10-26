@@ -7,7 +7,7 @@ def configure(conf):
 
 def build(bld):
   obj = bld.new_task_gen('cxx', 'shlib', 'node_addon')
-  obj.lib=['X11', 'ev']
+  obj.lib=['X11', 'Xinerama', 'ev']
   obj.linkflags=[ '-L/usr/X11/lib']
   obj.cxxflags = ["-g", "-static", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
   obj.target = "nwm"
