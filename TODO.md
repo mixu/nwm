@@ -9,6 +9,23 @@ Todo:
 - Customizable mouse key bindings (C)
 - Graceful exit support (C)
 
+Simplify:
+
+- Stuff that's needed for windows:
+    - From Node to X11 (operations): Node window ID -> X11 window
+    - From X11 to Node (events): X11 window -> Node window ID
+    - Since windows are already uint32_t or CARD32 type (e.g. numbers), maybe we can just
+    send them
+- Not needed for windows:
+    - Storing the window class, or window title in C
+- Stuff that's needed for monitors:
+    - Agreement about the number of monitors
+    - Agreement about the dimensions of monitors
+- Not needed for monitors:
+    - Keeping track of what window is on what monitor in C (e.g. window.mon_id and monits[n].clients)
+    - onFocusMonitor event (can determine that from mouse coordinates)
+
+
 # Todo (Nwm.js)
 
 - Multi-monitor bug fixes:

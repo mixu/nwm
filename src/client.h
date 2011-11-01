@@ -49,13 +49,13 @@ public:
   inline int getId() { return this->id; }
   inline Window getWin() { return this->win; }
   void resize(Display* dpy, int width, int height) {
-    fprintf( stderr, "ResizeWindow: id=%d width=%d height=%d \n", id, width, height);    
-    XResizeWindow(dpy, this->win, width, height);    
-    XFlush(dpy);    
+    fprintf( stderr, "ResizeWindow: id=%d width=%d height=%d \n", id, width, height);
+    XResizeWindow(dpy, this->win, width, height);
+    XFlush(dpy);
   }
   void move(Display* dpy, int x, int y) {
-    fprintf( stderr, "MoveWindow: id=%d x=%d y=%d \n", id, x, y);    
-    XMoveWindow(dpy, this->win, x, y);    
+    fprintf( stderr, "MoveWindow: id=%d x=%d y=%d \n", id, x, y);
+    XMoveWindow(dpy, this->win, x, y);
     XFlush(dpy);
   }
   void kill(Display* dpy) {
@@ -89,21 +89,21 @@ public:
     if(!gettextprop(dpy, this->win, NetWMName, this->name, sizeof this->name))
       gettextprop(dpy, this->win, XA_WM_NAME, this->name, sizeof this->name);
     if(this->name[0] == '\0') /* hack to mark broken clients */
-      strcpy(this->name, broken);    
+      strcpy(this->name, broken);
   }
   void updateclass(Display* dpy) {
     XClassHint ch = { 0 };
-    if(XGetClassHint(dpy, this->win, &ch)) {  
+    if(XGetClassHint(dpy, this->win, &ch)) {
       if(ch.res_class) {
         strncpy(this->klass, ch.res_class, 256-1 );
       } else {
-        strncpy(this->klass, broken, 256-1 );        
+        strncpy(this->klass, broken, 256-1 );
       }
       this->klass[256-1] = 0;
       if(ch.res_name) {
         strncpy(this->instance, ch.res_name, 256-1 );
       } else {
-        strncpy(this->instance, broken, 256-1 );        
+        strncpy(this->instance, broken, 256-1 );
       }
       this->instance[256-1] = 0;
       if(ch.res_class)
@@ -117,7 +117,7 @@ public:
     Local<Object> result = Object::New();
 
     // read and set the window geometry
-    result->Set(String::NewSymbol("id"), Integer::New(this->id));
+    result->Set(String::NewSymbol("id"), Integer::New(this->win));
     result->Set(String::NewSymbol("x"), Integer::New(this->x));
     result->Set(String::NewSymbol("y"), Integer::New(this->y));
     result->Set(String::NewSymbol("monitor"), Integer::New(this->mon_id));

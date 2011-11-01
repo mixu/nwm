@@ -278,6 +278,9 @@ public:
           delete m;
         }
         // update monitor dimensions
+        // REFACTOR ME: We should just emit the monitors,
+        // and let Node figure out whether there were any changes
+        // I mean, we already have the dimensions anyway.
         for(i = 0; i < nn; i++) {
           if(i >= n
           || (unique[i].x_org != hw->monits[i].getX() || unique[i].y_org != hw->monits[i].getY()
@@ -691,6 +694,10 @@ public:
 
     fprintf(stderr, "EmitEnterNotify\n");
 
+    // REFACTOR ME: we should just see if the window can be
+    // mapped to an id. Even if it cannot, we should still
+    // emit the EnterNotify. Node should set the focused monitor
+    // purely based on the event coordinates.
     Client* c = Client::getByWindow(&hw->monits, ev->window);
     if(c) {
       int id = c->getId();
