@@ -37,7 +37,7 @@ public:
     fprintf( stderr, "Create client %d on monitor %d (x %d, y %d, w %d, h %d, float %d)\n", id, mon_id, x, y, width, height, isfloating);
     this->win = win;
     this->mon_id = mon_id;
-    this->id = id;
+    this->id = win;
     this->x = x;
     this->y = y;
     this->width = width;
