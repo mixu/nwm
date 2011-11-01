@@ -310,12 +310,15 @@ public:
       else { /* less monitors available nn < n */
         fprintf( stderr, "Less monitors available %d %d\n", n, nn);
         for(i = nn; i < n; i++) {
-          // remove clients
+          // remove clients -- NOT NEEDED since handled in Node on remove monitor.
           for(j = 0; j < hw->monits[i].clients.size(); j++) {
             // emit REATTACH WINDOW (j)
             hw->monits[i].clients.pop_back();
           }
           // emit REMOVE MONITOR (i)
+          Local<Value> argv[1];
+          argv[0] = Integer::New(i);
+          hw->Emit(onRemoveMonitor, 1, argv);
           // remove monitor
           hw->monits.pop_back();
         }

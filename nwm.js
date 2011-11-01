@@ -47,6 +47,7 @@ NWM.prototype.events = {
 
   // A monitor is removed
   removeMonitor: function(id) {
+    console.log('Remove monitor', id);
     this.monitors.remove(function(monitor){ return (monitor.id != id); });
   },
 
