@@ -21,7 +21,7 @@ Simplify:
     - Agreement about the number of monitors
     - Agreement about the dimensions of monitors
 - Not needed for monitors:
-    - Keeping track of what window is on what monitor in C (e.g. window.mon_id and monits[n].clients)
+    - Keeping track of what window is on what monitor in C (e.g. window.mon_id and monits[n].clients) (DONE)
     - onFocusMonitor event (can determine that from mouse coordinates)
 
 

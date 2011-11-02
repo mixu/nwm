@@ -67,7 +67,6 @@ enum callback_map {
   onEnterNotify,
   onFullscreen,
   onFocusIn,
-  onFocusMonitor,
   onLast
 };
 
@@ -75,12 +74,9 @@ enum callback_map {
 class NodeWM: ObjectWrap
 {
 private:
-  // window id
-  int next_index;
   // X11
   Display *dpy;
   GC gc;
-  Window wnd;
   Window root;
   Window selected;
   std::vector <Monitor> monits;
@@ -129,7 +125,6 @@ public:
 
   // C++ constructor
   NodeWM() :
-    next_index(1),
     keys(NULL),
     numlockmask(0)
   {
@@ -177,7 +172,7 @@ public:
         v8::String::New("focusMonitor")
       };
 
-    v8::Local<v8::String> value  = Local<v8::String>::Cast(args[0]);
+    v8::Local<v8::String> value = Local<v8::String>::Cast(args[0]);
     int selected = -1;
     for(int i = 0; i < onLast; i++) {
       if( strcmp(*v8::String::AsciiValue(value),  *v8::String::AsciiValue(map[i])) == 0 ) {
@@ -324,11 +319,15 @@ public:
     }
     // update the selected monitor on Node.js side
     int x, y;
-    Local<Value> argv[2];
+    Local<Value> argv[1];
     if(hw->getrootptr(&x, &y)) {
-      argv[0] = Integer::New(x);
-      argv[1] = Integer::New(y);
-      hw->Emit(onFocusMonitor, 2, argv);
+      fprintf(stderr, "EmitEnterNotify wid = %li \n", hw->root);
+      Local<Object> result = Object::New();
+      result->Set(String::NewSymbol("id"), Integer::New(hw->root));
+      result->Set(String::NewSymbol("x"), Integer::New(x));
+      result->Set(String::NewSymbol("y"), Integer::New(y));
+      argv[0] = result;
+      hw->Emit(onEnterNotify, 1, argv);
     }
 
     fprintf( stderr, "Done with updategeom\n");
@@ -353,7 +352,6 @@ public:
     // add to global window list
     hw->clients.push_back(*c);
     argv[0] = c->toNode();
-    hw->next_index++;
 
     // call the callback in Node.js, passing the window object...
     hw->Emit(onAddWindow, 1, argv);
@@ -677,13 +675,6 @@ public:
   static void EmitEnterNotify(NodeWM* hw, XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
     // onManage receives a window object
-    fprintf(stderr, "EmitEnterNotify\n");
-
-    // REFACTOR ME: we should just see if the window can be
-    // mapped to an id. Even if it cannot, we should still
-    // emit the EnterNotify. Node should set the focused monitor
-    // purely based on the event coordinates.
-
     fprintf(stderr, "EmitEnterNotify wid = %li \n", ev->window);
     Local<Value> argv[1];
     Local<Object> result = Object::New();
@@ -694,18 +685,8 @@ public:
     result->Set(String::NewSymbol("y_root"), Integer::New(ev->y_root));
     argv[0] = result;
     // call the callback in Node.js, passing the window object...
+    // Note that this also called for the root window (focus monitor)
     hw->Emit(onEnterNotify, 1, argv);
-
-    if(ev->window == hw->root) {
-      int x, y;
-      Local<Value> argvs[2];
-      if(hw->getrootptr(&x, &y)) {
-        fprintf(stderr, "Emit onFocusMonitor x %d y %d \n", x, y);
-        argvs[0] = Integer::New(x);
-        argvs[1] = Integer::New(y);
-        hw->Emit(onFocusMonitor, 2, argvs);
-      }
-    }
   }
 
   static void EmitFocusIn(NodeWM* hw, XEvent *e) {
@@ -778,21 +759,19 @@ public:
 
     if((c)
     && (cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen)) {
+      argv[0] = Integer::New(c->getWin());
       if(cme->data.l[0]) {
         XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
-        argv[0] = Integer::New(c->getWin());
         argv[1] = Integer::New(1);
-        hw->Emit(onFullscreen, 2, argv);
         XRaiseWindow(hw->dpy, c->getWin());
       }
       else {
         XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)0, 0);
-        argv[0] = Integer::New(c->getWin());
         argv[1] = Integer::New(0);
-        hw->Emit(onFullscreen, 2, argv);
       }
+      hw->Emit(onFullscreen, 2, argv);
     }
   }
 

@@ -138,17 +138,30 @@ NWM.prototype.events = {
     if(this.windows.exists(event.id)) {
       var window = this.windows.get(event.id);
       console.log('focused monitor is ', this.monitors.current, 'focusing to', window.monitor, window.title);
-      // Current monitor changes when a new window in that monitor receives focus
       if(this.monitors.exists(window.monitor)) {
-        this.monitors.current = window.monitor;
+        this.monitors.get(window.monitor).focused_window = event.id;
       }
-      this.monitors.get(window.monitor).focused_window = event.id;
       this.wm.focusWindow(event.id);
     } else {
       console.log('WARNING got focus event for nonexistent (transient) window', event);
       // transients need this to happen to get keyboard focus
       this.wm.focusWindow(event.id);
     }
+    // This event is also emitted for the root window
+    //  so in any case, we want to set the current monitor based on the event coordinates
+    console.log('Focus monitor by coordinates', event.x, event.y);
+    // go through the monitors and find a matching monitor
+    var monitor_ids = Object.keys(this.monitors.items);
+    var self = this;
+    monitor_ids.some(function(monid) {
+      var monitor = self.monitors.get(monid);
+      if(monitor.inside(event.x, event.y)) {
+        console.log('Change focused monitor: ', monid);
+        self.monitors.current = monid;
+        return true; // end iteration
+      }
+      return false; // continue iteration
+    });
   },
 
   focusIn: function(event) {
@@ -162,26 +175,6 @@ NWM.prototype.events = {
       // and the focus is already set correctly when we do it ourself. And calling focusWindow() again here is a bad idea,
       // as it will generate another focusIn event. Generally, you want enterNotify above.
     }
-  },
-
-  // This is emitted when we need to shift focus based on pointer location within the
-  // ROOT window -- to make it possible to shift focus from one monitor to another
-  // without already having a window on that monitor
-  focusMonitor: function(x, y) {
-    // event.x, event y represent coordinates in the root
-    console.log('Focus monitor by root window', x, y);
-    // go through the monitors and find a matching monitor
-    var monitor_ids = Object.keys(this.monitors.items);
-    var self = this;
-    monitor_ids.some(function(monid) {
-      var monitor = self.monitors.get(monid);
-      if(monitor.inside(x, y)) {
-        console.log('Change focused monitor: ', monid);
-        self.monitors.current = monid;
-        return true; // end iteration
-      }
-      return false; // continue iteration
-    });
   },
 
   // Screen events
