@@ -41,12 +41,10 @@ struct Key {
   Key* next;
 };
 
-typedef struct Monitor Monitor;
 typedef struct Client Client;
 typedef struct NodeWM NodeWM;
 
 #include "client.h"
-#include "monitor.h"
 #include "handler.h"
 
 
@@ -79,7 +77,8 @@ private:
   GC gc;
   Window root;
   Window selected;
-  std::vector <Monitor> monits;
+  // We only track the number of monitors: that allows us to tell if a monitor has been removed or added.
+  unsigned int total_monitors;
   std::vector <Client> clients;
   // screen dimensions
   int screen, screen_width, screen_height;
@@ -125,6 +124,7 @@ public:
 
   // C++ constructor
   NodeWM() :
+    total_monitors(0),
     keys(NULL),
     numlockmask(0)
   {
@@ -224,11 +224,10 @@ public:
       fprintf( stderr, "Xinerama active\n");
       int i, n, nn;
       unsigned int j;
-      Monitor *m;
       XineramaScreenInfo *info = XineramaQueryScreens(hw->dpy, &nn);
       XineramaScreenInfo *unique = NULL;
 
-      n = hw->monits.size();
+      n = hw->total_monitors;
       fprintf( stderr, "Monitors known %d, monitors found %d\n", n, nn);
       /* only consider unique geometries as separate screens */
       if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
@@ -244,44 +243,28 @@ public:
         // reserve space
         for(i = 0; i < (nn - n); i++) { /* new monitors available */
           fprintf(stderr, "Monitor %d \n", i);
-          m = new Monitor();
-          hw->monits.push_back(*m);
-          delete m;
+          hw->total_monitors++;
         }
         // update monitor dimensions
-        // REFACTOR ME: We should just emit the monitors,
-        // and let Node figure out whether there were any changes
-        // I mean, we already have the dimensions anyway.
+        //  We just emit the monitors and don't track the dimensions in the binding at all.
         for(i = 0; i < nn; i++) {
-          if(i >= n
-          || (unique[i].x_org != hw->monits[i].getX() || unique[i].y_org != hw->monits[i].getY()
-              || unique[i].width != hw->monits[i].getWidth() || unique[i].height != hw->monits[i].getHeight()))
-          {
-            hw->monits[i].setId(i);
-            hw->monits[i].setX(unique[i].x_org);
-            hw->monits[i].setY(unique[i].y_org);
-            hw->monits[i].setWidth(unique[i].width);
-            hw->monits[i].setHeight(unique[i].height);
-            // emit ADD MONITOR or UPDATE MONITOR here
-            // make screen object
-            Local<Value> argv[1];
-            Local<Object> result = Object::New();
-            result->Set(String::NewSymbol("id"), Integer::New(i));
-            result->Set(String::NewSymbol("x"), Integer::New(unique[i].x_org));
-            result->Set(String::NewSymbol("y"), Integer::New(unique[i].y_org));
-            result->Set(String::NewSymbol("width"), Integer::New(unique[i].width));
-            result->Set(String::NewSymbol("height"), Integer::New(unique[i].height));
-            argv[0] = result;
-            fprintf( stderr, "Emit monitor %d\n", i);
-            if(i >= n) {
-              hw->Emit(onAddMonitor, 1, argv);
-            } else {
-              hw->Emit(onUpdateMonitor, 1, argv);
-            }
+          // emit ADD MONITOR or UPDATE MONITOR here
+          Local<Value> argv[1];
+          Local<Object> result = Object::New();
+          result->Set(String::NewSymbol("id"), Integer::New(i));
+          result->Set(String::NewSymbol("x"), Integer::New(unique[i].x_org));
+          result->Set(String::NewSymbol("y"), Integer::New(unique[i].y_org));
+          result->Set(String::NewSymbol("width"), Integer::New(unique[i].width));
+          result->Set(String::NewSymbol("height"), Integer::New(unique[i].height));
+          argv[0] = result;
+          fprintf( stderr, "Emit monitor %d\n", i);
+          if(i >= n) {
+            hw->Emit(onAddMonitor, 1, argv);
+          } else {
+            hw->Emit(onUpdateMonitor, 1, argv);
           }
         }
-      }
-      else { /* less monitors available nn < n */
+      } else { /* less monitors available nn < n */
         fprintf( stderr, "Less monitors available %d %d\n", n, nn);
         for(i = nn; i < n; i++) {
           // emit REMOVE MONITOR (i)
@@ -289,22 +272,14 @@ public:
           argv[0] = Integer::New(i);
           hw->Emit(onRemoveMonitor, 1, argv);
           // remove monitor
-          hw->monits.pop_back();
+          hw->total_monitors--;
         }
       }
       free(unique);
     } else {
-      if(hw->monits.size() == 0) {
-        Monitor *m;
-        m = new Monitor();
-        m->setId(0);
-        m->setX(0);
-        m->setY(0);
-        m->setWidth(hw->screen_width);
-        m->setHeight(hw->screen_height);
-        hw->monits.push_back(*m);
+      if(hw->total_monitors == 0) {
+        hw->total_monitors++;
         // emit ADD MONITOR
-        // make screen object
         Local<Value> argv[1];
         Local<Object> result = Object::New();
         result->Set(String::NewSymbol("id"), Integer::New(0));
@@ -314,7 +289,6 @@ public:
         result->Set(String::NewSymbol("height"), Integer::New(hw->screen_height));
         argv[0] = result;
         hw->Emit(onAddMonitor, 1, argv);
-        delete m;
       }
     }
     // update the selected monitor on Node.js side
