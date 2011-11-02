@@ -337,7 +337,7 @@ public:
   /**
    * Prepare the window object and call the Node.js callback.
    */
-  static void EmitAdd(NodeWM* hw, Window win, XWindowAttributes *wa) {
+  static void HandleAdd(NodeWM* hw, Window win, XWindowAttributes *wa) {
     Window trans = None;
     TryCatch try_catch;
     // onManage receives a window object
@@ -606,17 +606,16 @@ public:
     }
   }
 
-  static void EmitButtonPress(NodeWM* hw, XEvent *e) {
+  static void HandleButtonPress(NodeWM* hw, XEvent *e) {
     XButtonPressedEvent *ev = &e->xbutton;
     Local<Value> argv[1];
 
-    fprintf(stderr, "EmitButtonPress\n");
+    fprintf(stderr, "Handle(mouse)ButtonPress\n");
 
     // fetch window: ev->window --> to window id
     // fetch root_x,root_y
 
     argv[0] = NodeWM::makeButtonPress(ev->window, ev->x, ev->y, ev->button, ev->state);
-    fprintf(stderr, "makeButtonPress\n");
     // call the callback in Node.js, passing the window object...
     hw->Emit(onMouseDown, 1, argv);
     fprintf(stderr, "Call cbButtonPress\n");
@@ -672,10 +671,23 @@ public:
 
 #include "return_values.cc"
 
-  static void EmitEnterNotify(NodeWM* hw, XEvent *e) {
+  static void HandleKeyPress(NodeWM* hw, XEvent *e) {
+    KeySym keysym;
+    XKeyEvent *ev;
+
+    ev = &e->xkey;
+    keysym = XKeycodeToKeysym(hw->dpy, (KeyCode)ev->keycode, 0);
+    Local<Value> argv[1];
+    // we always unset numlock and LockMask since those should not matter
+    argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, keysym, (ev->state & ~(hw->numlockmask|LockMask)));
+    // call the callback in Node.js, passing the window object...
+    hw->Emit(onKeyPress, 1, argv);
+  }
+
+  static void HandleEnterNotify(NodeWM* hw, XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
     // onManage receives a window object
-    fprintf(stderr, "EmitEnterNotify wid = %li \n", ev->window);
+    fprintf(stderr, "HandleEnterNotify wid = %li \n", ev->window);
     Local<Value> argv[1];
     Local<Object> result = Object::New();
     result->Set(String::NewSymbol("id"), Integer::New(ev->window));
@@ -689,33 +701,33 @@ public:
     hw->Emit(onEnterNotify, 1, argv);
   }
 
-  static void EmitFocusIn(NodeWM* hw, XEvent *e) {
+  static void HandleFocusIn(NodeWM* hw, XEvent *e) {
     XFocusChangeEvent *ev = &e->xfocus;
     Local<Value> argv[1];
 
-    fprintf(stderr, "EmitFocusIn for client %li by window\n", ev->window);
+    fprintf(stderr, "HandleFocusIn for client %li by window\n", ev->window);
     // Don't do this yet, results in another FocusIn --> loop
     // call the callback in Node.js, passing the window object...
     argv[0] = NodeWM::makeEvent(ev->window);
     hw->Emit(onFocusIn, 1, argv);
   }
 
-  static void EmitUnmapNotify(NodeWM* hw, XEvent *e) {
+  static void HandleUnmapNotify(NodeWM* hw, XEvent *e) {
     Client *c;
     XUnmapEvent *ev = &e->xunmap;
     if((c = hw->getClientByWindow(ev->window)))
-      EmitRemove(hw, c, False);
+      NodeWM::HandleRemove(hw, c, False);
   }
 
-  static void EmitDestroyNotify(NodeWM* hw, XEvent *e) {
+  static void HandleDestroyNotify(NodeWM* hw, XEvent *e) {
     Client *c;
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
     if((c = hw->getClientByWindow(ev->window)))
-      EmitRemove(hw, c, True);
+      NodeWM::HandleRemove(hw, c, True);
   }
 
-  static void EmitConfigureNotify(NodeWM* hw, XEvent *e) {
+  static void HandleConfigureNotify(NodeWM* hw, XEvent *e) {
     XConfigureEvent *ev = &e->xconfigure;
 
     if(ev->window == hw->root) {
@@ -727,7 +739,7 @@ public:
     }
   }
 
-  static void EmitPropertyNotify(NodeWM* hw, XEvent *e) {
+  static void HandlePropertyNotify(NodeWM* hw, XEvent *e) {
     XPropertyEvent *ev = &e->xproperty;
     // could be used for tracking hints, transient status and window name
     if((ev->window == hw->root) && (ev->atom == XA_WM_NAME)) {
@@ -750,7 +762,7 @@ public:
     }
   }
 
-  static void EmitClientMessage(NodeWM* hw, XEvent *e) {
+  static void HandleClientMessage(NodeWM* hw, XEvent *e) {
     XClientMessageEvent *cme = &e->xclient;
     Client *c = hw->getClientByWindow(cme->window);
     Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
@@ -775,13 +787,13 @@ public:
     }
   }
 
-  static void EmitRemove(NodeWM* hw, Client *c, Bool destroyed) {
-    fprintf( stderr, "EmitRemove\n");
+  static void HandleRemove(NodeWM* hw, Client *c, Bool destroyed) {
+    fprintf( stderr, "HandleRemove\n");
     Window win = c->getWin();
     // emit a remove
     Local<Value> argv[1];
     argv[0] = Integer::New(win);
-    fprintf( stderr, "EmitRemove - emit onRemovewindow, %li\n", win);
+    fprintf( stderr, "HandleRemove - emit onRemovewindow, %li\n", win);
     hw->Emit(onRemoveWindow, 1, argv);
     if(!destroyed) {
       fprintf( stderr, "X11 cleanup\n");
@@ -866,14 +878,14 @@ public:
         }
         // visible or minimized window ("Iconic state")
         if(watt.map_state == IsViewable )//|| getstate(wins[i]) == IconicState)
-          NodeWM::EmitAdd(hw, wins[i], &watt);
+          NodeWM::HandleAdd(hw, wins[i], &watt);
       }
       for(i = 0; i < num; i++) { /* now the transients */
         if(!XGetWindowAttributes(hw->dpy, wins[i], &watt))
           continue;
         if(XGetTransientForHint(hw->dpy, wins[i], &d1)
         && (watt.map_state == IsViewable )) //|| getstate(wins[i]) == IconicState))
-          NodeWM::EmitAdd(hw, wins[i], &watt);
+          NodeWM::HandleAdd(hw, wins[i], &watt);
       }
       if(wins) {
         // To free a non-NULL children list when it is no longer needed, use XFree()
@@ -906,11 +918,11 @@ public:
       switch (event.type) {
         case ButtonPress:
           {
-            NodeWM::EmitButtonPress(hw, &event);
+            NodeWM::HandleButtonPress(hw, &event);
           }
           break;
         case ClientMessage:
-          NodeWM::EmitClientMessage(hw, &event);
+          NodeWM::HandleClientMessage(hw, &event);
           break;
         case ConfigureRequest:
           {
@@ -927,23 +939,22 @@ public:
           }
           break;
         case ConfigureNotify:
-            NodeWM::EmitConfigureNotify(hw, &event);
+            NodeWM::HandleConfigureNotify(hw, &event);
             break;
         case DestroyNotify:
-            NodeWM::EmitDestroyNotify(hw, &event);
+            NodeWM::HandleDestroyNotify(hw, &event);
             break;
         case EnterNotify:
-            NodeWM::EmitEnterNotify(hw, &event);
+            NodeWM::HandleEnterNotify(hw, &event);
             break;
 //        case Expose:
 //            break;
         case FocusIn:
-            NodeWM::EmitFocusIn(hw, &event);
+            NodeWM::HandleFocusIn(hw, &event);
             break;
         case KeyPress:
           {
-            fprintf(stderr, "EmitKeyPress\n");
-            NodeWM::EmitKeyPress(hw, &event);
+            NodeWM::HandleKeyPress(hw, &event);
           }
             break;
 //        case MappingNotify:
@@ -962,10 +973,9 @@ public:
             fprintf(stderr, "MapRequest\n");
             Client* c = hw->getClientByWindow(ev->window);
             if(c == NULL) {
-              fprintf(stderr, "Emit manage!\n");
               // dwm actually does this only once per window (e.g. for unknown windows only...)
               // that's because otherwise you'll cause a hang when you map a mapped window again...
-              NodeWM::EmitAdd(hw, ev->window, &wa);
+              NodeWM::HandleAdd(hw, ev->window, &wa);
               // emit a rearrange
               hw->Emit(onRearrange, 0, 0);
             } else {
@@ -974,10 +984,10 @@ public:
           }
             break;
         case PropertyNotify:
-            NodeWM::EmitPropertyNotify(hw, &event);
+            NodeWM::HandlePropertyNotify(hw, &event);
             break;
         case UnmapNotify:
-            NodeWM::EmitUnmapNotify(hw, &event);
+            NodeWM::HandleUnmapNotify(hw, &event);
             break;
         default:
           fprintf(stderr, "Did nothing with %s (%d)\n", event_names[event.type], event.type);

@@ -2,7 +2,6 @@
 
 Todo:
 
-- Ignore popup windows (C)
 - Expose stacking order and stacking operations (C)
 - Display full info of PropertyNotify, ClientMessage, ConfigureRequest and ConfigureNotify as nwm should not honor some requests e.g. guake Ctrl+shift+t.
 - Test reloading key bindings on the fly (C)
@@ -11,36 +10,21 @@ Todo:
 
 Simplify:
 
-- Stuff that's needed for windows:
-    - From Node to X11 (operations): Node window ID -> X11 window (DONE)
-    - From X11 to Node (events): X11 window -> Node window ID (DONE)
-    - Since windows are already uint32_t or CARD32 type (e.g. numbers), just use the Window to identify them (DONE)
-- Not needed for windows:
-    - Storing the window class, or window title in C
-- Stuff that's needed for monitors:
-    - Agreement about the number of monitors
-    - Agreement about the dimensions of monitors
-- Not needed for monitors:
-    - Keeping track of what window is on what monitor in C (e.g. window.mon_id and monits[n].clients) (DONE)
-    - onFocusMonitor event (can determine that from mouse coordinates)
-
+- Do not store the window class, or window title in C++
 
 # Todo (Nwm.js)
 
 - Multi-monitor bug fixes:
-  - Maximizing a window on a secondary monitor causes it to maximize in the primary monitor instead (JS)
-  - Removing a monitor causes windows on that monitor to be inaccessible rather than being moved to the remaining monitor (JS)
   - Transient windows which are too large to fit the current monitor should be resized (JS)
   - Transient windows should be repositioned to the current screen when they open (JS)
-- TCP interface (JS)
 - Test with conky and dzen, figure out how to make integration w/those easy (JS)
 - Website and tutorial e.g. http://xmonad.org/tour.html
 - Saving state on exit (JS)
-- Floating window mode (JS)
-
+- Floating window mode for Flash fullscreen etc. (JS)
 
 # Done (C++ bindings)
 
+- Ignore popup windows (DONE)
 - Monitor dimension change notifications (DONE)
 - Expose window titles to JS (DONE)
 - Support switch to full screen requests (DONE)
@@ -67,7 +51,9 @@ Simplify:
     - Code hot loading from file
 - Setting main focus should move that window to the first window in grid layout (DONE)
 - Multi-monitor bug fixes:
-    - GetMainWindow() should take into account whether the window is on the same monitor as the workspace (JS)
+    - Removing a monitor causes windows on that monitor to be inaccessible rather than being moved to the remaining monitor (DONE)
+    - Maximizing a window on a secondary monitor causes it to maximize in the primary monitor instead (DONE)
+    - GetMainWindow() should take into account whether the window is on the same monitor as the workspace (DONE)
     - Rearrange should apply to all windows (e.g. when a new window is mapped it is put at 0,0 but is associated with the focused monitor in C) (DONE)
     - Window termination relies on nwm.focused_window which is deprecated (JS)
     - Need a key to reassign a window to a different monitor (JS)

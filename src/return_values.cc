@@ -27,19 +27,6 @@
     return result;
   }
 
-  static void EmitKeyPress(NodeWM* hw, XEvent *e) {
-    KeySym keysym;
-    XKeyEvent *ev;
-
-    ev = &e->xkey;
-    keysym = XKeycodeToKeysym(hw->dpy, (KeyCode)ev->keycode, 0);
-    Local<Value> argv[1];
-    // we always unset numlock and LockMask since those should not matter
-    argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, keysym, (ev->state & ~(hw->numlockmask|LockMask)));
-    // call the callback in Node.js, passing the window object...
-    hw->Emit(onKeyPress, 1, argv);
-  }
-
   static Local<Object> makeKeyPress(int x, int y, unsigned int keycode, KeySym keysym, unsigned int mod) {
     // window object to return
     Local<Object> result = Object::New();
@@ -58,4 +45,3 @@
     result->Set(String::NewSymbol("id"), Integer::New(id));
     return result;
   }
-
