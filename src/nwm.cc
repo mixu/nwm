@@ -83,8 +83,8 @@ private:
   Window wnd;
   Window root;
   Window selected;
-  Monitor* selmon;
   std::vector <Monitor> monits;
+  std::vector <Client> clients;
   // screen dimensions
   int screen, screen_width, screen_height;
   // callback storage
@@ -124,14 +124,12 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "keys", SetGrabKeys);
 
     // FINALLY: export the current function template
-    target->Set(String::NewSymbol("NodeWM"),
-                s_ct->GetFunction());
+    target->Set(String::NewSymbol("NodeWM"), s_ct->GetFunction());
   }
 
   // C++ constructor
   NodeWM() :
     next_index(1),
-    selmon(NULL),
     keys(NULL),
     numlockmask(0)
   {
@@ -217,35 +215,13 @@ public:
     return True;
   }
 
-  Monitor * wintomon(Window w) {
-    int x, y;
-    Client *c;
-    if(w == root && getrootptr(&x, &y))
-      return ptrtomon(x, y);
-    if((c = Client::getByWindow(&this->monits, w))) {
-      fprintf( stderr, "wintomon by client %li, monitor id %d\n", c->getWin(), this->monits[c->mon_id].getId());
-      return &(this->monits[c->mon_id]);
+  Client* getClientByWindow(Window win) {
+    unsigned int j;
+    for(j = 0; j < this->clients.size(); j++) {
+      if(this->clients[j].getWin() == win)
+        return &this->clients[j];
     }
-    // ERROR!
-    fprintf( stderr, "wintomon default, monitor id %d\n", this->monits[0].getId());
-    return &(this->monits[0]);
-  }
-
-  Monitor * ptrtomon(int x, int y) {
-    unsigned int i;
-    for(i = 0; i < this->monits.size(); i++) {
-      int mx = this->monits[i].getX();
-      int my = this->monits[i].getY();
-      int mw = this->monits[i].getWidth();
-      int mh = this->monits[i].getHeight();
-      if ((x) >= (mx) && (x) < (mx) + (mw) && (y) >= (my) && (y) < (my) + (mh)) {
-        fprintf( stderr, "ptrtomon %d, monitor id %d\n", i, this->monits[i].getId());
-        return &(this->monits[i]);
-      }
-    }
-    // ERROR!
-    fprintf( stderr, "ptrtomon default, monitor id %d\n", this->monits[0].getId());
-    return &(this->monits[0]);
+    return NULL;
   }
 
   static void updateGeometry(NodeWM* hw) {
@@ -313,11 +289,6 @@ public:
       else { /* less monitors available nn < n */
         fprintf( stderr, "Less monitors available %d %d\n", n, nn);
         for(i = nn; i < n; i++) {
-          // remove clients -- NOT NEEDED since handled in Node on remove monitor.
-          for(j = 0; j < hw->monits[i].clients.size(); j++) {
-            // emit REATTACH WINDOW (j)
-            hw->monits[i].clients.pop_back();
-          }
           // emit REMOVE MONITOR (i)
           Local<Value> argv[1];
           argv[0] = Integer::New(i);
@@ -351,7 +322,6 @@ public:
         delete m;
       }
     }
-    hw->selmon = hw->wintomon(hw->root);
     // update the selected monitor on Node.js side
     int x, y;
     Local<Value> argv[2];
@@ -377,11 +347,11 @@ public:
     // check whether the window is transient
     XGetTransientForHint(hw->dpy, win, &trans);
     isfloating = (trans != None);
-    Client* c = new Client(win, hw->selmon->getId(), wa->x, wa->y, wa->height, wa->width, isfloating);
+    Client* c = new Client(win, wa->x, wa->y, wa->height, wa->width, isfloating);
     c->updatetitle(hw->dpy);
     c->updateclass(hw->dpy);
-    // attach to monitor
-    hw->selmon->clients.push_back(*c);
+    // add to global window list
+    hw->clients.push_back(*c);
     argv[0] = c->toNode();
     hw->next_index++;
 
@@ -622,8 +592,6 @@ public:
     XFreeModifiermap(modmap);
   }
 
-
-
   static void GrabKeys(NodeWM* hw, Display* dpy, Window root) {
     hw->updatenumlockmask();
     {
@@ -754,7 +722,7 @@ public:
   static void EmitUnmapNotify(NodeWM* hw, XEvent *e) {
     Client *c;
     XUnmapEvent *ev = &e->xunmap;
-    if((c = Client::getByWindow(&hw->monits, ev->window)))
+    if((c = hw->getClientByWindow(ev->window)))
       EmitRemove(hw, c, False);
   }
 
@@ -762,7 +730,7 @@ public:
     Client *c;
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
-    if((c = Client::getByWindow(&hw->monits, ev->window)))
+    if((c = hw->getClientByWindow(ev->window)))
       EmitRemove(hw, c, True);
   }
 
@@ -787,7 +755,7 @@ public:
       return; // ignore property deletes
     } else {
       Local<Value> argv[1];
-      Client* c = Client::getByWindow(&hw->monits, ev->window);
+      Client* c = hw->getClientByWindow(ev->window);
       if(c) {
         Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
         if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
@@ -803,7 +771,7 @@ public:
 
   static void EmitClientMessage(NodeWM* hw, XEvent *e) {
     XClientMessageEvent *cme = &e->xclient;
-    Client *c = Client::getByWindow(&hw->monits, cme->window);
+    Client *c = hw->getClientByWindow(cme->window);
     Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
     Atom NetWMFullscreen = XInternAtom(hw->dpy, "_NET_WM_STATE_FULLSCREEN", False);
     Local<Value> argv[2];
@@ -844,14 +812,9 @@ public:
       XUngrabServer(hw->dpy);
     }
     // remove from monitor
-    fprintf( stderr, "Iterate monitor %d\n", hw->monits[c->mon_id].getId());
-    std::vector<Client>& vec = hw->monits[c->mon_id].clients; // use shorter name
+    fprintf( stderr, "Iterate window list to remove window from global list\n");
+    std::vector<Client>& vec = hw->clients; // use shorter name
     std::vector<Client>::iterator iter = vec.begin();
-    while (iter != vec.end()) {
-      fprintf( stderr, "Monitor has client %li.\n", iter->getWin());
-      ++iter;
-    }
-    fprintf( stderr, "Remove window from monitor\n");
     iter = vec.begin();
     while (iter != vec.end()) {
       Window vid = iter->getWin();
@@ -1018,7 +981,7 @@ public:
             if(wa.override_redirect)
               return;
             fprintf(stderr, "MapRequest\n");
-            Client* c = Client::getByWindow(&hw->monits, ev->window);
+            Client* c = hw->getClientByWindow(ev->window);
             if(c == NULL) {
               fprintf(stderr, "Emit manage!\n");
               // dwm actually does this only once per window (e.g. for unknown windows only...)
@@ -1047,8 +1010,6 @@ public:
 
   ev_io watcher;
 };
-
-#include "client.cc"
 
 Persistent<FunctionTemplate> NodeWM::s_ct;
 

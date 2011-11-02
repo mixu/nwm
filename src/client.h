@@ -31,18 +31,15 @@ Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int siz
 
 class Client {
 public:
-  int mon_id;
-  Client(Window win, int mon_id, int x, int y, int width, int height, Bool isfloating) {
-    fprintf( stderr, "Create client %li on monitor %d (x %d, y %d, w %d, h %d, float %d)\n", win, mon_id, x, y, width, height, isfloating);
+  Client(Window win, int x, int y, int width, int height, Bool isfloating) {
+    fprintf( stderr, "Create client %li (x %d, y %d, w %d, h %d, float %d)\n", win, x, y, width, height, isfloating);
     this->win = win;
-    this->mon_id = mon_id;
     this->x = x;
     this->y = y;
     this->width = width;
     this->height = height;
     this->isfloating = isfloating;
   }
-  static Client* getByWindow(std::vector <Monitor>* monits, Window win);
   inline Window getWin() { return this->win; }
   void updatetitle(Display* dpy) {
     Atom NetWMName = XInternAtom(dpy, "_NET_WM_NAME", False);
@@ -80,7 +77,6 @@ public:
     result->Set(String::NewSymbol("id"), Integer::New(this->win));
     result->Set(String::NewSymbol("x"), Integer::New(this->x));
     result->Set(String::NewSymbol("y"), Integer::New(this->y));
-    result->Set(String::NewSymbol("monitor"), Integer::New(this->mon_id));
     result->Set(String::NewSymbol("height"), Integer::New(this->height));
     result->Set(String::NewSymbol("width"), Integer::New(this->width));
     result->Set(String::NewSymbol("title"), String::New(this->name));

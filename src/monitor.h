@@ -10,7 +10,6 @@ class Monitor {
     inline int getHeight() { return this->height; }
     inline int getX() { return this->x; }
     inline int getY() { return this->y; }
-    std::vector <Client> clients;
   private:
     int id;
     int x, y, width, height;

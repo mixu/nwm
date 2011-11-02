@@ -12,10 +12,9 @@ Todo:
 Simplify:
 
 - Stuff that's needed for windows:
-    - From Node to X11 (operations): Node window ID -> X11 window
-    - From X11 to Node (events): X11 window -> Node window ID
-    - Since windows are already uint32_t or CARD32 type (e.g. numbers), maybe we can just
-    send them
+    - From Node to X11 (operations): Node window ID -> X11 window (DONE)
+    - From X11 to Node (events): X11 window -> Node window ID (DONE)
+    - Since windows are already uint32_t or CARD32 type (e.g. numbers), just use the Window to identify them (DONE)
 - Not needed for windows:
     - Storing the window class, or window title in C
 - Stuff that's needed for monitors:
