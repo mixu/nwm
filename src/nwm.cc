@@ -427,14 +427,14 @@ public:
     HandleScope scope;
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
-    int id = args[0]->IntegerValue();
+    Window id = args[0]->Uint32Value();
     int width = args[1]->IntegerValue();
     int height = args[2]->IntegerValue();
 
-    Client* c = Client::getById(&hw->monits, id);
-    if(c) {
-      c->resize(hw->dpy, width, height);
-    }
+    fprintf( stderr, "ResizeWindow: id=%li width=%d height=%d \n", id, width, height);
+    XResizeWindow(hw->dpy, id, width, height);
+    XFlush(hw->dpy);
+
     return Undefined();
   }
 
@@ -442,14 +442,13 @@ public:
     HandleScope scope;
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
-    int id = args[0]->IntegerValue();
+    Window id = args[0]->Uint32Value();
     int x = args[1]->IntegerValue();
     int y = args[2]->IntegerValue();
 
-    Client* c = Client::getById(&hw->monits, id);
-    if(c) {
-      c->move(hw->dpy, x, y);
-    }
+    fprintf( stderr, "MoveWindow: id=%li x=%d y=%d \n", id, x, y);
+    XMoveWindow(hw->dpy, id, x, y);
+    XFlush(hw->dpy);
     return Undefined();
   }
 
@@ -457,33 +456,56 @@ public:
     HandleScope scope;
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
-    int id = args[0]->IntegerValue();
+    Window id = args[0]->Uint32Value();
     RealFocus(hw, id);
     return Undefined();
+  }
+
+  static Bool isprotodel(Display* dpy, Window win) {
+    int i, n;
+    Atom *protocols;
+    Bool ret = False;
+
+    if(XGetWMProtocols(dpy, win, &protocols, &n)) {
+      for(i = 0; !ret && i < n; i++)
+        if(protocols[i] == XInternAtom(dpy, "WM_DELETE_WINDOW", False))
+          ret = True;
+      XFree(protocols);
+    }
+    return ret;
   }
 
   static Handle<Value> KillWindow(const Arguments& args) {
     HandleScope scope;
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
-    int id = args[0]->IntegerValue();
+    Window id = args[0]->Uint32Value();
 
-    Client* c = Client::getById(&hw->monits, id);
-    if(c) {
-      c->kill(hw->dpy);
+    XEvent ev;
+    // check whether the client supports "graceful" termination
+    if(isprotodel(hw->dpy, id)) {
+      ev.type = ClientMessage;
+      ev.xclient.window = id;
+      ev.xclient.message_type = XInternAtom(hw->dpy, "WM_PROTOCOLS", False);
+      ev.xclient.format = 32;
+      ev.xclient.data.l[0] = XInternAtom(hw->dpy, "WM_DELETE_WINDOW", False);
+      ev.xclient.data.l[1] = CurrentTime;
+      XSendEvent(hw->dpy, id, False, NoEventMask, &ev);
+    }
+    else {
+      XGrabServer(hw->dpy);
+      XSetErrorHandler(xerrordummy);
+      XSetCloseDownMode(hw->dpy, DestroyAll);
+      XKillClient(hw->dpy, id);
+      XSync(hw->dpy, False);
+      XSetErrorHandler(xerror);
+      XUngrabServer(hw->dpy);
     }
     return Undefined();
   }
 
-  static void RealFocus(NodeWM* hw, int id) {
-    Window win;
-    Client* c = Client::getById(&hw->monits, id);
-    if(c) {
-      win = c->getWin();
-    } else {
-      win = hw->root;
-    }
-    fprintf( stderr, "FocusWindow: id=%d\n", id);
+  static void RealFocus(NodeWM* hw, Window win) {
+    fprintf( stderr, "FocusWindow: id=%li\n", win);
     // do not focus on the same window... it'll cause a flurry of events...
     if(hw->selected && hw->selected != win) {
       hw->GrabButtons(win, True);
@@ -609,7 +631,7 @@ public:
       unsigned int modifiers[] = { 0, LockMask, hw->numlockmask, hw->numlockmask|LockMask };
       XUngrabKey(hw->dpy, AnyKey, AnyModifier, hw->root);
       for(Key* curr = hw->keys; curr != NULL; curr = curr->next) {
-        fprintf( stderr, "grab key -- key: %d modifier %d \n", curr->keysym, curr->mod);
+        fprintf( stderr, "grab key -- key: %li modifier %d \n", curr->keysym, curr->mod);
         // also grab the combinations of screen lock and num lock (as those should not matter)
         for(i = 0; i < 4; i++) {
           XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod | modifiers[i], hw->root, True, GrabModeAsync, GrabModeAsync);
@@ -854,7 +876,7 @@ public:
       }
     }
     fprintf( stderr, "Focusing to root window\n");
-    RealFocus(hw, -1);
+    RealFocus(hw, hw->root);
     fprintf( stderr, "Emitting rearrange\n");
     hw->Emit(onRearrange, 0, 0);
   }
