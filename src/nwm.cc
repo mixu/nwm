@@ -165,8 +165,7 @@ public:
         v8::String::New("keyPress"),
         v8::String::New("enterNotify"),
         v8::String::New("fullscreen"),
-        v8::String::New("focusIn"),
-        v8::String::New("focusMonitor")
+        v8::String::New("focusIn")
       };
 
     v8::Local<v8::String> value = Local<v8::String>::Cast(args[0]);
@@ -675,9 +674,15 @@ public:
   static void HandleFocusIn(NodeWM* hw, XEvent *e) {
     XFocusChangeEvent *ev = &e->xfocus;
     Local<Value> argv[1];
+    // Preventing focus stealing
+    // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
+    // instead of emitting FocusIn, we should just revert the
+    // focus to whatever was last set by the Node runtime.
+    //
+    // This should fix focus stealing, since the only way
+    // focus can change is if we set it from Node (e.g. due to EnterNotify from the mouse).
 
     fprintf(stderr, "HandleFocusIn for client %li by window\n", ev->window);
-    // Don't do this yet, results in another FocusIn --> loop
     // call the callback in Node.js, passing the window object...
     argv[0] = NodeWM::makeEvent(ev->window);
     hw->Emit(onFocusIn, 1, argv);
@@ -898,6 +903,16 @@ public:
         case ConfigureRequest:
           {
             XConfigureRequestEvent *ev = &event.xconfigurerequest;
+            // TODO:
+            // dwm checks for whether the window is known,
+            // only unknown windows are allowed to configure themselves.
+
+            // We should trigger the Node callback, passing:
+            // window id, x, y, width, height, border_width and detail
+
+            // Node should call AllowReconfigure()
+            // or ConfigureNotify() + Move/Resize etc.
+
             XWindowChanges wc;
             wc.x = ev->x;
             wc.y = ev->y;

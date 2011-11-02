@@ -112,6 +112,18 @@ NWM.prototype.events = {
 
   // TODO - NOT IMPLEMENTED: A window is requesting to be configured to particular dimensions
   configureRequest: function(event){
+    // ConfigureRequest is generated when a client window wants
+    // to change its size, stacking order or border width
+
+    // Check whether the window is known (e.g. managed and not floating)
+    // Known windows should not be allowed to reconfigure themselves.
+    // They should just be send back a ConfigureNotify() with the current info
+
+    // If the window is floating, it should be moved and resized
+    // The size should be modifiable, but the floating window should be centered
+    // on the current?? monitor
+
+    // Unknown windows should be passed through with a XConfigureWindow()
     return event;
   },
 
@@ -164,6 +176,9 @@ NWM.prototype.events = {
     });
   },
 
+  // These events notify that focus has been changed.
+  // Generally, we should undo any focus changed that
+  // we did not initiate ourselves, otherwise apps will steal focus.
   focusIn: function(event) {
     if(this.windows.exists(event.id)) {
       var window = this.windows.get(event.id);
