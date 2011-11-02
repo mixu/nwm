@@ -47,9 +47,6 @@ typedef struct NodeWM NodeWM;
 #include "client.h"
 #include "handler.h"
 
-
-// make these classes of their own
-
 enum callback_map {
   onAddMonitor,
   onUpdateMonitor,
