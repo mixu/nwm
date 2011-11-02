@@ -31,13 +31,11 @@ Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int siz
 
 class Client {
 public:
-  int id;
   int mon_id;
-  Client(Window win, int mon_id, int id, int x, int y, int width, int height, Bool isfloating) {
-    fprintf( stderr, "Create client %d on monitor %d (x %d, y %d, w %d, h %d, float %d)\n", id, mon_id, x, y, width, height, isfloating);
+  Client(Window win, int mon_id, int x, int y, int width, int height, Bool isfloating) {
+    fprintf( stderr, "Create client %li on monitor %d (x %d, y %d, w %d, h %d, float %d)\n", win, mon_id, x, y, width, height, isfloating);
     this->win = win;
     this->mon_id = mon_id;
-    this->id = win;
     this->x = x;
     this->y = y;
     this->width = width;
@@ -45,15 +43,7 @@ public:
     this->isfloating = isfloating;
   }
   static Client* getByWindow(std::vector <Monitor>* monits, Window win);
-  static Client* getById(std::vector <Monitor>* monits, int id);
-  inline int getId() { return this->id; }
   inline Window getWin() { return this->win; }
-  void kill(Display* dpy) {
-  }
-  void raise(Display* dpy) {
-    XRaiseWindow(dpy, this->win);
-  }
-
   void updatetitle(Display* dpy) {
     Atom NetWMName = XInternAtom(dpy, "_NET_WM_NAME", False);
     if(!gettextprop(dpy, this->win, NetWMName, this->name, sizeof this->name))

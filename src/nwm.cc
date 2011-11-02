@@ -223,7 +223,7 @@ public:
     if(w == root && getrootptr(&x, &y))
       return ptrtomon(x, y);
     if((c = Client::getByWindow(&this->monits, w))) {
-      fprintf( stderr, "wintomon by client %d, monitor id %d\n", c->getId(), this->monits[c->mon_id].getId());
+      fprintf( stderr, "wintomon by client %li, monitor id %d\n", c->getWin(), this->monits[c->mon_id].getId());
       return &(this->monits[c->mon_id]);
     }
     // ERROR!
@@ -377,7 +377,7 @@ public:
     // check whether the window is transient
     XGetTransientForHint(hw->dpy, win, &trans);
     isfloating = (trans != None);
-    Client* c = new Client(win, hw->selmon->getId(), hw->next_index, wa->x, wa->y, wa->height, wa->width, isfloating);
+    Client* c = new Client(win, hw->selmon->getId(), wa->x, wa->y, wa->height, wa->width, isfloating);
     c->updatetitle(hw->dpy);
     c->updateclass(hw->dpy);
     // attach to monitor
@@ -413,7 +413,7 @@ public:
     hw->GrabButtons(win, False);
 
     if(isfloating) {
-      c->raise(hw->dpy);
+      XRaiseWindow(hw->dpy, c->getWin());
     }
 
     // move and (finally) map the window
@@ -648,17 +648,14 @@ public:
 
     // fetch window: ev->window --> to window id
     // fetch root_x,root_y
-    Client* c = Client::getByWindow(&hw->monits, ev->window);
-    if(c) {
-      int id = c->getId();
-      argv[0] = NodeWM::makeButtonPress(id, ev->x, ev->y, ev->button, ev->state);
-      fprintf(stderr, "makeButtonPress\n");
-      // call the callback in Node.js, passing the window object...
-      hw->Emit(onMouseDown, 1, argv);
-      fprintf(stderr, "Call cbButtonPress\n");
-      // now emit the drag events
-      GrabMouseRelease(hw, id);
-    }
+
+    argv[0] = NodeWM::makeButtonPress(ev->window, ev->x, ev->y, ev->button, ev->state);
+    fprintf(stderr, "makeButtonPress\n");
+    // call the callback in Node.js, passing the window object...
+    hw->Emit(onMouseDown, 1, argv);
+    fprintf(stderr, "Call cbButtonPress\n");
+    // now emit the drag events
+    GrabMouseRelease(hw, ev->window);
   }
 
   Bool getrootptr(int *x, int *y) {
@@ -669,7 +666,7 @@ public:
     return XQueryPointer(this->dpy, this->root, &dummy, &dummy, x, y, &di, &di, &dui);
   }
 
-  static void GrabMouseRelease(NodeWM* hw, int id) {
+  static void GrabMouseRelease(NodeWM* hw, Window id) {
     XEvent ev;
     int x, y;
     Local<Value> argv[1];
@@ -712,37 +709,33 @@ public:
   static void EmitEnterNotify(NodeWM* hw, XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
     // onManage receives a window object
-    Local<Value> argv[1];
-
     fprintf(stderr, "EmitEnterNotify\n");
 
     // REFACTOR ME: we should just see if the window can be
     // mapped to an id. Even if it cannot, we should still
     // emit the EnterNotify. Node should set the focused monitor
     // purely based on the event coordinates.
-    Client* c = Client::getByWindow(&hw->monits, ev->window);
-    if(c) {
-      int id = c->getId();
-      fprintf(stderr, "EmitEnterNotify wid = %d \n", id);
-      Local<Value> argv[1];
-      Local<Object> result = Object::New();
-      result->Set(String::NewSymbol("id"), Integer::New(id));
-      result->Set(String::NewSymbol("x"), Integer::New(ev->x));
-      result->Set(String::NewSymbol("y"), Integer::New(ev->y));
-      result->Set(String::NewSymbol("x_root"), Integer::New(ev->x_root));
-      result->Set(String::NewSymbol("y_root"), Integer::New(ev->y_root));
-      argv[0] = result;
-      // call the callback in Node.js, passing the window object...
-      hw->Emit(onEnterNotify, 1, argv);
-    }
+
+    fprintf(stderr, "EmitEnterNotify wid = %li \n", ev->window);
+    Local<Value> argv[1];
+    Local<Object> result = Object::New();
+    result->Set(String::NewSymbol("id"), Integer::New(ev->window));
+    result->Set(String::NewSymbol("x"), Integer::New(ev->x));
+    result->Set(String::NewSymbol("y"), Integer::New(ev->y));
+    result->Set(String::NewSymbol("x_root"), Integer::New(ev->x_root));
+    result->Set(String::NewSymbol("y_root"), Integer::New(ev->y_root));
+    argv[0] = result;
+    // call the callback in Node.js, passing the window object...
+    hw->Emit(onEnterNotify, 1, argv);
+
     if(ev->window == hw->root) {
       int x, y;
-      Local<Value> argv[2];
+      Local<Value> argvs[2];
       if(hw->getrootptr(&x, &y)) {
         fprintf(stderr, "Emit onFocusMonitor x %d y %d \n", x, y);
-        argv[0] = Integer::New(x);
-        argv[1] = Integer::New(y);
-        hw->Emit(onFocusMonitor, 2, argv);
+        argvs[0] = Integer::New(x);
+        argvs[1] = Integer::New(y);
+        hw->Emit(onFocusMonitor, 2, argvs);
       }
     }
   }
@@ -750,17 +743,12 @@ public:
   static void EmitFocusIn(NodeWM* hw, XEvent *e) {
     XFocusChangeEvent *ev = &e->xfocus;
     Local<Value> argv[1];
-    Client* c = Client::getByWindow(&hw->monits, ev->window);
-    if(c) {
-      int id = c->getId();
-      fprintf(stderr, "EmitFocusIn for client %d by window\n", id);
-      // Don't do this yet, results in another FocusIn --> loop
-      // call the callback in Node.js, passing the window object...
-      argv[0] = NodeWM::makeEvent(id);
-      hw->Emit(onFocusIn, 1, argv);
-    } else {
-      fprintf(stderr, "EmitFocusIn could not find client by window\n");
-    }
+
+    fprintf(stderr, "EmitFocusIn for client %li by window\n", ev->window);
+    // Don't do this yet, results in another FocusIn --> loop
+    // call the callback in Node.js, passing the window object...
+    argv[0] = NodeWM::makeEvent(ev->window);
+    hw->Emit(onFocusIn, 1, argv);
   }
 
   static void EmitUnmapNotify(NodeWM* hw, XEvent *e) {
@@ -825,15 +813,15 @@ public:
       if(cme->data.l[0]) {
         XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
-        argv[0] = Integer::New(c->getId());
+        argv[0] = Integer::New(c->getWin());
         argv[1] = Integer::New(1);
         hw->Emit(onFullscreen, 2, argv);
-        c->raise(hw->dpy);
+        XRaiseWindow(hw->dpy, c->getWin());
       }
       else {
         XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)0, 0);
-        argv[0] = Integer::New(c->getId());
+        argv[0] = Integer::New(c->getWin());
         argv[1] = Integer::New(0);
         hw->Emit(onFullscreen, 2, argv);
       }
@@ -842,16 +830,16 @@ public:
 
   static void EmitRemove(NodeWM* hw, Client *c, Bool destroyed) {
     fprintf( stderr, "EmitRemove\n");
-    int id = c->getId();
+    Window win = c->getWin();
     // emit a remove
     Local<Value> argv[1];
-    argv[0] = Integer::New(id);
-    fprintf( stderr, "EmitRemove - emit onRemovewindow, %d\n", id);
+    argv[0] = Integer::New(win);
+    fprintf( stderr, "EmitRemove - emit onRemovewindow, %li\n", win);
     hw->Emit(onRemoveWindow, 1, argv);
     if(!destroyed) {
       fprintf( stderr, "X11 cleanup\n");
       XGrabServer(hw->dpy);
-      XUngrabButton(hw->dpy, AnyButton, AnyModifier, c->getWin());
+      XUngrabButton(hw->dpy, AnyButton, AnyModifier, win);
       XSync(hw->dpy, False);
       XUngrabServer(hw->dpy);
     }
@@ -860,18 +848,18 @@ public:
     std::vector<Client>& vec = hw->monits[c->mon_id].clients; // use shorter name
     std::vector<Client>::iterator iter = vec.begin();
     while (iter != vec.end()) {
-      fprintf( stderr, "Monitor has client %d.\n", iter->getId());
+      fprintf( stderr, "Monitor has client %li.\n", iter->getWin());
       ++iter;
     }
     fprintf( stderr, "Remove window from monitor\n");
     iter = vec.begin();
     while (iter != vec.end()) {
-      int vid = iter->getId();
-      if (vid == id) {
-        fprintf( stderr, "Perform erase as item %d is equal to needle %d.\n", vid, id);
+      Window vid = iter->getWin();
+      if (vid == win) {
+        fprintf( stderr, "Perform erase as item %li is equal to needle %li.\n", vid, win);
         iter = vec.erase(iter);
       } else {
-        fprintf( stderr, "Not perform erase as item %d is not equal to needle %d.\n", vid, id);
+        fprintf( stderr, "Not perform erase as item %li is not equal to needle %li.\n", vid, win);
         ++iter;
       }
     }

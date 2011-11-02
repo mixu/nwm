@@ -1,4 +1,4 @@
-  static Local<Object> makeMouseDrag(int id, int x, int y, int movex, int movey //, unsigned int state
+  static Local<Object> makeMouseDrag(Window id, int x, int y, int movex, int movey //, unsigned int state
   ) {
     // window object to return
     Local<Object> result = Object::New();
@@ -14,7 +14,7 @@
   }
 
 
-  static Local<Object> makeButtonPress(int id, int x, int y, unsigned int button, unsigned int state) {
+  static Local<Object> makeButtonPress(Window id, int x, int y, unsigned int button, unsigned int state) {
     // window object to return
     Local<Object> result = Object::New();
 
@@ -52,7 +52,7 @@
     return result;
   }
 
-  static Local<Object> makeEvent(int id) {
+  static Local<Object> makeEvent(Window id) {
     // window object to return
     Local<Object> result = Object::New();
     result->Set(String::NewSymbol("id"), Integer::New(id));
