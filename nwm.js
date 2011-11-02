@@ -161,13 +161,15 @@ NWM.prototype.events = {
     }
     // This event is also emitted for the root window
     //  so in any case, we want to set the current monitor based on the event coordinates
-    console.log('Focus monitor by coordinates', event.x, event.y);
+    var x = event.x_root || event.x;
+    var y = event.y_root || event.y;
+    console.log('Focus monitor by coordinates', x, y);
     // go through the monitors and find a matching monitor
     var monitor_ids = Object.keys(this.monitors.items);
     var self = this;
     monitor_ids.some(function(monid) {
       var monitor = self.monitors.get(monid);
-      if(monitor.inside(event.x, event.y)) {
+      if(monitor.inside(x, y)) {
         console.log('Change focused monitor: ', monid);
         self.monitors.current = monid;
         return true; // end iteration
