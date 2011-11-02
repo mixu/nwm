@@ -55,7 +55,15 @@ Select "nwm" from the Sessions menu when logging in.
 Some tips for running nwm in a VM:
 
 - If you use VMware Workstation, you have to start vmware-user manually for multi-monitor support via Xinerama after starting nwm.
-- If you use VirtualBox, you have to use xrandr manually for multi-monitor support (e.g. randr --output VBOX0 --auto --left-of VBOX1)
+- If you use VirtualBox, you have to use xrandr manually for multi-monitor support (e.g. xrandr --output VBOX0 --auto --left-of VBOX1).
+
+VirtualBox sometimes gets your virtual screen sizes wrong. If this happens, you need to rerun xrandr, otherwise Xinerama reports the starting index of your second display incorrectly. You can see this by running xrandr:
+
+    VBOX0 connected 1440x900+0+0 0mm x 0mm
+    VBOX1 connected 2560x1440+2560+0 0mm x 0mm
+                              !!!!
+
+The display VBOX1 is marked as starting at x=2560 even though VBOX0 ends at 1440. This was because VirtualBox resized the VBOX0 screen incorrectly when you ran xrandr. This is a VirtualBox bug, not a nwm one.
 
 # Running under a secondary X11 server (Xephyr)
 
