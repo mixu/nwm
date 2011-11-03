@@ -442,6 +442,30 @@ public:
     return Undefined();
   }
 
+  static Handle<Value> ConfigureWindow(const Arguments& args) {
+    HandleScope scope;
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
+
+    hw->RealConfigureWindow(args[0]->Uint32Value(), args[1]->IntegerValue(),
+      args[2]->IntegerValue(), args[3]->IntegerValue(), args[4]->IntegerValue(),
+      args[5]->IntegerValue(), args[6]->IntegerValue(), args[7]->IntegerValue(),
+      args[8]->IntegerValue());
+    return Undefined();
+  }
+
+  void RealConfigureWindow(Window win, int x, int y, int width, int height,
+    int border_width, int above, int detail, int value_mask) {
+      XWindowChanges wc;
+      wc.x = x;
+      wc.y = y;
+      wc.width = width;
+      wc.height = height;
+      wc.border_width = border_width;
+      wc.sibling = above;
+      wc.stack_mode = detail;
+      XConfigureWindow(this->dpy, win, value_mask, &wc);
+  }
+
   static void RealFocus(NodeWM* hw, Window win) {
     fprintf( stderr, "FocusWindow: id=%li\n", win);
     // do not focus on the same window... it'll cause a flurry of events...
@@ -910,18 +934,26 @@ public:
             // We should trigger the Node callback, passing:
             // window id, x, y, width, height, border_width and detail
 
+            Local<Value> argv[1];
+            Local<Object> result = Object::New();
+            result->Set(String::NewSymbol("id"), Integer::New(ev->window));
+            result->Set(String::NewSymbol("x"), Integer::New(ev->x));
+            result->Set(String::NewSymbol("y"), Integer::New(ev->y));
+            result->Set(String::NewSymbol("width"), Integer::New(ev->width));
+            result->Set(String::NewSymbol("height"), Integer::New(ev->height));
+            result->Set(String::NewSymbol("above"), Integer::New(ev->above));
+            result->Set(String::NewSymbol("detail"), Integer::New(ev->detail));
+            result->Set(String::NewSymbol("value_mask"), Integer::New(ev->value_mask));
+            argv[0] = result;
+            hw->Emit(onConfigureRequest, 1, argv);
+
             // Node should call AllowReconfigure()
             // or ConfigureNotify() + Move/Resize etc.
 
-            XWindowChanges wc;
-            wc.x = ev->x;
-            wc.y = ev->y;
-            wc.width = ev->width;
-            wc.height = ev->height;
-            wc.border_width = ev->border_width;
-            wc.sibling = ev->above;
-            wc.stack_mode = ev->detail;
-            XConfigureWindow(hw->dpy, ev->window, ev->value_mask, &wc);
+            hw->RealConfigureWindow(ev->window, ev->x, ev->y,
+              ev->width, ev->height,
+              ev->border_width, ev->above,
+              ev->detail, ev->value_mask);
           }
           break;
         case ConfigureNotify:
