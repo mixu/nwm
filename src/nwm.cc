@@ -217,17 +217,17 @@ public:
 
   static void updateGeometry(NodeWM* hw) {
     if(XineramaIsActive(hw->dpy)) {
-      fprintf( stderr, "Xinerama active\n");
+      fprintf( stdout, "Xinerama active\n");
       int i, n, nn;
       unsigned int j;
       XineramaScreenInfo *info = XineramaQueryScreens(hw->dpy, &nn);
       XineramaScreenInfo *unique = NULL;
 
       n = hw->total_monitors;
-      fprintf( stderr, "Monitors known %d, monitors found %d\n", n, nn);
+      fprintf( stdout, "Monitors known %d, monitors found %d\n", n, nn);
       /* only consider unique geometries as separate screens */
       if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
-        fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
+        fprintf( stdout, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
         exit( -1 );
       }
       for(i = 0, j = 0; i < nn; i++)
@@ -238,7 +238,7 @@ public:
       if(n <= nn) {
         // reserve space
         for(i = 0; i < (nn - n); i++) { /* new monitors available */
-          fprintf(stderr, "Monitor %d \n", i);
+          fprintf(stdout, "Monitor %d \n", i);
           hw->total_monitors++;
         }
         // update monitor dimensions
@@ -253,7 +253,7 @@ public:
           result->Set(String::NewSymbol("width"), Integer::New(unique[i].width));
           result->Set(String::NewSymbol("height"), Integer::New(unique[i].height));
           argv[0] = result;
-          fprintf( stderr, "Emit monitor %d\n", i);
+          fprintf( stdout, "Emit monitor %d\n", i);
           if(i >= n) {
             hw->Emit(onAddMonitor, 1, argv);
           } else {
@@ -261,7 +261,7 @@ public:
           }
         }
       } else { /* less monitors available nn < n */
-        fprintf( stderr, "Less monitors available %d %d\n", n, nn);
+        fprintf( stdout, "Less monitors available %d %d\n", n, nn);
         for(i = nn; i < n; i++) {
           // emit REMOVE MONITOR (i)
           Local<Value> argv[1];
@@ -291,7 +291,7 @@ public:
     int x, y;
     Local<Value> argv[1];
     if(hw->getrootptr(&x, &y)) {
-      fprintf(stderr, "EmitEnterNotify wid = %li \n", hw->root);
+      fprintf(stdout, "EmitEnterNotify wid = %li \n", hw->root);
       Local<Object> result = Object::New();
       result->Set(String::NewSymbol("id"), Integer::New(hw->root));
       result->Set(String::NewSymbol("x"), Integer::New(x));
@@ -300,7 +300,7 @@ public:
       hw->Emit(onEnterNotify, 1, argv);
     }
 
-    fprintf( stderr, "Done with updategeom\n");
+    fprintf( stdout, "Done with updategeom\n");
     return;
   }
 
@@ -341,7 +341,7 @@ public:
     ce.above = None;
     ce.override_redirect = False;
 
-    (void) fprintf( stderr, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
+    (void) fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
 
     XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
 
@@ -369,7 +369,7 @@ public:
     int width = args[1]->IntegerValue();
     int height = args[2]->IntegerValue();
 
-    fprintf( stderr, "ResizeWindow: id=%li width=%d height=%d \n", id, width, height);
+    fprintf( stdout, "ResizeWindow: id=%li width=%d height=%d \n", id, width, height);
     XResizeWindow(hw->dpy, id, width, height);
     XFlush(hw->dpy);
 
@@ -384,7 +384,7 @@ public:
     int x = args[1]->IntegerValue();
     int y = args[2]->IntegerValue();
 
-    fprintf( stderr, "MoveWindow: id=%li x=%d y=%d \n", id, x, y);
+    fprintf( stdout, "MoveWindow: id=%li x=%d y=%d \n", id, x, y);
     XMoveWindow(hw->dpy, id, x, y);
     XFlush(hw->dpy);
     return Undefined();
@@ -467,16 +467,13 @@ public:
   }
 
   static void RealFocus(NodeWM* hw, Window win) {
-    fprintf( stderr, "FocusWindow: id=%li\n", win);
-    // do not focus on the same window... it'll cause a flurry of events...
-    if(hw->selected && hw->selected != win) {
-      hw->GrabButtons(win, True);
-      XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);
-      Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
-      SendEvent(hw, win, atom);
-      XFlush(hw->dpy);
-      hw->selected = win;
-    }
+    fprintf( stdout, "FocusWindow: id=%li\n", win);
+    hw->GrabButtons(win, True);
+    XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);
+    Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
+    SendEvent(hw, win, atom);
+    XFlush(hw->dpy);
+    hw->selected = win;
   }
 
   static Bool SendEvent(NodeWM* hw, Window wnd, Atom proto) {
@@ -514,7 +511,7 @@ public:
 //      unsigned int modifiers[] = { 0, LockMask, this->numlockmask, this->numlockmask|LockMask };
 //      XUngrabButton(this->dpy, AnyButton, AnyModifier, wnd);
 //      if(focused) {
-//        fprintf( stderr, "GRABBUTTONS - focused: true\n");
+//        fprintf( stdout, "GRABBUTTONS - focused: true\n");
 //          for(i = 0; i < 4; i++) {
 //            XGrabButton(dpy, Button1,
 //                              Mod4Mask|ControlMask|modifiers[i],
@@ -522,7 +519,7 @@ public:
 //                              GrabModeAsync, GrabModeSync, None, None);
 //          }
 //      } else {
-//        fprintf( stderr, "GRABBUTTONS - focused: false\n");
+//        fprintf( stdout, "GRABBUTTONS - focused: false\n");
 //        XGrabButton(this->dpy, AnyButton, AnyModifier, wnd, False,
 //                    (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
 //      }
@@ -561,7 +558,7 @@ public:
   static void pushKey(Key** keys, KeySym keysym, unsigned int mod) {
     Key* curr;
     if(!(curr = (Key*)calloc(1, sizeof(Key)))) {
-      fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
+      fprintf( stdout, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
       exit( -1 );
     }
     curr->keysym = keysym;
@@ -591,7 +588,7 @@ public:
       unsigned int modifiers[] = { 0, LockMask, hw->numlockmask, hw->numlockmask|LockMask };
       XUngrabKey(hw->dpy, AnyKey, AnyModifier, hw->root);
       for(Key* curr = hw->keys; curr != NULL; curr = curr->next) {
-        fprintf( stderr, "grab key -- key: %li modifier %d \n", curr->keysym, curr->mod);
+        fprintf( stdout, "grab key -- key: %li modifier %d \n", curr->keysym, curr->mod);
         // also grab the combinations of screen lock and num lock (as those should not matter)
         for(i = 0; i < 4; i++) {
           XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod | modifiers[i], hw->root, True, GrabModeAsync, GrabModeAsync);
@@ -604,7 +601,7 @@ public:
     XButtonPressedEvent *ev = &e->xbutton;
     Local<Value> argv[1];
 
-    fprintf(stderr, "Handle(mouse)ButtonPress\n");
+    fprintf(stdout, "Handle(mouse)ButtonPress\n");
 
     // fetch window: ev->window --> to window id
     // fetch root_x,root_y
@@ -612,7 +609,7 @@ public:
     argv[0] = NodeWM::makeButtonPress(ev->window, ev->x, ev->y, ev->button, ev->state);
     // call the callback in Node.js, passing the window object...
     hw->Emit(onMouseDown, 1, argv);
-    fprintf(stderr, "Call cbButtonPress\n");
+    fprintf(stdout, "Call cbButtonPress\n");
     // now emit the drag events
     GrabMouseRelease(hw, ev->window);
   }
@@ -681,7 +678,7 @@ public:
   static void HandleEnterNotify(NodeWM* hw, XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
     // onManage receives a window object
-    fprintf(stderr, "HandleEnterNotify wid = %li \n", ev->window);
+    fprintf(stdout, "HandleEnterNotify wid = %li \n", ev->window);
     Local<Value> argv[1];
     Local<Object> result = Object::New();
     result->Set(String::NewSymbol("id"), Integer::New(ev->window));
@@ -706,7 +703,7 @@ public:
     // This should fix focus stealing, since the only way
     // focus can change is if we set it from Node (e.g. due to EnterNotify from the mouse).
 
-    fprintf(stderr, "HandleFocusIn for client %li by window\n", ev->window);
+    fprintf(stdout, "HandleFocusIn for client %li by window\n", ev->window);
     // call the callback in Node.js, passing the window object...
     argv[0] = NodeWM::makeEvent(ev->window);
     hw->Emit(onFocusIn, 1, argv);
@@ -788,38 +785,38 @@ public:
   }
 
   static void HandleRemove(NodeWM* hw, Client *c, Bool destroyed) {
-    fprintf( stderr, "HandleRemove\n");
+    fprintf( stdout, "HandleRemove\n");
     Window win = c->getWin();
     // emit a remove
     Local<Value> argv[1];
     argv[0] = Integer::New(win);
-    fprintf( stderr, "HandleRemove - emit onRemovewindow, %li\n", win);
+    fprintf( stdout, "HandleRemove - emit onRemovewindow, %li\n", win);
     hw->Emit(onRemoveWindow, 1, argv);
     if(!destroyed) {
-      fprintf( stderr, "X11 cleanup\n");
+      fprintf( stdout, "X11 cleanup\n");
       XGrabServer(hw->dpy);
       XUngrabButton(hw->dpy, AnyButton, AnyModifier, win);
       XSync(hw->dpy, False);
       XUngrabServer(hw->dpy);
     }
     // remove from monitor
-    fprintf( stderr, "Iterate window list to remove window from global list\n");
+    fprintf( stdout, "Iterate window list to remove window from global list\n");
     std::vector<Client>& vec = hw->clients; // use shorter name
     std::vector<Client>::iterator iter = vec.begin();
     iter = vec.begin();
     while (iter != vec.end()) {
       Window vid = iter->getWin();
       if (vid == win) {
-        fprintf( stderr, "Perform erase as item %li is equal to needle %li.\n", vid, win);
+        fprintf( stdout, "Perform erase as item %li is equal to needle %li.\n", vid, win);
         iter = vec.erase(iter);
       } else {
-        fprintf( stderr, "Not perform erase as item %li is not equal to needle %li.\n", vid, win);
+        fprintf( stdout, "Not perform erase as item %li is not equal to needle %li.\n", vid, win);
         ++iter;
       }
     }
-    fprintf( stderr, "Focusing to root window\n");
+    fprintf( stdout, "Focusing to root window\n");
     RealFocus(hw, hw->root);
-    fprintf( stderr, "Emitting rearrange\n");
+    fprintf( stdout, "Emitting rearrange\n");
     hw->Emit(onRearrange, 0, 0);
   }
 
@@ -833,7 +830,7 @@ public:
 
     // open the display
     if ( ( hw->dpy = XOpenDisplay(NIL) ) == NULL ) {
-      fprintf( stderr, "cannot connect to X server %s\n", XDisplayName(NULL));
+      fprintf( stdout, "cannot connect to X server %s\n", XDisplayName(NULL));
       exit( -1 );
     }
     // set error handler
@@ -913,7 +910,7 @@ public:
     // main event loop
     while(XPending(hw->dpy)) {
       XNextEvent(hw->dpy, &event);
-      fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);
+      fprintf(stdout, "got event %s (%d).\n", event_names[event.type], event.type);
       // handle event internally --> calls Node if necessary
       switch (event.type) {
         case ButtonPress:
@@ -983,12 +980,12 @@ public:
             XWindowAttributes wa;
             XMapRequestEvent *ev = &event.xmaprequest;
             if(!XGetWindowAttributes(hw->dpy, ev->window, &wa)) {
-              fprintf(stderr, "XGetWindowAttributes failed\n");
+              fprintf(stdout, "XGetWindowAttributes failed\n");
               return;
             }
             if(wa.override_redirect)
               return;
-            fprintf(stderr, "MapRequest\n");
+            fprintf(stdout, "MapRequest\n");
             Client* c = hw->getClientByWindow(ev->window);
             if(c == NULL) {
               // dwm actually does this only once per window (e.g. for unknown windows only...)
@@ -997,7 +994,7 @@ public:
               // emit a rearrange
               hw->Emit(onRearrange, 0, 0);
             } else {
-              fprintf(stderr, "Window is known\n");
+              fprintf(stdout, "Window is known\n");
             }
           }
             break;
@@ -1008,7 +1005,7 @@ public:
             NodeWM::HandleUnmapNotify(hw, &event);
             break;
         default:
-          fprintf(stderr, "Did nothing with %s (%d)\n", event_names[event.type], event.type);
+          fprintf(stdout, "Did nothing with %s (%d)\n", event_names[event.type], event.type);
           break;
       }
     }

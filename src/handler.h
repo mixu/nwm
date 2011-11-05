@@ -11,9 +11,9 @@ int xerror(Display *dpy, XErrorEvent *ee) {
   || (ee->request_code == X_GrabKey && ee->error_code == BadAccess)
   || (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
     return 0;
-  fprintf(stderr, "nwm: fatal error: request code=%d, error code=%d\n",
+  fprintf(stdout, "nwm: fatal error: request code=%d, error code=%d\n",
       ee->request_code, ee->error_code);
-//    return xerrorxlib(dpy, ee); /* may call exit */    
+//    return xerrorxlib(dpy, ee); /* may call exit */
   exit(-1);
   return 0;
 }

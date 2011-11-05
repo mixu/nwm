@@ -38,6 +38,13 @@ NWM.prototype.events = {
   addMonitor: function(monitor) {
     this.monitors.add(new Monitor(this, monitor));
     this.monitors.current = monitor.id;
+
+    // TODO:
+    // When a monitor is added, check that the x coordinates
+    // represent a continuous space.
+    // Virtualbox incorrectly reports the starting
+    // x position even when it correctly detects the w/h of the monitor
+
   },
 
   // A monitor is updated
