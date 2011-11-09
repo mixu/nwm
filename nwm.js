@@ -129,6 +129,10 @@ NWM.prototype.events = {
   // ConfigureRequest is generated when a client window wants to change its size, stacking order or border width
   configureRequest: function(ev){
     console.log('configureRequest', ev);
+      this.wm.configureWindow(ev.id, ev.x, ev.y, ev.width, ev.height, ev.border_width,
+        ev.above, ev.detail, ev.value_mask);
+    
+    return;
     if(ev.id && this.windows.exists(ev.id)) {
       // Check whether the window is known (e.g. managed and not floating)
       // Known windows should not be allowed to reconfigure themselves.
