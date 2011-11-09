@@ -27,8 +27,6 @@ public:
 
   private:
     int x, y, width, height;
-    Client *next;
-    Client *snext;
     Window win;
     Bool isfloating;
 };

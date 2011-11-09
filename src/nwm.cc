@@ -122,6 +122,7 @@ private:
   // We only track the number of monitors: that allows us to tell if a monitor has been removed or added.
   unsigned int total_monitors;
   std::vector <Client> clients;
+  std::vector <Window> seen_windows;
   // screen dimensions
   int screen, screen_width, screen_height;
   // callback storage
@@ -703,6 +704,21 @@ public:
   }
 
 #include "return_values.cc"
+
+  void addWindow(Window win, int x, int y, int width, int height, Bool isfloating) {
+    fprintf( stderr, "Create client %li (x %d, y %d, w %d, h %d, float %d)\n", win, x, y, width, height, isfloating);
+    // window object to return
+    Local<Object> result = Object::New();
+
+    // read and set the window geometry
+    result->Set(String::NewSymbol("id"), Integer::New(win));
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("height"), Integer::New(height));
+    result->Set(String::NewSymbol("width"), Integer::New(width));
+    result->Set(String::NewSymbol("isfloating"), Integer::New(isfloating));
+
+  }
 
   void updateWindowStr(Window win) {
     char name[256];
