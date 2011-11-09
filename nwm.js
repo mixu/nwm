@@ -25,6 +25,7 @@ var NWM = function(binding) {
   this.monitors = new Collection(this, 'monitor', 0);
   // windows -- this is the global storage for windows, any other objects just store ids referring to this hash.
   this.windows = new Collection(this, 'window', 1);
+  this.floaters = [];
 }
 
 require('util').inherits(NWM, require('events').EventEmitter);
@@ -75,6 +76,7 @@ NWM.prototype.events = {
       // do not add floating windows
       if(window.isfloating) {
         console.log('Ignoring floating window: ', window);
+        this.floaters.push(window.id);
         return;
       }
       var window = new Window(this, window);
@@ -90,6 +92,10 @@ NWM.prototype.events = {
   // When a window is removed
   removeWindow: function(id) {
     this.windows.remove(function(window) { return (window.id != id); });
+    var pos = this.floaters.indexOf(id);
+    if(pos > -1) {
+      this.floaters = this.floaters.splice(pos, 1);
+    }
   },
 
   // When a window is updated
@@ -117,21 +123,34 @@ NWM.prototype.events = {
     }
   },
 
-  // TODO - NOT IMPLEMENTED: A window is requesting to be configured to particular dimensions
-  configureRequest: function(event){
-    // ConfigureRequest is generated when a client window wants
-    // to change its size, stacking order or border width
-
-    // Check whether the window is known (e.g. managed and not floating)
-    // Known windows should not be allowed to reconfigure themselves.
-    // They should just be send back a ConfigureNotify() with the current info
-
-    // If the window is floating, it should be moved and resized
-    // The size should be modifiable, but the floating window should be centered
-    // on the current?? monitor
-
-    // Unknown windows should be passed through with a XConfigureWindow()
-    return event;
+  // ConfigureRequest is generated when a client window wants to change its size, stacking order or border width
+  configureRequest: function(ev){
+    console.log('configureRequest', ev);
+    if(ev.id && this.windows.exists(ev.id)) {
+      // Check whether the window is known (e.g. managed and not floating)
+      // Known windows should not be allowed to reconfigure themselves.
+      // They should just be send back a ConfigureNotify() with the current info
+      console.log('denying configureRequest');
+    } else {
+      console.log('allowing configureRequest');
+      if(ev.id && this.floaters.indexOf(ev.id)) {
+        // If the window is floating, it should be moved and resized
+        // The size should be modifiable, but the floating window should be centered
+        // on the current monitor (or the monitor the floater is on, but we don't track that now)
+        var monitor = this.currentMonitor();
+        ev.x = monitor.x + ev.x;
+        ev.y = monitor.y + ev.y;
+        if ( (ev.x + ev.width) > monitor.x + monitor.width) {
+          ev.x = monitor.x + Math.floor(monitor.width / 2 - ev.width / 2);
+        }
+        if ( (ev.y + ev.heigth) > monitor.y + monitor.height) {
+          ev.y = monitor.y + Math.floor(monitor.height / 2 - ev.height / 2);
+        }
+      }
+      // Unknown windows should be passed through with a XConfigureWindow()
+      this.wm.configureWindow(ev.id, ev.x, ev.y, ev.width, ev.height, ev.border_width,
+        ev.above, ev.detail, ev.value_mask);
+    }
   },
 
   // Mouse events
@@ -183,22 +202,6 @@ NWM.prototype.events = {
       }
       return false; // continue iteration
     });
-  },
-
-  // These events notify that focus has been changed.
-  // Generally, we should undo any focus changed that
-  // we did not initiate ourselves, otherwise apps will steal focus.
-  focusIn: function(event) {
-    if(this.windows.exists(event.id)) {
-      var window = this.windows.get(event.id);
-      console.log('Change focused monitor ', this.monitors.current, '=>', window.monitor, '(but not window)');
-      if(this.monitors.exists(window.monitor)) {
-        this.monitors.current = window.monitor;
-      }
-      // Important: Don't change window focus here, as focusIn events get emitted after focusWindow() is called,
-      // and the focus is already set correctly when we do it ourself. And calling focusWindow() again here is a bad idea,
-      // as it will generate another focusIn event. Generally, you want enterNotify above.
-    }
   },
 
   // Screen events

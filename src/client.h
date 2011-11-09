@@ -1,6 +1,3 @@
-
-#include "handler.h"
-
 static const char broken[] = "broken";
 
 Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int size) {

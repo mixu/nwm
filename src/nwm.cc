@@ -45,7 +45,27 @@ typedef struct Client Client;
 typedef struct NodeWM NodeWM;
 
 #include "client.h"
-#include "handler.h"
+int xerror(Display *dpy, XErrorEvent *ee) {
+  if(ee->error_code == BadWindow
+  || (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch)
+  || (ee->request_code == X_PolyText8 && ee->error_code == BadDrawable)
+  || (ee->request_code == X_PolyFillRectangle && ee->error_code == BadDrawable)
+  || (ee->request_code == X_PolySegment && ee->error_code == BadDrawable)
+  || (ee->request_code == X_ConfigureWindow && ee->error_code == BadMatch)
+  || (ee->request_code == X_GrabButton && ee->error_code == BadAccess)
+  || (ee->request_code == X_GrabKey && ee->error_code == BadAccess)
+  || (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
+    return 0;
+  fprintf(stdout, "nwm: fatal error: request code=%d, error code=%d\n",
+      ee->request_code, ee->error_code);
+//    return xerrorxlib(dpy, ee); /* may call exit */
+  exit(-1);
+  return 0;
+}
+
+int xerrordummy(Display *dpy, XErrorEvent *ee) {
+  return 0;
+}
 
 enum callback_map {
   onAddMonitor,
@@ -61,7 +81,6 @@ enum callback_map {
   onKeyPress,
   onEnterNotify,
   onFullscreen,
-  onFocusIn,
   onLast
 };
 
@@ -110,6 +129,7 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "resizeWindow", ResizeWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "focusWindow", FocusWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "killWindow", KillWindow);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "configureWindow", ConfigureWindow);
 
     // Setting up
     NODE_SET_PROTOTYPE_METHOD(s_ct, "start", Start);
@@ -164,8 +184,7 @@ public:
         v8::String::New("configureRequest"),
         v8::String::New("keyPress"),
         v8::String::New("enterNotify"),
-        v8::String::New("fullscreen"),
-        v8::String::New("focusIn")
+        v8::String::New("fullscreen")
       };
 
     v8::Local<v8::String> value = Local<v8::String>::Cast(args[0]);
@@ -237,7 +256,7 @@ public:
       nn = j;
       if(n <= nn) {
         // reserve space
-        for(i = 0; i < (nn - n); i++) { /* new monitors available */
+        for(i = 0; i < (nn - n); i++) { // new monitors available
           fprintf(stdout, "Monitor %d \n", i);
           hw->total_monitors++;
         }
@@ -260,7 +279,7 @@ public:
             hw->Emit(onUpdateMonitor, 1, argv);
           }
         }
-      } else { /* less monitors available nn < n */
+      } else { // fewer monitors available nn < n
         fprintf( stdout, "Less monitors available %d %d\n", n, nn);
         for(i = nn; i < n; i++) {
           // emit REMOVE MONITOR (i)
@@ -344,7 +363,6 @@ public:
     (void) fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
 
     XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
-
 
     // subscribe to window events
     XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
@@ -603,7 +621,6 @@ public:
 
     fprintf(stdout, "Handle(mouse)ButtonPress\n");
 
-    // fetch window: ev->window --> to window id
     // fetch root_x,root_y
 
     argv[0] = NodeWM::makeButtonPress(ev->window, ev->x, ev->y, ev->button, ev->state);
@@ -695,18 +712,15 @@ public:
   static void HandleFocusIn(NodeWM* hw, XEvent *e) {
     XFocusChangeEvent *ev = &e->xfocus;
     Local<Value> argv[1];
-    // Preventing focus stealing
-    // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
-    // instead of emitting FocusIn, we should just revert the
-    // focus to whatever was last set by the Node runtime.
-    //
-    // This should fix focus stealing, since the only way
-    // focus can change is if we set it from Node (e.g. due to EnterNotify from the mouse).
-
-    fprintf(stdout, "HandleFocusIn for client %li by window\n", ev->window);
-    // call the callback in Node.js, passing the window object...
-    argv[0] = NodeWM::makeEvent(ev->window);
-    hw->Emit(onFocusIn, 1, argv);
+    fprintf(stdout, "HandleFocusIn for window id %li\n", ev->window);
+    if(hw->selected && ev->window != hw->selected){
+      // Preventing focus stealing
+      // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
+      // We will always revert the focus to whatever was last set by Node (e.g. enterNotify).
+      // This prevents naughty applications from stealing the focus permanently.
+      fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, hw->selected);
+      RealFocus(hw, hw->selected);
+    }
   }
 
   static void HandleUnmapNotify(NodeWM* hw, XEvent *e) {
@@ -946,11 +960,6 @@ public:
 
             // Node should call AllowReconfigure()
             // or ConfigureNotify() + Move/Resize etc.
-
-            hw->RealConfigureWindow(ev->window, ev->x, ev->y,
-              ev->width, ev->height,
-              ev->border_width, ev->above,
-              ev->detail, ev->value_mask);
           }
           break;
         case ConfigureNotify:
@@ -988,8 +997,7 @@ public:
             fprintf(stdout, "MapRequest\n");
             Client* c = hw->getClientByWindow(ev->window);
             if(c == NULL) {
-              // dwm actually does this only once per window (e.g. for unknown windows only...)
-              // that's because otherwise you'll cause a hang when you map a mapped window again...
+              // only map new windows
               NodeWM::HandleAdd(hw, ev->window, &wa);
               // emit a rearrange
               hw->Emit(onRearrange, 0, 0);
