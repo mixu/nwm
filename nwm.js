@@ -99,11 +99,14 @@ NWM.prototype.events = {
   },
 
   // When a window is updated
+  // This is only triggered for title and class updates, never coordinates or monitors.
   updateWindow: function(window) {
     if(this.windows.exists(window.id)) {
-      // ignore monitor number from binding as it will go out of date if the window is moved
-      window.monitor = this.windows.get(window.id).monitor;
-      this.windows.update(window.id, window);
+      var old = this.windows.get(window.id);
+      this.windows.update(window.id, {
+        title: window.title || old.title || '',
+        class: window.class || old.class || ''
+      });
     }
   },
 

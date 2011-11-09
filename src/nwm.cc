@@ -44,6 +44,7 @@ struct Key {
 typedef struct Client Client;
 typedef struct NodeWM NodeWM;
 
+static const char broken[] = "broken";
 #include "client.h"
 int xerror(Display *dpy, XErrorEvent *ee) {
   if(ee->error_code == BadWindow
@@ -66,6 +67,31 @@ int xerror(Display *dpy, XErrorEvent *ee) {
 int xerrordummy(Display *dpy, XErrorEvent *ee) {
   return 0;
 }
+
+Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int size) {
+  char **list = NULL;
+  int n;
+  XTextProperty name;
+
+  if(!text || size == 0)
+    return False;
+  text[0] = '\0';
+  XGetTextProperty(dpy, w, &name, atom);
+  if(!name.nitems)
+    return False;
+  if(name.encoding == XA_STRING)
+    strncpy(text, (char *)name.value, size - 1);
+  else {
+    if(XmbTextPropertyToTextList(dpy, &name, &list, &n) >= Success && n > 0 && *list) {
+      strncpy(text, *list, size - 1);
+      XFreeStringList(list);
+    }
+  }
+  text[size - 1] = '\0';
+  XFree(name.value);
+  return True;
+}
+
 
 enum callback_map {
   onAddMonitor,
@@ -336,14 +362,13 @@ public:
     XGetTransientForHint(hw->dpy, win, &trans);
     isfloating = (trans != None);
     Client* c = new Client(win, wa->x, wa->y, wa->height, wa->width, isfloating);
-    c->updatetitle(hw->dpy);
-    c->updateclass(hw->dpy);
     // add to global window list
     hw->clients.push_back(*c);
     argv[0] = c->toNode();
 
     // call the callback in Node.js, passing the window object...
     hw->Emit(onAddWindow, 1, argv);
+    hw->updateWindowStr(win); // update title and class, emit onUpdateWindow
 
     // configure the window
     XConfigureEvent ce;
@@ -679,6 +704,49 @@ public:
 
 #include "return_values.cc"
 
+  void updateWindowStr(Window win) {
+    char name[256];
+    char klass[256];
+    char instance[256];
+    // update title
+    Atom NetWMName = XInternAtom(dpy, "_NET_WM_NAME", False);
+    if(!gettextprop(this->dpy, win, NetWMName, name, sizeof name))
+      gettextprop(this->dpy, win, XA_WM_NAME, name, sizeof name);
+    if(name[0] == '\0') /* hack to mark broken clients */
+      strcpy(name, broken);
+    // update class
+    XClassHint ch = { 0 };
+    if(XGetClassHint(this->dpy, win, &ch)) {
+      if(ch.res_class) {
+        strncpy(klass, ch.res_class, 256-1 );
+      } else {
+        strncpy(klass, broken, 256-1 );
+      }
+      klass[256-1] = 0;
+      if(ch.res_name) {
+        strncpy(instance, ch.res_name, 256-1 );
+      } else {
+        strncpy(instance, broken, 256-1 );
+      }
+      instance[256-1] = 0;
+      if(ch.res_class)
+        XFree(ch.res_class);
+      if(ch.res_name)
+        XFree(ch.res_name);
+    }
+
+    Local<Object> result = Object::New();
+    result->Set(String::NewSymbol("id"), Integer::New(win));
+    result->Set(String::NewSymbol("title"), String::New(name));
+    result->Set(String::NewSymbol("instance"), String::New(instance));
+    result->Set(String::NewSymbol("class"), String::New(klass));
+
+    // emit onUpdateWindow
+    Local<Value> argv[1];
+    argv[0] = result;
+    this->Emit(onUpdateWindow, 1, argv);
+  }
+
   static void HandleKeyPress(NodeWM* hw, XEvent *e) {
     KeySym keysym;
     XKeyEvent *ev;
@@ -711,7 +779,6 @@ public:
 
   static void HandleFocusIn(NodeWM* hw, XEvent *e) {
     XFocusChangeEvent *ev = &e->xfocus;
-    Local<Value> argv[1];
     fprintf(stdout, "HandleFocusIn for window id %li\n", ev->window);
     if(hw->selected && ev->window != hw->selected){
       // Preventing focus stealing
@@ -758,16 +825,11 @@ public:
     } else if(ev->state == PropertyDelete) {
       return; // ignore property deletes
     } else {
-      Local<Value> argv[1];
       Client* c = hw->getClientByWindow(ev->window);
       if(c) {
         Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
         if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
-          c->updatetitle(hw->dpy);
-          c->updateclass(hw->dpy);
-          argv[0] = c->toNode();
-          // call the callback in Node.js, passing the window object...
-          hw->Emit(onUpdateWindow, 1, argv);
+          hw->updateWindowStr(ev->window); // update title and class
         }
       }
     }
