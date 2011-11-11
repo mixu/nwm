@@ -30,7 +30,6 @@
 #define NIL (0)       // A name for the void pointer
 #include "event_names.h"
 
-
 using namespace node;
 using namespace v8;
 
@@ -41,11 +40,8 @@ struct Key {
   Key* next;
 };
 
-typedef struct Client Client;
-typedef struct NodeWM NodeWM;
-
 static const char broken[] = "broken";
-#include "client.h"
+
 int xerror(Display *dpy, XErrorEvent *ee) {
   if(ee->error_code == BadWindow
   || (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch)
@@ -92,7 +88,6 @@ Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int siz
   return True;
 }
 
-
 enum callback_map {
   onAddMonitor,
   onUpdateMonitor,
@@ -110,7 +105,6 @@ enum callback_map {
   onLast
 };
 
-
 class NodeWM: ObjectWrap
 {
 private:
@@ -121,16 +115,16 @@ private:
   Window selected;
   // We only track the number of monitors: that allows us to tell if a monitor has been removed or added.
   unsigned int total_monitors;
-  std::vector <Client> clients;
+  // We only track the window ids of windows, nothing else
   std::vector <Window> seen_windows;
   // screen dimensions
-  int screen, screen_width, screen_height;
+  int screen_width, screen_height;
   // callback storage
   Persistent<Function>* callbacks[onLast];
   // grabbed keys
   Key* keys;
   unsigned int numlockmask;
-
+  ev_io watcher;
 public:
 
   static Persistent<FunctionTemplate> s_ct;
@@ -138,7 +132,6 @@ public:
     HandleScope scope;
     // create a local FunctionTemplate
     Local<FunctionTemplate> t = FunctionTemplate::New(New);
-
     // initialize our template
     s_ct = Persistent<FunctionTemplate>::New(t);
     // set the field count
@@ -146,18 +139,14 @@ public:
     // set the symbol for this function
     s_ct->SetClassName(String::NewSymbol("NodeWM"));
 
-    // FUNCTIONS
-
-    // callbacks
+    // Callbacks
     NODE_SET_PROTOTYPE_METHOD(s_ct, "on", OnCallback);
-
     // API
     NODE_SET_PROTOTYPE_METHOD(s_ct, "moveWindow", MoveWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "resizeWindow", ResizeWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "focusWindow", FocusWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "killWindow", KillWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "configureWindow", ConfigureWindow);
-
     // Setting up
     NODE_SET_PROTOTYPE_METHOD(s_ct, "start", Start);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "keys", SetGrabKeys);
@@ -252,16 +241,9 @@ public:
     return True;
   }
 
-  Client* getClientByWindow(Window win) {
-    unsigned int j;
-    for(j = 0; j < this->clients.size(); j++) {
-      if(this->clients[j].getWin() == win)
-        return &this->clients[j];
-    }
-    return NULL;
-  }
-
   static void updateGeometry(NodeWM* hw) {
+    Local<Value> argv[1];
+
     if(XineramaIsActive(hw->dpy)) {
       fprintf( stdout, "Xinerama active\n");
       int i, n, nn;
@@ -291,14 +273,7 @@ public:
         //  We just emit the monitors and don't track the dimensions in the binding at all.
         for(i = 0; i < nn; i++) {
           // emit ADD MONITOR or UPDATE MONITOR here
-          Local<Value> argv[1];
-          Local<Object> result = Object::New();
-          result->Set(String::NewSymbol("id"), Integer::New(i));
-          result->Set(String::NewSymbol("x"), Integer::New(unique[i].x_org));
-          result->Set(String::NewSymbol("y"), Integer::New(unique[i].y_org));
-          result->Set(String::NewSymbol("width"), Integer::New(unique[i].width));
-          result->Set(String::NewSymbol("height"), Integer::New(unique[i].height));
-          argv[0] = result;
+          argv[0] = NodeWM::makeMonitor(i, unique[i].x_org, unique[i].y_org, unique[i].width, unique[i].height);
           fprintf( stdout, "Emit monitor %d\n", i);
           if(i >= n) {
             hw->Emit(onAddMonitor, 1, argv);
@@ -310,7 +285,6 @@ public:
         fprintf( stdout, "Less monitors available %d %d\n", n, nn);
         for(i = nn; i < n; i++) {
           // emit REMOVE MONITOR (i)
-          Local<Value> argv[1];
           argv[0] = Integer::New(i);
           hw->Emit(onRemoveMonitor, 1, argv);
           // remove monitor
@@ -323,19 +297,12 @@ public:
         hw->total_monitors++;
         // emit ADD MONITOR
         Local<Value> argv[1];
-        Local<Object> result = Object::New();
-        result->Set(String::NewSymbol("id"), Integer::New(0));
-        result->Set(String::NewSymbol("x"), Integer::New(0));
-        result->Set(String::NewSymbol("y"), Integer::New(0));
-        result->Set(String::NewSymbol("width"), Integer::New(hw->screen_width));
-        result->Set(String::NewSymbol("height"), Integer::New(hw->screen_height));
-        argv[0] = result;
+        argv[0] = NodeWM::makeMonitor(0, 0, 0, hw->screen_width, hw->screen_height);
         hw->Emit(onAddMonitor, 1, argv);
       }
     }
     // update the selected monitor on Node.js side
     int x, y;
-    Local<Value> argv[1];
     if(hw->getrootptr(&x, &y)) {
       fprintf(stdout, "EmitEnterNotify wid = %li \n", hw->root);
       Local<Object> result = Object::New();
@@ -357,18 +324,13 @@ public:
     Window trans = None;
     TryCatch try_catch;
     // onManage receives a window object
-    Local<Value> argv[1];
     Bool isfloating = false;
     // check whether the window is transient
     XGetTransientForHint(hw->dpy, win, &trans);
     isfloating = (trans != None);
-    Client* c = new Client(win, wa->x, wa->y, wa->height, wa->width, isfloating);
-    // add to global window list
-    hw->clients.push_back(*c);
-    argv[0] = c->toNode();
 
-    // call the callback in Node.js, passing the window object...
-    hw->Emit(onAddWindow, 1, argv);
+    // emit onAddWindow in Node.js
+    hw->addWindow(win, wa->x, wa->y, wa->height, wa->width, isfloating);
     hw->updateWindowStr(win); // update title and class, emit onUpdateWindow
 
     // configure the window
@@ -386,23 +348,20 @@ public:
     ce.above = None;
     ce.override_redirect = False;
 
-    (void) fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
+    fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
 
     XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
-
     // subscribe to window events
     XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     hw->GrabButtons(win, False);
 
     if(isfloating) {
-      XRaiseWindow(hw->dpy, c->getWin());
+      XRaiseWindow(hw->dpy, win);
     }
 
     // move and (finally) map the window
     XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);
     XMapWindow(hw->dpy, win);
-
-    delete c;
  }
 
   static Handle<Value> ResizeWindow(const Arguments& args) {
@@ -438,8 +397,7 @@ public:
     HandleScope scope;
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
-    Window id = args[0]->Uint32Value();
-    RealFocus(hw, id);
+    RealFocus(hw, args[0]->Uint32Value());
     return Undefined();
   }
 
@@ -462,7 +420,6 @@ public:
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     Window id = args[0]->Uint32Value();
-
     XEvent ev;
     // check whether the client supports "graceful" termination
     if(isprotodel(hw->dpy, id)) {
@@ -473,8 +430,7 @@ public:
       ev.xclient.data.l[0] = XInternAtom(hw->dpy, "WM_DELETE_WINDOW", False);
       ev.xclient.data.l[1] = CurrentTime;
       XSendEvent(hw->dpy, id, False, NoEventMask, &ev);
-    }
-    else {
+    } else {
       XGrabServer(hw->dpy);
       XSetErrorHandler(xerrordummy);
       XSetCloseDownMode(hw->dpy, DestroyAll);
@@ -642,19 +598,15 @@ public:
   }
 
   static void HandleButtonPress(NodeWM* hw, XEvent *e) {
-    XButtonPressedEvent *ev = &e->xbutton;
-    Local<Value> argv[1];
-
     fprintf(stdout, "Handle(mouse)ButtonPress\n");
-
     // fetch root_x,root_y
-
-    argv[0] = NodeWM::makeButtonPress(ev->window, ev->x, ev->y, ev->button, ev->state);
+    Local<Value> argv[1];
+    argv[0] = NodeWM::eventToNode(e);
     // call the callback in Node.js, passing the window object...
     hw->Emit(onMouseDown, 1, argv);
     fprintf(stdout, "Call cbButtonPress\n");
     // now emit the drag events
-    GrabMouseRelease(hw, ev->window);
+    GrabMouseRelease(hw, e->xbutton.window);
   }
 
   Bool getrootptr(int *x, int *y) {
@@ -666,6 +618,9 @@ public:
   }
 
   static void GrabMouseRelease(NodeWM* hw, Window id) {
+    // disabled for now
+    return;
+
     XEvent ev;
     int x, y;
     Local<Value> argv[1];
@@ -703,13 +658,82 @@ public:
     return;
   }
 
-#include "return_values.cc"
+  static Local<Object> makeMonitor(int id, int x, int y, int width, int height) {
+    Local<Object> result = Object::New();
+    result->Set(String::NewSymbol("id"), Integer::New(id));
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("width"), Integer::New(width));
+    result->Set(String::NewSymbol("height"), Integer::New(height));
+    return result;
+  }
 
-  void addWindow(Window win, int x, int y, int width, int height, Bool isfloating) {
-    fprintf( stderr, "Create client %li (x %d, y %d, w %d, h %d, float %d)\n", win, x, y, width, height, isfloating);
+  static Local<Object> makeMouseDrag(Window id, int x, int y, int movex, int movey //, unsigned int state
+  ) {
     // window object to return
     Local<Object> result = Object::New();
 
+    // read and set the window geometry
+    result->Set(String::NewSymbol("id"), Integer::New(id));
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("move_x"), Integer::New(movex));
+    result->Set(String::NewSymbol("move_y"), Integer::New(movey));
+//    result->Set(String::NewSymbol("state"), Integer::New(state));
+    return result;
+  }
+
+  static Local<Object> makeKeyPress(int x, int y, unsigned int keycode, KeySym keysym, unsigned int mod) {
+    // window object to return
+    Local<Object> result = Object::New();
+    // read and set the window geometry
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("keysym"), Integer::New(keysym));
+    result->Set(String::NewSymbol("keycode"), Integer::New(keycode));
+    result->Set(String::NewSymbol("modifier"), Integer::New(mod));
+    return result;
+  }
+
+  static Local<Object> eventToNode(XEvent *ev) {
+    Local<Object> o = Object::New();
+    switch(ev->type) {
+      case ButtonPress:
+        o->Set(String::NewSymbol("id"), Integer::New(ev->xbutton.window));
+        o->Set(String::NewSymbol("x"), Integer::New(ev->xbutton.x));
+        o->Set(String::NewSymbol("y"), Integer::New(ev->xbutton.y));
+        o->Set(String::NewSymbol("button"), Integer::New(ev->xbutton.button));
+        o->Set(String::NewSymbol("state"), Integer::New(ev->xbutton.state));
+        break;
+      case EnterNotify:
+        o->Set(String::NewSymbol("id"), Integer::New(ev->xcrossing.window));
+        o->Set(String::NewSymbol("x"), Integer::New(ev->xcrossing.x));
+        o->Set(String::NewSymbol("y"), Integer::New(ev->xcrossing.y));
+        o->Set(String::NewSymbol("x_root"), Integer::New(ev->xcrossing.x_root));
+        o->Set(String::NewSymbol("y_root"), Integer::New(ev->xcrossing.y_root));
+        break;
+      case ConfigureRequest:
+        o->Set(String::NewSymbol("id"), Integer::New(ev->xconfigurerequest.window));
+        o->Set(String::NewSymbol("x"), Integer::New(ev->xconfigurerequest.x));
+        o->Set(String::NewSymbol("y"), Integer::New(ev->xconfigurerequest.y));
+        o->Set(String::NewSymbol("width"), Integer::New(ev->xconfigurerequest.width));
+        o->Set(String::NewSymbol("height"), Integer::New(ev->xconfigurerequest.height));
+        o->Set(String::NewSymbol("above"), Integer::New(ev->xconfigurerequest.above));
+        o->Set(String::NewSymbol("detail"), Integer::New(ev->xconfigurerequest.detail));
+        o->Set(String::NewSymbol("value_mask"), Integer::New(ev->xconfigurerequest.value_mask));
+        break;
+    }
+    return o;
+  }
+
+  void addWindow(Window win, int x, int y, int width, int height, Bool isfloating) {
+    fprintf( stderr, "Create client %li (x %d, y %d, w %d, h %d, float %d)\n", win, x, y, width, height, isfloating);
+
+    // push the window id so we know what windows we've seen
+    this->seen_windows.push_back(win);
+
+    // window object to return
+    Local<Object> result = Object::New();
     // read and set the window geometry
     result->Set(String::NewSymbol("id"), Integer::New(win));
     result->Set(String::NewSymbol("x"), Integer::New(x));
@@ -718,6 +742,9 @@ public:
     result->Set(String::NewSymbol("width"), Integer::New(width));
     result->Set(String::NewSymbol("isfloating"), Integer::New(isfloating));
 
+    Local<Value> argv[1];
+    argv[0] = result;
+    this->Emit(onAddWindow, 1, argv);
   }
 
   void updateWindowStr(Window win) {
@@ -777,17 +804,9 @@ public:
   }
 
   static void HandleEnterNotify(NodeWM* hw, XEvent *e) {
-    XCrossingEvent *ev = &e->xcrossing;
-    // onManage receives a window object
-    fprintf(stdout, "HandleEnterNotify wid = %li \n", ev->window);
     Local<Value> argv[1];
-    Local<Object> result = Object::New();
-    result->Set(String::NewSymbol("id"), Integer::New(ev->window));
-    result->Set(String::NewSymbol("x"), Integer::New(ev->x));
-    result->Set(String::NewSymbol("y"), Integer::New(ev->y));
-    result->Set(String::NewSymbol("x_root"), Integer::New(ev->x_root));
-    result->Set(String::NewSymbol("y_root"), Integer::New(ev->y_root));
-    argv[0] = result;
+    fprintf(stdout, "HandleEnterNotify wid = %li \n", e->xcrossing.window);
+    argv[0] = NodeWM::eventToNode(e);
     // call the callback in Node.js, passing the window object...
     // Note that this also called for the root window (focus monitor)
     hw->Emit(onEnterNotify, 1, argv);
@@ -804,21 +823,6 @@ public:
       fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, hw->selected);
       RealFocus(hw, hw->selected);
     }
-  }
-
-  static void HandleUnmapNotify(NodeWM* hw, XEvent *e) {
-    Client *c;
-    XUnmapEvent *ev = &e->xunmap;
-    if((c = hw->getClientByWindow(ev->window)))
-      NodeWM::HandleRemove(hw, c, False);
-  }
-
-  static void HandleDestroyNotify(NodeWM* hw, XEvent *e) {
-    Client *c;
-    XDestroyWindowEvent *ev = &e->xdestroywindow;
-
-    if((c = hw->getClientByWindow(ev->window)))
-      NodeWM::HandleRemove(hw, c, True);
   }
 
   static void HandleConfigureNotify(NodeWM* hw, XEvent *e) {
@@ -841,31 +845,26 @@ public:
     } else if(ev->state == PropertyDelete) {
       return; // ignore property deletes
     } else {
-      Client* c = hw->getClientByWindow(ev->window);
-      if(c) {
-        Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
-        if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
-          hw->updateWindowStr(ev->window); // update title and class
-        }
+      Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
+      if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
+        hw->updateWindowStr(ev->window); // update title and class
       }
     }
   }
 
   static void HandleClientMessage(NodeWM* hw, XEvent *e) {
     XClientMessageEvent *cme = &e->xclient;
-    Client *c = hw->getClientByWindow(cme->window);
     Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
     Atom NetWMFullscreen = XInternAtom(hw->dpy, "_NET_WM_STATE_FULLSCREEN", False);
     Local<Value> argv[2];
 
-    if((c)
-    && (cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen)) {
-      argv[0] = Integer::New(c->getWin());
+    if(cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen) {
+      argv[0] = Integer::New(cme->window);
       if(cme->data.l[0]) {
         XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
                         PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
         argv[1] = Integer::New(1);
-        XRaiseWindow(hw->dpy, c->getWin());
+        XRaiseWindow(hw->dpy, cme->window);
       }
       else {
         XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
@@ -876,9 +875,8 @@ public:
     }
   }
 
-  static void HandleRemove(NodeWM* hw, Client *c, Bool destroyed) {
+  static void HandleRemove(NodeWM* hw, Window win, Bool destroyed) {
     fprintf( stdout, "HandleRemove\n");
-    Window win = c->getWin();
     // emit a remove
     Local<Value> argv[1];
     argv[0] = Integer::New(win);
@@ -893,19 +891,10 @@ public:
     }
     // remove from monitor
     fprintf( stdout, "Iterate window list to remove window from global list\n");
-    std::vector<Client>& vec = hw->clients; // use shorter name
-    std::vector<Client>::iterator iter = vec.begin();
-    iter = vec.begin();
-    while (iter != vec.end()) {
-      Window vid = iter->getWin();
-      if (vid == win) {
-        fprintf( stdout, "Perform erase as item %li is equal to needle %li.\n", vid, win);
-        iter = vec.erase(iter);
-      } else {
-        fprintf( stdout, "Not perform erase as item %li is not equal to needle %li.\n", vid, win);
-        ++iter;
-      }
-    }
+    std::vector<Window>& vec = hw->seen_windows; // use shorter name
+    std::vector<Window>::iterator newEnd = std::remove(vec.begin(), vec.end(), win);
+    vec.erase(newEnd, vec.end());
+
     fprintf( stdout, "Focusing to root window\n");
     RealFocus(hw, hw->root);
     fprintf( stdout, "Emitting rearrange\n");
@@ -914,7 +903,6 @@ public:
 
   static Handle<Value> Start(const Arguments& args) {
     HandleScope scope;
-    // extract from args.this
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     // initialize resources
@@ -930,13 +918,11 @@ public:
     XSync(hw->dpy, False);
 
     // take the default screen
-    hw->screen = DefaultScreen(hw->dpy);
-    // get the root window
-    hw->root = RootWindow(hw->dpy, hw->screen);
-
-    // get screen geometry
-    hw->screen_width = DisplayWidth(hw->dpy, hw->screen);
-    hw->screen_height = DisplayHeight(hw->dpy, hw->screen);
+    int screen = DefaultScreen(hw->dpy);
+    // get the root window and screen geometry
+    hw->root = RootWindow(hw->dpy, screen);
+    hw->screen_width = DisplayWidth(hw->dpy, screen);
+    hw->screen_height = DisplayHeight(hw->dpy, screen);
     // update monitor geometry (and create hw->monitor)
     updateGeometry(hw);
 
@@ -946,11 +932,9 @@ public:
                     |EnterWindowMask|LeaveWindowMask|StructureNotifyMask
                     |PropertyChangeMask;
     XSelectInput(hw->dpy, hw->root, wa.event_mask);
-
     GrabKeys(hw, hw->dpy, hw->root);
 
     // Scan and layout current windows
-
     unsigned int i, num;
     Window d1, d2, *wins = NULL;
     XWindowAttributes watt;
@@ -995,10 +979,9 @@ public:
   }
 
   static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents) {
-
     NodeWM* hw = static_cast<NodeWM*>(watcher->data);
-
     XEvent event;
+
     // main event loop
     while(XPending(hw->dpy)) {
       XNextEvent(hw->dpy, &event);
@@ -1006,59 +989,40 @@ public:
       // handle event internally --> calls Node if necessary
       switch (event.type) {
         case ButtonPress:
-          {
-            NodeWM::HandleButtonPress(hw, &event);
-          }
+          NodeWM::HandleButtonPress(hw, &event);
           break;
         case ClientMessage:
           NodeWM::HandleClientMessage(hw, &event);
           break;
         case ConfigureRequest:
           {
-            XConfigureRequestEvent *ev = &event.xconfigurerequest;
-            // TODO:
             // dwm checks for whether the window is known,
             // only unknown windows are allowed to configure themselves.
-
-            // We should trigger the Node callback, passing:
-            // window id, x, y, width, height, border_width and detail
-
             Local<Value> argv[1];
-            Local<Object> result = Object::New();
-            result->Set(String::NewSymbol("id"), Integer::New(ev->window));
-            result->Set(String::NewSymbol("x"), Integer::New(ev->x));
-            result->Set(String::NewSymbol("y"), Integer::New(ev->y));
-            result->Set(String::NewSymbol("width"), Integer::New(ev->width));
-            result->Set(String::NewSymbol("height"), Integer::New(ev->height));
-            result->Set(String::NewSymbol("above"), Integer::New(ev->above));
-            result->Set(String::NewSymbol("detail"), Integer::New(ev->detail));
-            result->Set(String::NewSymbol("value_mask"), Integer::New(ev->value_mask));
-            argv[0] = result;
-            hw->Emit(onConfigureRequest, 1, argv);
-
+            argv[0] = NodeWM::eventToNode(&event);
             // Node should call AllowReconfigure()
             // or ConfigureNotify() + Move/Resize etc.
+            hw->Emit(onConfigureRequest, 1, argv);
+
           }
           break;
         case ConfigureNotify:
             NodeWM::HandleConfigureNotify(hw, &event);
             break;
         case DestroyNotify:
-            NodeWM::HandleDestroyNotify(hw, &event);
-            break;
+          NodeWM::HandleRemove(hw, event.xdestroywindow.window, True);
+          break;
         case EnterNotify:
-            NodeWM::HandleEnterNotify(hw, &event);
-            break;
+          NodeWM::HandleEnterNotify(hw, &event);
+          break;
 //        case Expose:
 //            break;
         case FocusIn:
-            NodeWM::HandleFocusIn(hw, &event);
-            break;
+          NodeWM::HandleFocusIn(hw, &event);
+          break;
         case KeyPress:
-          {
-            NodeWM::HandleKeyPress(hw, &event);
-          }
-            break;
+          NodeWM::HandleKeyPress(hw, &event);
+          break;
 //        case MappingNotify:
 //            break;
         case MapRequest:
@@ -1073,8 +1037,8 @@ public:
             if(wa.override_redirect)
               return;
             fprintf(stdout, "MapRequest\n");
-            Client* c = hw->getClientByWindow(ev->window);
-            if(c == NULL) {
+            bool found = (std::find(hw->seen_windows.begin(), hw->seen_windows.end(), ev->window) != hw->seen_windows.end());
+            if(!found) {
               // only map new windows
               NodeWM::HandleAdd(hw, ev->window, &wa);
               // emit a rearrange
@@ -1083,13 +1047,13 @@ public:
               fprintf(stdout, "Window is known\n");
             }
           }
-            break;
+          break;
         case PropertyNotify:
-            NodeWM::HandlePropertyNotify(hw, &event);
-            break;
+          NodeWM::HandlePropertyNotify(hw, &event);
+          break;
         case UnmapNotify:
-            NodeWM::HandleUnmapNotify(hw, &event);
-            break;
+          NodeWM::HandleRemove(hw, event.xunmap.window, False);
+          break;
         default:
           fprintf(stdout, "Did nothing with %s (%d)\n", event_names[event.type], event.type);
           break;
@@ -1097,16 +1061,13 @@ public:
     }
     return;
   }
-
-  ev_io watcher;
 };
 
 Persistent<FunctionTemplate> NodeWM::s_ct;
 
 extern "C" {
   // target for export
-  static void init (Handle<Object> target)
-  {
+  static void init (Handle<Object> target) {
     NodeWM::Init(target);
   }
 
