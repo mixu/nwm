@@ -987,10 +987,10 @@ public:
 
     // initialize and start
     XSync(hw->dpy, False);
-    // DO NOT REMOVE THIS. For some reason, OSX will segfault without it. Timing issue with EIO?
+    // DO NOT REMOVE THIS. For some reason, OSX will segfault without it. Not sure why.
     fprintf( stdout, "EIO INIT\n");
-
-    ev_io_init(&hw->watcher, EIO_RealLoop, XConnectionNumber(hw->dpy), EV_READ);
+    int fd = XConnectionNumber(hw->dpy);
+    ev_io_init(&hw->watcher, EIO_RealLoop, fd, EV_READ);
     hw->watcher.data = hw;
     ev_io_start(EV_DEFAULT_ &hw->watcher);
 
@@ -998,7 +998,7 @@ public:
   }
 
   static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents) {
-
+    fprintf( stdout, "EIO LOOP\n");
     NodeWM* hw = static_cast<NodeWM*>(watcher->data);
 
     XEvent event;
