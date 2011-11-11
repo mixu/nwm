@@ -386,7 +386,7 @@ public:
     ce.above = None;
     ce.override_redirect = False;
 
-    (void) fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
+    fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
 
     XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
 
@@ -987,6 +987,9 @@ public:
 
     // initialize and start
     XSync(hw->dpy, False);
+    // DO NOT REMOVE THIS. For some reason, OSX will segfault without it. Timing issue with EIO?
+    fprintf( stdout, "EIO INIT\n");
+
     ev_io_init(&hw->watcher, EIO_RealLoop, XConnectionNumber(hw->dpy), EV_READ);
     hw->watcher.data = hw;
     ev_io_start(EV_DEFAULT_ &hw->watcher);
