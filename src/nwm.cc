@@ -6,7 +6,6 @@
 #include <v8.h>
 #include <node.h>
 #include <ev.h>
-
 #include <vector>
 #include <algorithm>
 #include <errno.h>
@@ -26,8 +25,6 @@
 #include <X11/Xproto.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/Xinerama.h>
-
-#define NIL (0)       // A name for the void pointer
 #include "event_names.h"
 
 using namespace node;
@@ -181,7 +178,6 @@ public:
   }
 
   // EVENTS
-
   static Handle<Value> OnCallback(const Arguments& args) {
     HandleScope scope;
     // extract from args.this
@@ -314,7 +310,6 @@ public:
     }
 
     fprintf( stdout, "Done with updategeom\n");
-    return;
   }
 
   /**
@@ -323,8 +318,9 @@ public:
   static void HandleAdd(NodeWM* hw, Window win, XWindowAttributes *wa) {
     Window trans = None;
     TryCatch try_catch;
-    // onManage receives a window object
     Bool isfloating = false;
+    XConfigureEvent ce;
+
     // check whether the window is transient
     XGetTransientForHint(hw->dpy, win, &trans);
     isfloating = (trans != None);
@@ -334,8 +330,6 @@ public:
     hw->updateWindowStr(win); // update title and class, emit onUpdateWindow
 
     // configure the window
-    XConfigureEvent ce;
-
     ce.type = ConfigureNotify;
     ce.display = hw->dpy;
     ce.event = win;
@@ -655,7 +649,6 @@ public:
     } while(ev.type != ButtonRelease);
 
     XUngrabPointer(hw->dpy, CurrentTime);
-    return;
   }
 
   static Local<Object> makeMonitor(int id, int x, int y, int width, int height) {
@@ -876,21 +869,18 @@ public:
   }
 
   static void HandleRemove(NodeWM* hw, Window win, Bool destroyed) {
-    fprintf( stdout, "HandleRemove\n");
-    // emit a remove
     Local<Value> argv[1];
     argv[0] = Integer::New(win);
     fprintf( stdout, "HandleRemove - emit onRemovewindow, %li\n", win);
+    // emit a remove
     hw->Emit(onRemoveWindow, 1, argv);
     if(!destroyed) {
-      fprintf( stdout, "X11 cleanup\n");
       XGrabServer(hw->dpy);
       XUngrabButton(hw->dpy, AnyButton, AnyModifier, win);
       XSync(hw->dpy, False);
       XUngrabServer(hw->dpy);
     }
-    // remove from monitor
-    fprintf( stdout, "Iterate window list to remove window from global list\n");
+    // remove from seen list of windows
     std::vector<Window>& vec = hw->seen_windows; // use shorter name
     std::vector<Window>::iterator newEnd = std::remove(vec.begin(), vec.end(), win);
     vec.erase(newEnd, vec.end());
@@ -905,11 +895,8 @@ public:
     HandleScope scope;
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
-    // initialize resources
-    // atoms
-
     // open the display
-    if ( ( hw->dpy = XOpenDisplay(NIL) ) == NULL ) {
+    if ( ( hw->dpy = XOpenDisplay(NULL) ) == NULL ) {
       fprintf( stdout, "cannot connect to X server %s\n", XDisplayName(NULL));
       exit( -1 );
     }
@@ -1000,10 +987,8 @@ public:
             // only unknown windows are allowed to configure themselves.
             Local<Value> argv[1];
             argv[0] = NodeWM::eventToNode(&event);
-            // Node should call AllowReconfigure()
-            // or ConfigureNotify() + Move/Resize etc.
+            // Node should call AllowReconfigure()or ConfigureNotify() + Move/Resize etc.
             hw->Emit(onConfigureRequest, 1, argv);
-
           }
           break;
         case ConfigureNotify:
