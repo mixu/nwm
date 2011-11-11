@@ -20,7 +20,7 @@ I'm now actively using this as my primary window manager, as multi-monitor suppo
 
 # Installing
 
-You need to use a 0.4.x branch of Node for now, since the 0.5.x branch does not have libev bundled. For instance v0.4.11 works (git checkout v0.4.11 after cloning Joyent's node.js repo).
+You need to use a 0.4.x branch of Node for now, since the 0.5.x branch does not have libev bundled. For instance v0.4.12 works (git checkout v0.4.12 after cloning Joyent's node.js repo). You also want xterm, since that's the default app launched from nwm.
 
 From github:
 
@@ -30,6 +30,14 @@ You may need the libev-dev packages (e.g. "/usr/bin/ld: cannot find -lev"):
 
 - On Fedora: sudo yum install libev-devel
 - On Ubuntu: apt-get install libev-dev libev3
+- On Arch: pacman -S libev
+- On OSX:
+    - Install XQuartz
+    - brew install libev
+    - sudo brew link libev
+    - Edit ~/.xinitrc to: "/usr/bin/login -fp $USER /usr/X11/bin/xterm". This will start X11 without a window manager.
+    - Run node nwm-user-sample.js manually. You get the REPL, but no update events are triggered.
+    - NOTE: Does not work yet on OSX. I'm trying to figure out what's going wrong. So far, it seems to be related to libev.
 
 # Installing as a primary window manager
 
