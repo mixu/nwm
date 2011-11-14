@@ -157,6 +157,7 @@ public:
     NODE_SET_PROTOTYPE_METHOD(s_ct, "focusWindow", FocusWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "killWindow", KillWindow);
     NODE_SET_PROTOTYPE_METHOD(s_ct, "configureWindow", ConfigureWindow);
+    NODE_SET_PROTOTYPE_METHOD(s_ct, "notifyWindow", NotifyWindow);
 
     // Setting up
     NODE_SET_PROTOTYPE_METHOD(s_ct, "start", Start);
@@ -509,6 +510,36 @@ public:
       wc.stack_mode = detail;
       XConfigureWindow(this->dpy, win, value_mask, &wc);
   }
+
+  static Handle<Value> NotifyWindow(const Arguments& args) {
+    HandleScope scope;
+    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
+
+    hw->RealNotifyWindow(args[0]->Uint32Value(), args[1]->IntegerValue(),
+      args[2]->IntegerValue(), args[3]->IntegerValue(), args[4]->IntegerValue(),
+      args[5]->IntegerValue(), args[6]->IntegerValue(), args[7]->IntegerValue(),
+      args[8]->IntegerValue());
+    return Undefined();
+  }
+
+  void RealNotifyWindow(Window win, int x, int y, int width, int height,
+    int border_width, int above, int detail, int value_mask) {
+    XConfigureEvent ce;
+
+    ce.type = ConfigureNotify;
+    ce.display = this->dpy;
+    ce.event = win;
+    ce.window = win;
+    ce.x = x;
+    ce.y = y;
+    ce.width = width;
+    ce.height = height;
+    ce.border_width = border_width;
+    ce.above = None;
+    ce.override_redirect = False;
+    XSendEvent(this->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
+  }
+
 
   static void RealFocus(NodeWM* hw, Window win) {
     fprintf( stdout, "FocusWindow: id=%li\n", win);

@@ -134,6 +134,9 @@ NWM.prototype.events = {
       // Known windows should not be allowed to reconfigure themselves.
       // They should just be send back a ConfigureNotify() with the current info
       console.log('denying configureRequest');
+      var window = this.windows.get(id);
+      this.wm.notifyWindow(ev.id, window.x, window.y, window.width, window.height, ev.border_width,
+        ev.above, ev.detail, ev.value_mask);
     } else {
       console.log('allowing configureRequest');
       if(ev.id && this.floaters.indexOf(ev.id)) {
