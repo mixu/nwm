@@ -114,6 +114,10 @@ NWM.prototype.events = {
   fullscreen: function(id, status) {
     if(this.windows.exists(id)) {
       var window = this.windows.get(id);
+      if(!this.monitors.exists(window.monitor)) {
+        // TODO handle this error, which occurs when a win was in fullscren and then the monitor was removed, then fullscreen is toggled back
+        return;
+      }
       // use the monitor dimensions associated with the window
       var monitor = this.monitors.get(window.monitor);
       var workspace = monitor.workspaces.get(monitor.workspaces.current);
