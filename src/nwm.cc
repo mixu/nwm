@@ -840,12 +840,17 @@ public:
     XFocusChangeEvent *ev = &e->xfocus;
     fprintf(stdout, "HandleFocusIn for window id %li\n", ev->window);
     if(hw->selected && ev->window != hw->selected){
+      bool found = (std::find(hw->seen_windows.begin(), hw->seen_windows.end(), ev->window) != hw->seen_windows.end());
       // Preventing focus stealing
       // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
       // We will always revert the focus to whatever was last set by Node (e.g. enterNotify).
       // This prevents naughty applications from stealing the focus permanently.
-      fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, hw->selected);
-      RealFocus(hw, hw->selected);
+      if(found) {
+        // only revert if the change was to a top-level window that we manage
+        // For instance, FF menus would otherwise get reverted..
+        fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, hw->selected);
+        RealFocus(hw, hw->selected);
+      }
     }
   }
 
