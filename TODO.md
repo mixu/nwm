@@ -8,10 +8,6 @@ Todo:
 - Customizable mouse key bindings (C)
 - Graceful exit support (C)
 
-Simplify:
-
-- Do not store the window class, or window title in C++
-
 # Todo (Nwm.js)
 
 - Multi-monitor bug fixes:
@@ -24,6 +20,7 @@ Simplify:
 
 # Done (C++ bindings)
 
+- Do not store the window class, or window title in C++ (DONE)
 - Ignore popup windows (DONE)
 - Monitor dimension change notifications (DONE)
 - Expose window titles to JS (DONE)
