@@ -209,7 +209,9 @@ NWM.prototype.events = {
     monitor_ids.some(function(monid) {
       var monitor = self.monitors.get(monid);
       if(monitor.inside(x, y)) {
-        console.log('Change focused monitor: ', monid);
+        if(monid != self.monitors.current) {
+          console.log('Change focused monitor from', self.monitors.current, 'to', monid);
+        }
         self.monitors.current = monid;
         return true; // end iteration
       }

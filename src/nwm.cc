@@ -829,7 +829,12 @@ public:
 
   static void HandleEnterNotify(NodeWM* hw, XEvent *e) {
     Local<Value> argv[1];
+    XCrossingEvent *ev = &e->xcrossing;
     fprintf(stdout, "HandleEnterNotify wid = %li \n", e->xcrossing.window);
+    if((ev->mode != NotifyNormal || ev->detail == NotifyInferior) && ev->window != hw->root) {
+      fprintf(stdout, "Ignore EnterNotify as it is not relevant \n");
+      return;
+    }
     argv[0] = NodeWM::eventToNode(e);
     // call the callback in Node.js, passing the window object...
     // Note that this also called for the root window (focus monitor)
@@ -845,7 +850,7 @@ public:
       // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
       // We will always revert the focus to whatever was last set by Node (e.g. enterNotify).
       // This prevents naughty applications from stealing the focus permanently.
-      if(found) {
+      if(found && hw->selected != hw->root) {
         // only revert if the change was to a top-level window that we manage
         // For instance, FF menus would otherwise get reverted..
         fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, hw->selected);
@@ -908,21 +913,33 @@ public:
     Local<Value> argv[1];
     argv[0] = Integer::New(win);
     fprintf( stdout, "HandleRemove - emit onRemovewindow, %li\n", win);
-    // emit a remove
-    hw->Emit(onRemoveWindow, 1, argv);
     if(!destroyed) {
       XGrabServer(hw->dpy);
       XUngrabButton(hw->dpy, AnyButton, AnyModifier, win);
       XSync(hw->dpy, False);
       XUngrabServer(hw->dpy);
     }
+// we should ignore remove events unrelated to windows we manage!
+// otherwise stuff like FF menus will trigger rearranges and refocuses
+// which breaks them.
+    bool found = (std::find(hw->seen_windows.begin(), hw->seen_windows.end(), win) != hw->seen_windows.end());
+    if(!found) {
+      return;
+    }
+
+    // emit a remove
+    hw->Emit(onRemoveWindow, 1, argv);
     // remove from seen list of windows
     std::vector<Window>& vec = hw->seen_windows; // use shorter name
     std::vector<Window>::iterator newEnd = std::remove(vec.begin(), vec.end(), win);
     vec.erase(newEnd, vec.end());
 
-    fprintf( stdout, "Focusing to root window\n");
-    RealFocus(hw, hw->root);
+
+// Focus should actually move to the first visible window in the current
+// monitor stack.
+//
+//    fprintf( stdout, "Focusing to root window\n");
+//    RealFocus(hw, hw->root);
     fprintf( stdout, "Emitting rearrange\n");
     hw->Emit(onRearrange, 0, 0);
   }
