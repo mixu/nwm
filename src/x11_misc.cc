@@ -91,18 +91,21 @@ Bool gettextprop(Display* dpy, Window w, Atom atom, char *text, unsigned int siz
   return True;
 }
 
-void updatenumlockmask(void) {
+int updatenumlockmask(Display* dpy) {
   unsigned int i;
   int j;
   XModifierKeymap *modmap;
 
-  this->numlockmask = 0;
+  int numlockmask = 0;
+//  this->numlockmask = 0;
   modmap = XGetModifierMapping(dpy);
   for(i = 0; i < 8; i++)
     for(j = 0; j < modmap->max_keypermod; j++)
       if(modmap->modifiermap[i * modmap->max_keypermod + j] == XKeysymToKeycode(dpy, XK_Num_Lock))
-        this->numlockmask = (1 << i);
+//        this->numlockmask = (1 << i);
+          numlockmask = (1 << i);
   XFreeModifiermap(modmap);
+  return numlockmask;
 }
 
 static Bool isprotodel(Display* dpy, Window win) {
@@ -119,13 +122,13 @@ static Bool isprotodel(Display* dpy, Window win) {
   return ret;
 }
 
-static Bool SendEvent(NodeWM* hw, Window wnd, Atom proto) {
+static Bool SendEvent(Display* dpy, Window wnd, Atom proto) {
   int n;
   Atom *protocols;
   Bool exists = False;
   XEvent ev;
 
-  if(XGetWMProtocols(hw->dpy, wnd, &protocols, &n)) {
+  if(XGetWMProtocols(dpy, wnd, &protocols, &n)) {
     while(!exists && n--)
       exists = protocols[n] == proto;
     XFree(protocols);
@@ -133,20 +136,43 @@ static Bool SendEvent(NodeWM* hw, Window wnd, Atom proto) {
   if(exists) {
     ev.type = ClientMessage;
     ev.xclient.window = wnd;
-    Atom atom = XInternAtom(hw->dpy, "WM_PROTOCOLS", False);
+    Atom atom = XInternAtom(dpy, "WM_PROTOCOLS", False);
     ev.xclient.message_type = atom;
     ev.xclient.format = 32;
     ev.xclient.data.l[0] = proto;
     ev.xclient.data.l[1] = CurrentTime;
-    XSendEvent(hw->dpy, wnd, False, NoEventMask, &ev);
+    XSendEvent(dpy, wnd, False, NoEventMask, &ev);
   }
   return exists;
 }
 
-Bool getrootptr(int *x, int *y) {
+Bool getrootptr(Display* dpy, Window root, int *x, int *y) {
   int di;
   unsigned int dui;
   Window dummy;
 
-  return XQueryPointer(this->dpy, this->root, &dummy, &dummy, x, y, &di, &di, &dui);
+  return XQueryPointer(dpy, root, &dummy, &dummy, x, y, &di, &di, &dui);
 }
+
+  int grabButtons(Window wnd, Bool focused) {
+    //return updatenumlockmask();
+//    {
+//      unsigned int i;
+//      unsigned int modifiers[] = { 0, LockMask, this->numlockmask, this->numlockmask|LockMask };
+//      XUngrabButton(this->dpy, AnyButton, AnyModifier, wnd);
+// If focused, then we only grab the modifier keys. Otherwise, we grab all buttons..
+//      if(focused) {
+//        fprintf( stdout, "GRABBUTTONS - focused: true\n");
+//          for(i = 0; i < 4; i++) {
+//            XGrabButton(dpy, Button1,
+//                              Mod4Mask|ControlMask|modifiers[i],
+//                              wnd, False, (ButtonPressMask|ButtonReleaseMask),
+//                              GrabModeAsync, GrabModeSync, None, None);
+//          }
+//      } else {
+//        fprintf( stdout, "GRABBUTTONS - focused: false\n");
+//        XGrabButton(this->dpy, AnyButton, AnyModifier, wnd, False,
+//                    (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
+//      }
+//    }
+  }

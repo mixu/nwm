@@ -98,17 +98,15 @@ public:
     return Undefined();
   }
 
-  void Emit(callback_map event, int argc, Handle<Value> argv[]) {
+  void Emit(callback_map event, nwm_emit *ev) {
 
     // instead of Handle<Value> argument, we will pass a single struct that
     // represents the various event types that nwm generates
 
-    argv = NodeWM::toNode(struct);
-
     TryCatch try_catch;
     if(this->callbacks[event] != NULL) {
       Handle<Function> *callback = cb_unwrap(this->callbacks[event]);
-      (*callback)->Call(Context::GetCurrent()->Global(), argc, argv);
+      (*callback)->Call(Context::GetCurrent()->Global(), 1, ToNode(ev));
       if (try_catch.HasCaught()) {
         FatalException(try_catch);
       }
@@ -118,53 +116,67 @@ public:
   #define INT_FIELD(name, value) \
       o->Set(String::NewSymbol(#name), Integer::New(value))
 
-  static Local<Object> ToNode(XEvent *ev) {
+  static Handle<Value>* ToNode(nwm_emit *ev) {
     Local<Object> o = Object::New();
     switch(ev->type) {
-      case nwm_monitor:
-        INT_FIELD(id, id);
-        INT_FIELD(x, x);
-        INT_FIELD(y, y);
-        INT_FIELD(width, width);
-        INT_FIELD(height, height);
+      case nwm_Window:
+    result->Set(String::NewSymbol("id"), Integer::New(win));
+    result->Set(String::NewSymbol("x"), Integer::New(x));
+    result->Set(String::NewSymbol("y"), Integer::New(y));
+    result->Set(String::NewSymbol("height"), Integer::New(height));
+    result->Set(String::NewSymbol("width"), Integer::New(width));
+    result->Set(String::NewSymbol("isfloating"), Integer::New(isfloating));
+
+      case nwm_Windowtitle:
+  result->Set(String::NewSymbol("id"), Integer::New(win));
+  result->Set(String::NewSymbol("title"), String::New(name));
+  result->Set(String::NewSymbol("instance"), String::New(instance));
+  result->Set(String::NewSymbol("class"), String::New(klass));
+
+      case nwm_Monitor:
+        INT_FIELD(id, ev->monitor.id);
+        INT_FIELD(x, ev->monitor.x);
+        INT_FIELD(y, ev->monitor.y);
+        INT_FIELD(width, ev->monitor.width);
+        INT_FIELD(height, ev->monitor.height);
         break;
-      case nwm_KeyPress:
-        INT_FIELD(x, x);
-        INT_FIELD(y, y);
-        INT_FIELD(keysym, keysym);
-        INT_FIELD(keycode, keycode);
-        INT_FIELD(modifier, modifier);
+      case nwm_Keypress:
+        INT_FIELD(x, ev->keypress.x);
+        INT_FIELD(y, ev->keypress.y);
+        INT_FIELD(keysym, ev->keypress.keysym);
+        INT_FIELD(keycode, ev->keypress.keycode);
+        INT_FIELD(modifier, ev->keypress.modifier);
         break;
-      case nwm_mousedrag:
-        INT_FIELD(id, id);
-        INT_FIELD(x, x);
-        INT_FIELD(y, y);
-        INT_FIELD(move_y, move_y);
-        INT_FIELD(move_x, move_y);
+      case nwm_Mousedrag:
+        INT_FIELD(id, ev->mousedrag.id);
+        INT_FIELD(x, ev->mousedrag.x);
+        INT_FIELD(y, ev->mousedrag.y);
+        INT_FIELD(move_y, ev->mousedrag.move_y);
+        INT_FIELD(move_x, ev->mousedrag.move_x);
         break;
-      case ButtonPress:
-        INT_FIELD(id, ev->xbutton.window);
-        INT_FIELD(x, ev->xbutton.x);
-        INT_FIELD(y, ev->xbutton.y);
-        INT_FIELD(button, ev->xbutton.button);
-        INT_FIELD(state, ev->xbutton.state);
+      case nwm_ButtonPress:
+        INT_FIELD(id, ev->xev.xbutton.window);
+        INT_FIELD(x, ev->xev.xbutton.x);
+        INT_FIELD(y, ev->xev.xbutton.y);
+        INT_FIELD(button, ev->xev.xbutton.button);
+        INT_FIELD(state, ev->xev.xbutton.state);
         break;
-      case EnterNotify:
-        o->Set(String::NewSymbol("id"), Integer::New(ev->xcrossing.window));
-        o->Set(String::NewSymbol("x"), Integer::New(ev->xcrossing.x));
-        o->Set(String::NewSymbol("y"), Integer::New(ev->xcrossing.y));
-        o->Set(String::NewSymbol("x_root"), Integer::New(ev->xcrossing.x_root));
-        o->Set(String::NewSymbol("y_root"), Integer::New(ev->xcrossing.y_root));
+      case nwm_EnterNotify:
+        o->Set(String::NewSymbol("id"), Integer::New(ev->xev.xcrossing.window));
+        o->Set(String::NewSymbol("x"), Integer::New(ev->xev.xcrossing.x));
+        o->Set(String::NewSymbol("y"), Integer::New(ev->xev.xcrossing.y));
+        o->Set(String::NewSymbol("x_root"), Integer::New(ev->xev.xcrossing.x_root));
+        o->Set(String::NewSymbol("y_root"), Integer::New(ev->xev.xcrossing.y_root));
         break;
-      case ConfigureRequest:
-        o->Set(String::NewSymbol("id"), Integer::New(ev->xconfigurerequest.window));
-        o->Set(String::NewSymbol("x"), Integer::New(ev->xconfigurerequest.x));
-        o->Set(String::NewSymbol("y"), Integer::New(ev->xconfigurerequest.y));
-        o->Set(String::NewSymbol("width"), Integer::New(ev->xconfigurerequest.width));
-        o->Set(String::NewSymbol("height"), Integer::New(ev->xconfigurerequest.height));
-        o->Set(String::NewSymbol("above"), Integer::New(ev->xconfigurerequest.above));
-        o->Set(String::NewSymbol("detail"), Integer::New(ev->xconfigurerequest.detail));
-        o->Set(String::NewSymbol("value_mask"), Integer::New(ev->xconfigurerequest.value_mask));
+      case nwm_ConfigureRequest:
+        o->Set(String::NewSymbol("id"), Integer::New(ev->xev.xconfigurerequest.window));
+        o->Set(String::NewSymbol("x"), Integer::New(ev->xev.xconfigurerequest.x));
+        o->Set(String::NewSymbol("y"), Integer::New(ev->xev.xconfigurerequest.y));
+        o->Set(String::NewSymbol("width"), Integer::New(ev->xev.xconfigurerequest.width));
+        o->Set(String::NewSymbol("height"), Integer::New(ev->xev.xconfigurerequest.height));
+        o->Set(String::NewSymbol("above"), Integer::New(ev->xev.xconfigurerequest.above));
+        o->Set(String::NewSymbol("detail"), Integer::New(ev->xev.xconfigurerequest.detail));
+        o->Set(String::NewSymbol("value_mask"), Integer::New(ev->xev.xconfigurerequest.value_mask));
         break;
     }
     return o;

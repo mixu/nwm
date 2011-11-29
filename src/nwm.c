@@ -1,5 +1,3 @@
-#include <vector>
-#include <algorithm>
 #include <errno.h>
 #include <locale.h>
 #include <stdarg.h>
@@ -28,13 +26,14 @@
 // run multiple instances of a window manager anyway
 
 static void nwm_add_window(Window win, XWindowAttributes *wa);
-// OLD: static void HandleAdd(NodeWM* hw, Window win, XWindowAttributes *wa);
 static void nwm_update_window(Window win);
-static void nwm_remove_window(Window win);
+static void nwm_remove_window(Window win, Bool destroyed);
 
 static void nwm_scan_monitors();
-static void nwm_add_monitor();
-static void nwm_remove_monitor();
+void nwm_add_monitor();
+void nwm_remove_monitor();
+
+static void nwm_emit(callback_map event, nwm_event *ev);
 
 // these should go into a function dispach table indexed by the Xevent type
 static void event_buttonpress(XEvent *e);
@@ -57,41 +56,26 @@ static void event_unmapnotify(XEvent *e);
 
 static const char broken[] = "broken";
 
-struct NodeWinMan {
-  // X11
-  Display *dpy;
-  GC gc;
-  Window root;
-  Window selected;
-  // We only track the number of monitors: that allows us to tell if a monitor has been removed or added.
-  unsigned int total_monitors;
-  // We only track the window ids of windows, nothing else
-  std::vector <Window> seen_windows;
-  // screen dimensions
-  int screen_width, screen_height;
-  // grabbed keys
-  Key* keys;
-  unsigned int numlockmask;
-};
-
 static void (*handler[LASTEvent]) (XEvent *) = {
-  [ButtonPress] = buttonpress,
-  [ClientMessage] = clientmessage,
-  [ConfigureRequest] = configurerequest,
-  [ConfigureNotify] = configurenotify,
-  [DestroyNotify] = destroynotify,
-  [EnterNotify] = enternotify,
-  [Expose] = expose,
-  [FocusIn] = focusin,
-  [KeyPress] = keypress,
-  [MappingNotify] = mappingnotify,
-  [MapRequest] = maprequest,
-  [PropertyNotify] = propertynotify,
-  [UnmapNotify] = unmapnotify
+  [ButtonPress] = event_buttonpress,
+  [ClientMessage] = event_clientmessage,
+  [ConfigureRequest] = event_configurerequest,
+  [ConfigureNotify] = event_configurenotify,
+  [DestroyNotify] = event_destroynotify,
+  [EnterNotify] = event_enternotify,
+//  [Expose] = event_expose,
+  [FocusIn] = event_focusin,
+  [KeyPress] = event_keypress,
+//  [MappingNotify] = event_mappingnotify,
+  [MapRequest] = event_maprequest,
+  [PropertyNotify] = event_propertynotify,
+  [UnmapNotify] = event_unmapnotify
 };
 
+void nwm_emit(callback_map event, nwm_event *ev) {
+  // NOP until I figure out how to call Node from here...
+}
 
-static NodeWinMan nwm;
 
 int nwm_init() {
   nwm.total_monitors = 0;
@@ -99,30 +83,30 @@ int nwm_init() {
   nwm.numlockmask = 0;
 
   // open the display
-  if ( ( hw->dpy = XOpenDisplay(NULL) ) == NULL ) {
+  if ( ( nwm.dpy = XOpenDisplay(NULL) ) == NULL ) {
     fprintf( stdout, "cannot connect to X server %s\n", XDisplayName(NULL));
     exit( -1 );
   }
   // set error handler
   XSetErrorHandler(xerror);
-  XSync(hw->dpy, False);
+  XSync(nwm.dpy, False);
 
   // take the default screen
-  int screen = DefaultScreen(hw->dpy);
+  int screen = DefaultScreen(nwm.dpy);
   // get the root window and screen geometry
-  hw->root = RootWindow(hw->dpy, screen);
-  hw->screen_width = DisplayWidth(hw->dpy, screen);
-  hw->screen_height = DisplayHeight(hw->dpy, screen);
-  // update monitor geometry (and create hw->monitor)
-  updateGeometry(hw);
+  nwm.root = RootWindow(nwm.dpy, screen);
+  nwm.screen_width = DisplayWidth(nwm.dpy, screen);
+  nwm.screen_height = DisplayHeight(nwm.dpy, screen);
+  // update monitor geometry (and create nwm.monitor)
+  nwm_scan_monitors();
 
   XSetWindowAttributes wa;
   // subscribe to root window events e.g. SubstructureRedirectMask
   wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
                   |EnterWindowMask|LeaveWindowMask|StructureNotifyMask
                   |PropertyChangeMask;
-  XSelectInput(hw->dpy, hw->root, wa.event_mask);
-  GrabKeys(hw, hw->dpy, hw->root);
+  XSelectInput(nwm.dpy, nwm.root, wa.event_mask);
+  nwm_grab_keys(nwm.dpy, nwm.root);
 
   // Scan and layout current windows
   unsigned int i, num;
@@ -131,24 +115,24 @@ int nwm_init() {
   // XQueryTree() function returns the root ID, the parent window ID, a pointer to
   // the list of children windows (NULL when there are no children), and
   // the number of children in the list for the specified window.
-  if(XQueryTree(hw->dpy, hw->root, &d1, &d2, &wins, &num)) {
+  if(XQueryTree(nwm.dpy, nwm.root, &d1, &d2, &wins, &num)) {
     for(i = 0; i < num; i++) {
       // if we can't read the window attributes,
       // or the window is a popup (transient or override_redirect), skip it
-      if(!XGetWindowAttributes(hw->dpy, wins[i], &watt)
-      || watt.override_redirect || XGetTransientForHint(hw->dpy, wins[i], &d1)) {
+      if(!XGetWindowAttributes(nwm.dpy, wins[i], &watt)
+      || watt.override_redirect || XGetTransientForHint(nwm.dpy, wins[i], &d1)) {
         continue;
       }
       // visible or minimized window ("Iconic state")
       if(watt.map_state == IsViewable )//|| getstate(wins[i]) == IconicState)
-        NodeWM::HandleAdd(hw, wins[i], &watt);
+        nwm_add_window(wins[i], &watt);
     }
     for(i = 0; i < num; i++) { /* now the transients */
-      if(!XGetWindowAttributes(hw->dpy, wins[i], &watt))
+      if(!XGetWindowAttributes(nwm.dpy, wins[i], &watt))
         continue;
-      if(XGetTransientForHint(hw->dpy, wins[i], &d1)
+      if(XGetTransientForHint(nwm.dpy, wins[i], &d1)
       && (watt.map_state == IsViewable )) //|| getstate(wins[i]) == IconicState))
-        NodeWM::HandleAdd(hw, wins[i], &watt);
+        nwm_add_window(wins[i], &watt);
     }
     if(wins) {
       // To free a non-NULL children list when it is no longer needed, use XFree()
@@ -157,17 +141,17 @@ int nwm_init() {
   }
 
   // emit a rearrange
-  hw->Emit(onRearrange, 0, 0);
+  nwm_emit(onRearrange, NULL);
 
   // initialize and start
-  XSync(hw->dpy, False);
+  XSync(nwm.dpy, False);
 
   // return the connection number so the node binding can use it with libev.
-  return XConnectionNumber(hw->dpy)
+  return XConnectionNumber(nwm.dpy);
 }
 
 void nwm_empty_keys() {
-  Key* curr = hw->keys;
+  Key* curr = nwm.keys;
   Key* next;
   while(curr != NULL) {
     next = curr->next;
@@ -188,17 +172,17 @@ void nwm_add_key(Key** keys, KeySym keysym, unsigned int mod) {
   *keys = curr;
 }
 
-void nwm_grab_keys(NodeWM* hw, Display* dpy, Window root) {
-  hw->updatenumlockmask();
+void nwm_grab_keys(Display* dpy, Window root) {
+  nwm.numlockmask = updatenumlockmask(dpy);
   {
     unsigned int i;
-    unsigned int modifiers[] = { 0, LockMask, hw->numlockmask, hw->numlockmask|LockMask };
-    XUngrabKey(hw->dpy, AnyKey, AnyModifier, hw->root);
-    for(Key* curr = hw->keys; curr != NULL; curr = curr->next) {
+    unsigned int modifiers[] = { 0, LockMask, nwm.numlockmask, nwm.numlockmask|LockMask };
+    XUngrabKey(nwm.dpy, AnyKey, AnyModifier, nwm.root);
+    for(Key* curr = nwm.keys; curr != NULL; curr = curr->next) {
       fprintf( stdout, "grab key -- key: %li modifier %d \n", curr->keysym, curr->mod);
       // also grab the combinations of screen lock and num lock (as those should not matter)
       for(i = 0; i < 4; i++) {
-        XGrabKey(hw->dpy, XKeysymToKeycode(hw->dpy, curr->keysym), curr->mod | modifiers[i], hw->root, True, GrabModeAsync, GrabModeAsync);
+        XGrabKey(nwm.dpy, XKeysymToKeycode(nwm.dpy, curr->keysym), curr->mod | modifiers[i], nwm.root, True, GrabModeAsync, GrabModeAsync);
       }
     }
   }
@@ -214,12 +198,12 @@ void nwm_loop() {
   XEvent event;
 
   // main event loop
-  while(XPending(hw->dpy)) {
-    XNextEvent(hw->dpy, &event);
+  while(XPending(nwm.dpy)) {
+    XNextEvent(nwm.dpy, &event);
     fprintf(stdout, "got event %s (%d).\n", event_names[event.type], event.type);
 
-    if(handler[ev.type]) {
-      handler[ev.type](&ev); /* call handler */
+    if(handler[event.type]) {
+      handler[event.type](&event); /* call handler */
     } else {
       fprintf(stdout, "Did nothing with %s (%d)\n", event_names[event.type], event.type);
     }
@@ -228,44 +212,44 @@ void nwm_loop() {
 
 void nwm_move_window(Window win, int x, int y) {
   fprintf( stdout, "MoveWindow: id=%li x=%d y=%d \n", win, x, y);
-  XMoveWindow(hw->dpy, win, x, y);
-  XFlush(hw->dpy);
+  XMoveWindow(nwm.dpy, win, x, y);
+  XFlush(nwm.dpy);
 }
 
 void nwm_resize_window(Window win, int width, int height) {
   fprintf( stdout, "ResizeWindow: id=%li width=%d height=%d \n", win, width, height);
-  XResizeWindow(hw->dpy, win, width, height);
-  XFlush(hw->dpy);
+  XResizeWindow(nwm.dpy, win, width, height);
+  XFlush(nwm.dpy);
 }
 
 void nwm_focus_window(Window win){
   fprintf( stdout, "FocusWindow: id=%li\n", win);
-  hw->GrabButtons(win, True);
-  XSetInputFocus(hw->dpy, win, RevertToPointerRoot, CurrentTime);
-  Atom atom = XInternAtom(hw->dpy, "WM_TAKE_FOCUS", False);
-  SendEvent(hw, win, atom);
-  XFlush(hw->dpy);
-  hw->selected = win;
+  grabButtons(win, True);
+  XSetInputFocus(nwm.dpy, win, RevertToPointerRoot, CurrentTime);
+  Atom atom = XInternAtom(nwm.dpy, "WM_TAKE_FOCUS", False);
+  SendEvent(nwm.dpy, win, atom);
+  XFlush(nwm.dpy);
+  nwm.selected = win;
 }
 void nwm_kill_window(Window win) {
   XEvent ev;
   // check whether the client supports "graceful" termination
-  if(isprotodel(hw->dpy, win)) {
+  if(isprotodel(nwm.dpy, win)) {
     ev.type = ClientMessage;
     ev.xclient.window = win;
-    ev.xclient.message_type = XInternAtom(hw->dpy, "WM_PROTOCOLS", False);
+    ev.xclient.message_type = XInternAtom(nwm.dpy, "WM_PROTOCOLS", False);
     ev.xclient.format = 32;
-    ev.xclient.data.l[0] = XInternAtom(hw->dpy, "WM_DELETE_WINDOW", False);
+    ev.xclient.data.l[0] = XInternAtom(nwm.dpy, "WM_DELETE_WINDOW", False);
     ev.xclient.data.l[1] = CurrentTime;
-    XSendEvent(hw->dpy, win, False, NoEventMask, &ev);
+    XSendEvent(nwm.dpy, win, False, NoEventMask, &ev);
   } else {
-    XGrabServer(hw->dpy);
+    XGrabServer(nwm.dpy);
     XSetErrorHandler(xerrordummy);
-    XSetCloseDownMode(hw->dpy, DestroyAll);
-    XKillClient(hw->dpy, win);
-    XSync(hw->dpy, False);
+    XSetCloseDownMode(nwm.dpy, DestroyAll);
+    XKillClient(nwm.dpy, win);
+    XSync(nwm.dpy, False);
     XSetErrorHandler(xerror);
-    XUngrabServer(hw->dpy);
+    XUngrabServer(nwm.dpy);
   }
 }
 
@@ -279,7 +263,7 @@ void nwm_configure_window(Window win, int x, int y, int width, int height,
   wc.border_width = border_width;
   wc.sibling = above;
   wc.stack_mode = detail;
-  XConfigureWindow(this->dpy, win, value_mask, &wc);
+  XConfigureWindow(nwm.dpy, win, value_mask, &wc);
 }
 
 void nwm_notify_window(Window win, int x, int y, int width, int height,
@@ -287,7 +271,7 @@ void nwm_notify_window(Window win, int x, int y, int width, int height,
   XConfigureEvent ce;
 
   ce.type = ConfigureNotify;
-  ce.display = this->dpy;
+  ce.display = nwm.dpy;
   ce.event = win;
   ce.window = win;
   ce.x = x;
@@ -297,87 +281,77 @@ void nwm_notify_window(Window win, int x, int y, int width, int height,
   ce.border_width = border_width;
   ce.above = None;
   ce.override_redirect = False;
-  XSendEvent(this->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
+  XSendEvent(nwm.dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
 }
 
-static void nwm_add_window(Window win, XWindowAttributes *wa);
-  static void HandleAdd(NodeWM* hw, Window win, XWindowAttributes *wa) {
-    Window trans = None;
-    TryCatch try_catch;
-    Bool isfloating = false;
-    XConfigureEvent ce;
+void nwm_add_window(Window win, XWindowAttributes *wa) {
+  Window trans = None;
+  Bool isfloating = False;
+  XConfigureEvent ce;
+  nwm_event event_data;
 
-    // check whether the window is transient
-    XGetTransientForHint(hw->dpy, win, &trans);
-    isfloating = (trans != None);
+  // check whether the window is transient
+  XGetTransientForHint(nwm.dpy, win, &trans);
+  isfloating = (trans != None);
 
-    // emit onAddWindow in Node.js
-    hw->addWindow(win, wa->x, wa->y, wa->height, wa->width, isfloating);
-    hw->updateWindowStr(win); // update title and class, emit onUpdateWindow
+  fprintf( stderr, "Create client %li (x %d, y %d, w %d, h %d, float %d)\n", win, wa->x, wa->y, wa->width, wa->height, isfloating);
+  // emit onAddWindow in Node.js
+  event_data.type = nwm_Window;
+  event_data.window.id = win;
+  event_data.window.x = wa->x;
+  event_data.window.y = wa->y;
+  event_data.window.height = wa->height;
+  event_data.window.width = wa->width;
+  event_data.window.isfloating = isfloating;
+  nwm_emit(onAddWindow, event_data);
 
-    // configure the window
-    ce.type = ConfigureNotify;
-    ce.display = hw->dpy;
-    ce.event = win;
-    ce.window = win;
-    ce.x = wa->x;
-    ce.y = wa->y;
-    ce.width = wa->width;
-    ce.height = wa->height;
-    ce.border_width = wa->border_width;
-    ce.above = None;
-    ce.override_redirect = False;
+  // push the window id so we know what windows we've seen
+// TODO TODO TODO    this->seen_windows.push_back(win);
 
-    fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
+  nwm_update_window(win); // update title and class, emit onUpdateWindow
 
-    XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
-    // subscribe to window events
-    XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
-    hw->GrabButtons(win, False);
+  // configure the window
+  ce.type = ConfigureNotify;
+  ce.display = nwm.dpy;
+  ce.event = win;
+  ce.window = win;
+  ce.x = wa->x;
+  ce.y = wa->y;
+  ce.width = wa->width;
+  ce.height = wa->height;
+  ce.border_width = wa->border_width;
+  ce.above = None;
+  ce.override_redirect = False;
 
-    if(isfloating) {
-      XRaiseWindow(hw->dpy, win);
-    }
+  fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
 
-    // move and (finally) map the window
-    XMoveResizeWindow(hw->dpy, win, ce.x, ce.y, ce.width, ce.height);
-    XMapWindow(hw->dpy, win);
- }
-  void addWindow(Window win, int x, int y, int width, int height, Bool isfloating) {
-    fprintf( stderr, "Create client %li (x %d, y %d, w %d, h %d, float %d)\n", win, x, y, width, height, isfloating);
+  XSendEvent(nwm.dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
+  // subscribe to window events
+  XSelectInput(nwm.dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
+  grabButtons(win, False);
 
-    // push the window id so we know what windows we've seen
-    this->seen_windows.push_back(win);
-
-    // window object to return
-    Local<Object> result = Object::New();
-    // read and set the window geometry
-    result->Set(String::NewSymbol("id"), Integer::New(win));
-    result->Set(String::NewSymbol("x"), Integer::New(x));
-    result->Set(String::NewSymbol("y"), Integer::New(y));
-    result->Set(String::NewSymbol("height"), Integer::New(height));
-    result->Set(String::NewSymbol("width"), Integer::New(width));
-    result->Set(String::NewSymbol("isfloating"), Integer::New(isfloating));
-
-    Local<Value> argv[1];
-    argv[0] = result;
-    this->Emit(onAddWindow, 1, argv);
+  if(isfloating) {
+    XRaiseWindow(nwm.dpy, win);
   }
+
+  // move and (finally) map the window
+  XMoveResizeWindow(nwm.dpy, win, ce.x, ce.y, ce.width, ce.height);
+  XMapWindow(nwm.dpy, win);
 }
 
-static void nwm_update_window(Window win) {
+void nwm_update_window(Window win) {
   char name[256];
   char klass[256];
   char instance[256];
   // update title
-  Atom NetWMName = XInternAtom(dpy, "_NET_WM_NAME", False);
-  if(!gettextprop(this->dpy, win, NetWMName, name, sizeof name))
-    gettextprop(this->dpy, win, XA_WM_NAME, name, sizeof name);
+  Atom NetWMName = XInternAtom(nwm.dpy, "_NET_WM_NAME", False);
+  if(!gettextprop(nwm.dpy, win, NetWMName, name, sizeof name))
+    gettextprop(nwm.dpy, win, XA_WM_NAME, name, sizeof name);
   if(name[0] == '\0') /* hack to mark broken clients */
     strcpy(name, broken);
   // update class
   XClassHint ch = { 0 };
-  if(XGetClassHint(this->dpy, win, &ch)) {
+  if(XGetClassHint(nwm.dpy, win, &ch)) {
     if(ch.res_class) {
       strncpy(klass, ch.res_class, 256-1 );
     } else {
@@ -396,55 +370,55 @@ static void nwm_update_window(Window win) {
       XFree(ch.res_name);
   }
 
-  Local<Object> result = Object::New();
-  result->Set(String::NewSymbol("id"), Integer::New(win));
-  result->Set(String::NewSymbol("title"), String::New(name));
-  result->Set(String::NewSymbol("instance"), String::New(instance));
-  result->Set(String::NewSymbol("class"), String::New(klass));
+  nwm_window_title event_data;
+
+  event_data.type = nwm_Windowtitle;
+  event_data.id = win;
+  event_data.title = name;
+  event_data.instance = instance;
+  event_data.klass = klass;
 
   // emit onUpdateWindow
-  Local<Value> argv[1];
-  argv[0] = result;
-  this->Emit(onUpdateWindow, 1, argv);
+  nwm_emit(onUpdateWindow, event_data);
 }
 
-static void nwm_remove_window(Window win) {
-  static void HandleRemove(NodeWM* hw, Window win, Bool destroyed) {
-    Local<Value> argv[1];
-    argv[0] = Integer::New(win);
-    fprintf( stdout, "HandleRemove - emit onRemovewindow, %li\n", win);
-    // emit a remove
-    hw->Emit(onRemoveWindow, 1, argv);
-    if(!destroyed) {
-      XGrabServer(hw->dpy);
-      XUngrabButton(hw->dpy, AnyButton, AnyModifier, win);
-      XSync(hw->dpy, False);
-      XUngrabServer(hw->dpy);
-    }
-    // remove from seen list of windows
-    std::vector<Window>& vec = hw->seen_windows; // use shorter name
-    std::vector<Window>::iterator newEnd = std::remove(vec.begin(), vec.end(), win);
-    vec.erase(newEnd, vec.end());
+void nwm_remove_window(Window win, Bool destroyed) {
+  fprintf( stdout, "HandleRemove - emit onRemovewindow, %li\n", win);
+  nwm_event event_data;
+  event_data.type = nwm_Window;
+  event_data.id = win;
 
-    fprintf( stdout, "Focusing to root window\n");
-    RealFocus(hw, hw->root);
-    fprintf( stdout, "Emitting rearrange\n");
-    hw->Emit(onRearrange, 0, 0);
+  // emit a remove
+  nwm_emit(onRemoveWindow, event_data);
+  if(!destroyed) {
+    XGrabServer(nwm.dpy);
+    XUngrabButton(nwm.dpy, AnyButton, AnyModifier, win);
+    XSync(nwm.dpy, False);
+    XUngrabServer(nwm.dpy);
   }
+  // remove from seen list of windows
+  // TODO TODO TODO std::vector<Window>& vec = nwm.seen_windows; // use shorter name
+  // TODO TODO TODO std::vector<Window>::iterator newEnd = std::remove(vec.begin(), vec.end(), win);
+  // TODO TODO TODO vec.erase(newEnd, vec.end());
+
+  fprintf( stdout, "Focusing to root window\n");
+  nwm_focus_window(nwm.root);
+  fprintf( stdout, "Emitting rearrange\n");
+  nwm_emit(onRearrange, NULL);
 }
 
 
 static void nwm_scan_monitors() {
   Local<Value> argv[1];
 
-  if(XineramaIsActive(hw->dpy)) {
+  if(XineramaIsActive(nwm.dpy)) {
     fprintf( stdout, "Xinerama active\n");
     int i, n, nn;
     unsigned int j;
-    XineramaScreenInfo *info = XineramaQueryScreens(hw->dpy, &nn);
+    XineramaScreenInfo *info = XineramaQueryScreens(nwm.dpy, &nn);
     XineramaScreenInfo *unique = NULL;
 
-    n = hw->total_monitors;
+    n = nwm.total_monitors;
     fprintf( stdout, "Monitors known %d, monitors found %d\n", n, nn);
     /* only consider unique geometries as separate screens */
     if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
@@ -460,7 +434,7 @@ static void nwm_scan_monitors() {
       // reserve space
       for(i = 0; i < (nn - n); i++) { // new monitors available
         fprintf(stdout, "Monitor %d \n", i);
-        hw->total_monitors++;
+        nwm.total_monitors++;
       }
       // update monitor dimensions
       //  We just emit the monitors and don't track the dimensions in the binding at all.
@@ -469,9 +443,9 @@ static void nwm_scan_monitors() {
         argv[0] = NodeWM::makeMonitor(i, unique[i].x_org, unique[i].y_org, unique[i].width, unique[i].height);
         fprintf( stdout, "Emit monitor %d\n", i);
         if(i >= n) {
-          hw->Emit(onAddMonitor, 1, argv);
+          nwm.Emit(onAddMonitor, 1, argv);
         } else {
-          hw->Emit(onUpdateMonitor, 1, argv);
+          nwm.Emit(onUpdateMonitor, 1, argv);
         }
       }
     } else { // fewer monitors available nn < n
@@ -479,76 +453,54 @@ static void nwm_scan_monitors() {
       for(i = nn; i < n; i++) {
         // emit REMOVE MONITOR (i)
         argv[0] = Integer::New(i);
-        hw->Emit(onRemoveMonitor, 1, argv);
+        nwm.Emit(onRemoveMonitor, 1, argv);
         // remove monitor
-        hw->total_monitors--;
+        nwm.total_monitors--;
       }
     }
     free(unique);
   } else {
-    if(hw->total_monitors == 0) {
-      hw->total_monitors++;
+    if(nwm.total_monitors == 0) {
+      nwm.total_monitors++;
       // emit ADD MONITOR
-      argv[0] = NodeWM::makeMonitor(0, 0, 0, hw->screen_width, hw->screen_height);
-      hw->Emit(onAddMonitor, 1, argv);
+      argv[0] = NodeWM::makeMonitor(0, 0, 0, nwm.screen_width, nwm.screen_height);
+      nwm.Emit(onAddMonitor, 1, argv);
     }
   }
   // update the selected monitor on Node.js side
   int x, y;
-  if(hw->getrootptr(&x, &y)) {
-    fprintf(stdout, "EmitEnterNotify wid = %li \n", hw->root);
+  if(nwm.getrootptr(&x, &y)) {
+    fprintf(stdout, "EmitEnterNotify wid = %li \n", nwm.root);
     Local<Object> result = Object::New();
-    result->Set(String::NewSymbol("id"), Integer::New(hw->root));
+    result->Set(String::NewSymbol("id"), Integer::New(nwm.root));
     result->Set(String::NewSymbol("x"), Integer::New(x));
     result->Set(String::NewSymbol("y"), Integer::New(y));
     argv[0] = result;
-    hw->Emit(onEnterNotify, 1, argv);
+    nwm.Emit(onEnterNotify, 1, argv);
   }
 
   fprintf( stdout, "Done with updategeom\n");
 }
 
-  void GrabButtons(Window wnd, Bool focused) {
-    this->updatenumlockmask();
-//    {
-//      unsigned int i;
-//      unsigned int modifiers[] = { 0, LockMask, this->numlockmask, this->numlockmask|LockMask };
-//      XUngrabButton(this->dpy, AnyButton, AnyModifier, wnd);
-// If focused, then we only grab the modifier keys. Otherwise, we grab all buttons..
-//      if(focused) {
-//        fprintf( stdout, "GRABBUTTONS - focused: true\n");
-//          for(i = 0; i < 4; i++) {
-//            XGrabButton(dpy, Button1,
-//                              Mod4Mask|ControlMask|modifiers[i],
-//                              wnd, False, (ButtonPressMask|ButtonReleaseMask),
-//                              GrabModeAsync, GrabModeSync, None, None);
-//          }
-//      } else {
-//        fprintf( stdout, "GRABBUTTONS - focused: false\n");
-//        XGrabButton(this->dpy, AnyButton, AnyModifier, wnd, False,
-//                    (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
-//      }
-//    }
-  }
 
-  static void GrabMouseRelease(NodeWM* hw, Window id) {
+  static void GrabMouseRelease(Window id) {
     // disabled for now
     return;
-
+/*
     XEvent ev;
     int x, y;
     Local<Value> argv[1];
 
-    if(XGrabPointer(hw->dpy, hw->root, False,
+    if(XGrabPointer(nwm.dpy, nwm.root, False,
       ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync,
-      GrabModeAsync, None, XCreateFontCursor(hw->dpy, XC_fleur), CurrentTime) != GrabSuccess) {
+      GrabModeAsync, None, XCreateFontCursor(nwm.dpy, XC_fleur), CurrentTime) != GrabSuccess) {
       return;
     }
-    if(!hw->getrootptr(&x, &y)) {
+    if(!nwm.getrootptr(&x, &y)) {
       return;
     }
     do{
-      XMaskEvent(hw->dpy, ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|SubstructureRedirectMask, &ev);
+      XMaskEvent(nwm.dpy, ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|SubstructureRedirectMask, &ev);
       switch(ev.type) {
         case ConfigureRequest:
           // handle normally
@@ -562,13 +514,13 @@ static void nwm_scan_monitors() {
         case MotionNotify:
           {
             argv[0] = NodeWM::makeMouseDrag(id, x, y, ev.xmotion.x, ev.xmotion.y); // , ev.state);
-            hw->Emit(onMouseDrag, 1, argv);
+            nwm.Emit(onMouseDrag, 1, argv);
           }
           break;
       }
     } while(ev.type != ButtonRelease);
 
-    XUngrabPointer(hw->dpy, CurrentTime);
+    XUngrabPointer(nwm.dpy, CurrentTime); */
   }
 
 static void event_buttonpress(XEvent *e) {
@@ -577,7 +529,7 @@ static void event_buttonpress(XEvent *e) {
   Local<Value> argv[1];
   argv[0] = NodeWM::eventToNode(e);
   // call the callback in Node.js, passing the window object...
-  hw->Emit(onMouseDown, 1, argv);
+  nwm.Emit(onMouseDown, 1, argv);
   fprintf(stdout, "Call cbButtonPress\n");
   // now emit the drag events
   GrabMouseRelease(hw, e->xbutton.window);
@@ -585,24 +537,24 @@ static void event_buttonpress(XEvent *e) {
 
 static void event_clientmessage(XEvent *e) {
   XClientMessageEvent *cme = &e->xclient;
-  Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
-  Atom NetWMFullscreen = XInternAtom(hw->dpy, "_NET_WM_STATE_FULLSCREEN", False);
+  Atom NetWMState = XInternAtom(nwm.dpy, "_NET_WM_STATE", False);
+  Atom NetWMFullscreen = XInternAtom(nwm.dpy, "_NET_WM_STATE_FULLSCREEN", False);
   Local<Value> argv[2];
 
   if(cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen) {
     argv[0] = Integer::New(cme->window);
     if(cme->data.l[0]) {
-      XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
+      XChangeProperty(nwm.dpy, cme->window, NetWMState, XA_ATOM, 32,
                       PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
       argv[1] = Integer::New(1);
-      XRaiseWindow(hw->dpy, cme->window);
+      XRaiseWindow(nwm.dpy, cme->window);
     }
     else {
-      XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
+      XChangeProperty(nwm.dpy, cme->window, NetWMState, XA_ATOM, 32,
                       PropModeReplace, (unsigned char*)0, 0);
       argv[1] = Integer::New(0);
     }
-    hw->Emit(onFullscreen, 2, argv);
+    nwm.Emit(onFullscreen, 2, argv);
   }
 }
 
@@ -612,18 +564,18 @@ static void event_configurerequest(XEvent *e) {
   Local<Value> argv[1];
   argv[0] = NodeWM::eventToNode(&event);
   // Node should call AllowReconfigure()or ConfigureNotify() + Move/Resize etc.
-  hw->Emit(onConfigureRequest, 1, argv);
+  nwm.Emit(onConfigureRequest, 1, argv);
 }
 
 static void event_configurenotify(XEvent *e) {
   XConfigureEvent *ev = &e->xconfigure;
 
-  if(ev->window == hw->root) {
-    hw->screen_width = ev->width;
-    hw->screen_height = ev->height;
+  if(ev->window == nwm.root) {
+    nwm.screen_width = ev->width;
+    nwm.screen_height = ev->height;
     // update monitor structures
-    updateGeometry(hw);
-    hw->Emit(onRearrange, 0, 0);
+    nwm_scan_monitors(hw);
+    nwm.Emit(onRearrange, 0, 0);
   }
 }
 
@@ -637,14 +589,14 @@ static void event_enternotify(XEvent *e) {
   argv[0] = NodeWM::eventToNode(e);
   // call the callback in Node.js, passing the window object...
   // Note that this also called for the root window (focus monitor)
-  hw->Emit(onEnterNotify, 1, argv);
+  nwm.Emit(onEnterNotify, 1, argv);
 }
 
 static void event_focusin(XEvent *e) {
   XFocusChangeEvent *ev = &e->xfocus;
   fprintf(stdout, "HandleFocusIn for window id %li\n", ev->window);
-  if(hw->selected && ev->window != hw->selected){
-    bool found = (std::find(hw->seen_windows.begin(), hw->seen_windows.end(), ev->window) != hw->seen_windows.end());
+  if(nwm.selected && ev->window != nwm.selected){
+    bool found = (std::find(nwm.seen_windows.begin(), nwm.seen_windows.end(), ev->window) != nwm.seen_windows.end());
     // Preventing focus stealing
     // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
     // We will always revert the focus to whatever was last set by Node (e.g. enterNotify).
@@ -652,8 +604,8 @@ static void event_focusin(XEvent *e) {
     if(found) {
       // only revert if the change was to a top-level window that we manage
       // For instance, FF menus would otherwise get reverted..
-      fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, hw->selected);
-      RealFocus(hw, hw->selected);
+      fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, nwm.selected);
+      RealFocus(hw, nwm.selected);
     }
   }
 }
@@ -663,31 +615,31 @@ static void event_keypress(XEvent *e) {
   XKeyEvent *ev;
 
   ev = &e->xkey;
-  keysym = XKeycodeToKeysym(hw->dpy, (KeyCode)ev->keycode, 0);
+  keysym = XKeycodeToKeysym(nwm.dpy, (KeyCode)ev->keycode, 0);
   Local<Value> argv[1];
   // we always unset numlock and LockMask since those should not matter
-  argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, keysym, (ev->state & ~(hw->numlockmask|LockMask)));
+  argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, keysym, (ev->state & ~(nwm.numlockmask|LockMask)));
   // call the callback in Node.js, passing the window object...
-  hw->Emit(onKeyPress, 1, argv);
+  nwm.Emit(onKeyPress, 1, argv);
 }
 
 static void event_maprequest(XEvent *e) {
   // read the window attrs, then add it to the managed windows...
   XWindowAttributes wa;
   XMapRequestEvent *ev = &event.xmaprequest;
-  if(!XGetWindowAttributes(hw->dpy, ev->window, &wa)) {
+  if(!XGetWindowAttributes(nwm.dpy, ev->window, &wa)) {
     fprintf(stdout, "XGetWindowAttributes failed\n");
     return;
   }
   if(wa.override_redirect)
     return;
   fprintf(stdout, "MapRequest\n");
-  bool found = (std::find(hw->seen_windows.begin(), hw->seen_windows.end(), ev->window) != hw->seen_windows.end());
+  bool found = (std::find(nwm.seen_windows.begin(), nwm.seen_windows.end(), ev->window) != nwm.seen_windows.end());
   if(!found) {
     // only map new windows
     NodeWM::HandleAdd(hw, ev->window, &wa);
     // emit a rearrange
-    hw->Emit(onRearrange, 0, 0);
+    nwm.Emit(onRearrange, 0, 0);
   } else {
     fprintf(stdout, "Window is known\n");
   }
@@ -696,14 +648,14 @@ static void event_maprequest(XEvent *e) {
 static void event_propertynotify(XEvent *e) {
   XPropertyEvent *ev = &e->xproperty;
   // could be used for tracking hints, transient status and window name
-  if((ev->window == hw->root) && (ev->atom == XA_WM_NAME)) {
+  if((ev->window == nwm.root) && (ev->atom == XA_WM_NAME)) {
     // the root window name has changed
   } else if(ev->state == PropertyDelete) {
     return; // ignore property deletes
   } else {
-    Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
+    Atom NetWMName = XInternAtom(nwm.dpy, "_NET_WM_NAME", False);
     if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
-      hw->updateWindowStr(ev->window); // update title and class
+      nwm.updateWindowStr(ev->window); // update title and class
     }
   }
 }
