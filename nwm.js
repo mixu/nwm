@@ -39,13 +39,6 @@ NWM.prototype.events = {
   addMonitor: function(monitor) {
     this.monitors.add(new Monitor(this, monitor));
     this.monitors.current = monitor.id;
-
-    // TODO:
-    // When a monitor is added, check that the x coordinates
-    // represent a continuous space.
-    // Virtualbox incorrectly reports the starting
-    // x position even when it correctly detects the w/h of the monitor
-
   },
 
   // A monitor is updated
@@ -150,7 +143,7 @@ NWM.prototype.events = {
         // If the window is floating, it should be moved and resized
         // The size should be modifiable, but the floating window should be centered
         // on the current monitor (or the monitor the floater is on, but we don't track that now)
-        var monitor = this.currentMonitor();
+        var monitor = this.monitors.get(this.monitors.current);
         ev.x = monitor.x + ev.x;
         ev.y = monitor.y + ev.y;
         if ( (ev.x + ev.width) > monitor.x + monitor.width) {
@@ -288,65 +281,6 @@ NWM.prototype.start = function(callback) {
   this.wm.start();
   if(callback) {
     callback();
-  }
-};
-
-NWM.prototype.currentMonitor = function() {
-  return this.monitors.get(this.monitors.current);
-};
-
-// Load, and watch a single file for changes.
-NWM.prototype.hotLoad = function(filename) {
-  var self = this;
-  // Load all files in the directory
-  self.require(filename);
-  // Watch the directory
-  console.log('watch', filename)
-  require('fs').watchFile(filename, function (curr, prev) {
-    if (curr.mtime.toString() !== prev.mtime.toString()) {
-      self.require(filename);
-    }
-  });
-};
-
-// Non-caching version of Node's default require()
-NWM.prototype.require = function(filename) {
-  // From lib/module.js in the Node.js core (v.0.5.3)
-  function stripBOM(content) {
-    // Remove byte order marker. This catches EF BB BF (the UTF-8 BOM)
-    // because the buffer-to-string conversion in `fs.readFileSync()`
-    // translates it to FEFF, the UTF-16 BOM.
-    if (content.charCodeAt(0) === 0xFEFF) {
-      content = content.slice(1);
-    }
-    return content;
-  }
-  function isFunction(obj) {
-    return !!(obj && obj.constructor && obj.call && obj.apply);
-  };
-  var fullname = require.resolve(filename);
-  console.log('readfile', filename, fullname)
-  // remove shebang
-  var content = stripBOM(require('fs').readFileSync(fullname, 'utf8')).replace(/^\#\!.*/, '');
-  var sandbox = { };
-  // emulate require()
-  for (var k in global) {
-    sandbox[k] = global[k];
-  }
-  sandbox.require = require;
-  sandbox.__filename = fullname;
-  sandbox.__dirname = require('path').dirname(filename);
-  sandbox.exports = {};
-  sandbox.module = sandbox;
-  sandbox.global = sandbox;
-  try {
-    require('vm').runInNewContext(content, sandbox);
-    if(sandbox.exports && isFunction(sandbox.exports)) {
-      sandbox.exports(this);
-    }
-  } catch(err) {
-    console.log('Error: running hot loaded file ', fullname, 'failed. Probably a syntax error.');
-    return;
   }
 };
 

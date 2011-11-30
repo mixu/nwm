@@ -6,6 +6,21 @@ nwm is a dynamic window manager for X written at NodeKO 2011. It uses libev to i
 
 The underlying X11 bindings are written as a Node native extension in C++/C.
 
+**News**
+
+I am using nwm as my primary window manager daily, and I run it on Ubuntu, Fedora and Arch Linux (mostly Arch).
+
+My next two goals for nwm are:
+
+1) Simplifying the C++ binding. I have already been able to eliminate ~ 400 lines of code from the naive implementation by removing things that don't need to be tracked in the binding. For instance, monitors are only represented with a single integer in the C++ binding and all other information is passed and stored in the JS window manager. Next, I want to separate it into two parts: a ~700 line C library and a ~300 line C++ binding to that library. This will improve
+
+2) Simplifying the JS binding.
+
+3) OSX support. This will take a while, since I am doing the rewrite first. The problem is, I don't quite know enough about debugging libev to figure out what's going wrong on OSX.
+
+
+
+
 I'm now actively using this as my primary window manager, as multi-monitor support is finally OK. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr. I'm looking for co-maintainers (e.g. interested in improving the nwm core, including the C++ stuff) and contributors (writing layouts and other JS code). Send pull requests :).
 
 # Major features
