@@ -120,18 +120,18 @@ public:
     Local<Object> o = Object::New();
     switch(ev->type) {
       case nwm_Window:
-    result->Set(String::NewSymbol("id"), Integer::New(win));
-    result->Set(String::NewSymbol("x"), Integer::New(x));
-    result->Set(String::NewSymbol("y"), Integer::New(y));
-    result->Set(String::NewSymbol("height"), Integer::New(height));
-    result->Set(String::NewSymbol("width"), Integer::New(width));
-    result->Set(String::NewSymbol("isfloating"), Integer::New(isfloating));
+        o->Set(String::NewSymbol("id"), Integer::New(win));
+        o->Set(String::NewSymbol("x"), Integer::New(x));
+        o->Set(String::NewSymbol("y"), Integer::New(y));
+        o->Set(String::NewSymbol("height"), Integer::New(height));
+        o->Set(String::NewSymbol("width"), Integer::New(width));
+        o->Set(String::NewSymbol("isfloating"), Integer::New(isfloating));
 
       case nwm_Windowtitle:
-  result->Set(String::NewSymbol("id"), Integer::New(win));
-  result->Set(String::NewSymbol("title"), String::New(name));
-  result->Set(String::NewSymbol("instance"), String::New(instance));
-  result->Set(String::NewSymbol("class"), String::New(klass));
+        o->Set(String::NewSymbol("id"), Integer::New(win));
+        o->Set(String::NewSymbol("title"), String::New(name));
+        o->Set(String::NewSymbol("instance"), String::New(instance));
+        o->Set(String::NewSymbol("class"), String::New(klass));
 
       case nwm_Monitor:
         INT_FIELD(id, ev->monitor.id);
@@ -162,6 +162,8 @@ public:
         INT_FIELD(state, ev->xev.xbutton.state);
         break;
       case nwm_EnterNotify:
+       // NOTE: the enternotify structure is also used with only x and y when the selected monitor is updated..
+       // that might not be needed, however, since it is not really essential to the Node WM..
         o->Set(String::NewSymbol("id"), Integer::New(ev->xev.xcrossing.window));
         o->Set(String::NewSymbol("x"), Integer::New(ev->xev.xcrossing.x));
         o->Set(String::NewSymbol("y"), Integer::New(ev->xev.xcrossing.y));

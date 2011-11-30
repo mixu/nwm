@@ -25,6 +25,7 @@
 // the nwm struct can be static, since it's not like you can
 // run multiple instances of a window manager anyway
 
+static void nwm_scan_windows();
 static void nwm_add_window(Window win, XWindowAttributes *wa);
 static void nwm_update_window(Window win);
 static void nwm_remove_window(Window win, Bool destroyed);
@@ -32,6 +33,7 @@ static void nwm_remove_window(Window win, Bool destroyed);
 static void nwm_scan_monitors();
 void nwm_add_monitor();
 void nwm_remove_monitor();
+void nwm_update_selected_monitor();
 
 static void nwm_emit(callback_map event, nwm_event *ev);
 
@@ -48,6 +50,8 @@ static void event_maprequest(XEvent *e);
 static void event_propertynotify(XEvent *e);
 static void event_unmapnotify(XEvent *e);
 
+void GrabMouseRelease(Window id);
+
 
 // then we need another set piece, which binds Node to the nwm library
 
@@ -63,21 +67,17 @@ static void (*handler[LASTEvent]) (XEvent *) = {
   [ConfigureNotify] = event_configurenotify,
   [DestroyNotify] = event_destroynotify,
   [EnterNotify] = event_enternotify,
-//  [Expose] = event_expose,
   [FocusIn] = event_focusin,
   [KeyPress] = event_keypress,
-//  [MappingNotify] = event_mappingnotify,
   [MapRequest] = event_maprequest,
   [PropertyNotify] = event_propertynotify,
   [UnmapNotify] = event_unmapnotify
 };
 
-void nwm_emit(callback_map event, nwm_event *ev) {
-  // NOP until I figure out how to call Node from here...
-}
-
-
 int nwm_init() {
+  int screen;
+  XSetWindowAttributes wa;
+
   nwm.total_monitors = 0;
   nwm.keys = NULL;
   nwm.numlockmask = 0;
@@ -92,7 +92,7 @@ int nwm_init() {
   XSync(nwm.dpy, False);
 
   // take the default screen
-  int screen = DefaultScreen(nwm.dpy);
+  screen = DefaultScreen(nwm.dpy);
   // get the root window and screen geometry
   nwm.root = RootWindow(nwm.dpy, screen);
   nwm.screen_width = DisplayWidth(nwm.dpy, screen);
@@ -100,7 +100,6 @@ int nwm_init() {
   // update monitor geometry (and create nwm.monitor)
   nwm_scan_monitors();
 
-  XSetWindowAttributes wa;
   // subscribe to root window events e.g. SubstructureRedirectMask
   wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask|ButtonPressMask
                   |EnterWindowMask|LeaveWindowMask|StructureNotifyMask
@@ -108,7 +107,16 @@ int nwm_init() {
   XSelectInput(nwm.dpy, nwm.root, wa.event_mask);
   nwm_grab_keys(nwm.dpy, nwm.root);
 
-  // Scan and layout current windows
+  nwm_scan_windows();
+
+  // emit a rearrange
+  nwm_emit(onRearrange, NULL);
+  XSync(nwm.dpy, False);
+  // return the connection number so the node binding can use it with libev.
+  return XConnectionNumber(nwm.dpy);
+}
+
+static void nwm_scan_windows() {
   unsigned int i, num;
   Window d1, d2, *wins = NULL;
   XWindowAttributes watt;
@@ -135,20 +143,17 @@ int nwm_init() {
         nwm_add_window(wins[i], &watt);
     }
     if(wins) {
-      // To free a non-NULL children list when it is no longer needed, use XFree()
       XFree(wins);
     }
   }
-
-  // emit a rearrange
-  nwm_emit(onRearrange, NULL);
-
-  // initialize and start
-  XSync(nwm.dpy, False);
-
-  // return the connection number so the node binding can use it with libev.
-  return XConnectionNumber(nwm.dpy);
 }
+
+// replace this with a linked list implementation
+// The linked list should provide:
+// add(item)
+// some(callback) --> for writing a find function
+// remove(index)
+
 
 void nwm_empty_keys() {
   Key* curr = nwm.keys;
@@ -174,7 +179,7 @@ void nwm_add_key(Key** keys, KeySym keysym, unsigned int mod) {
 
 void nwm_grab_keys(Display* dpy, Window root) {
   nwm.numlockmask = updatenumlockmask(dpy);
-  {
+  { // update numlockmask first!
     unsigned int i;
     unsigned int modifiers[] = { 0, LockMask, nwm.numlockmask, nwm.numlockmask|LockMask };
     XUngrabKey(nwm.dpy, AnyKey, AnyModifier, nwm.root);
@@ -188,11 +193,14 @@ void nwm_grab_keys(Display* dpy, Window root) {
   }
 }
 
-
 void nwm_emit_function() {
-
+  // This function should store the emit function in nwm.
+  // That function then gets called from nwm_emit
 }
 
+void nwm_emit(callback_map event, nwm_event *ev) {
+  // NOP until I figure out how to call Node from here...
+}
 
 void nwm_loop() {
   XEvent event;
@@ -231,6 +239,7 @@ void nwm_focus_window(Window win){
   XFlush(nwm.dpy);
   nwm.selected = win;
 }
+
 void nwm_kill_window(Window win) {
   XEvent ev;
   // check whether the client supports "graceful" termination
@@ -384,7 +393,7 @@ void nwm_update_window(Window win) {
 
 void nwm_remove_window(Window win, Bool destroyed) {
   fprintf( stdout, "HandleRemove - emit onRemovewindow, %li\n", win);
-  nwm_event event_data;
+  nwm_window event_data;
   event_data.type = nwm_Window;
   event_data.id = win;
 
@@ -409,162 +418,175 @@ void nwm_remove_window(Window win, Bool destroyed) {
 
 
 static void nwm_scan_monitors() {
-  Local<Value> argv[1];
+  int i, nn;
+  unsigned int j;
+  XineramaScreenInfo *info = NULL;
+  XineramaScreenInfo *unique = NULL;
+  // no Xinerama
+  if(!XineramaIsActive(nwm.dpy) && nwm.total_monitors == 0) {
+    nwm.total_monitors++;
+    // emit ADD MONITOR
+    nwm_monitor event_data;
 
-  if(XineramaIsActive(nwm.dpy)) {
-    fprintf( stdout, "Xinerama active\n");
-    int i, n, nn;
-    unsigned int j;
-    XineramaScreenInfo *info = XineramaQueryScreens(nwm.dpy, &nn);
-    XineramaScreenInfo *unique = NULL;
+    event_data.type = nwm_Monitor;
+    event_data.id = 0;
+    event_data.x = 0;
+    event_data.y = 0;
+    event_data.width = nwm.screen_width;
+    event_data.height = nwm.screen_height;
 
-    n = nwm.total_monitors;
-    fprintf( stdout, "Monitors known %d, monitors found %d\n", n, nn);
-    /* only consider unique geometries as separate screens */
-    if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
-      fprintf( stdout, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
-      exit( -1 );
-    }
-    for(i = 0, j = 0; i < nn; i++)
-      if(isuniquegeom(unique, j, &info[i]))
-        memcpy(&unique[j++], &info[i], sizeof(XineramaScreenInfo));
-    XFree(info);
-    nn = j;
-    if(n <= nn) {
-      // reserve space
-      for(i = 0; i < (nn - n); i++) { // new monitors available
-        fprintf(stdout, "Monitor %d \n", i);
+    nwm_emit(onAddMonitor, event_data);
+    nwm_update_selected_monitor();
+    return;
+  }
+
+  // with Xinerama
+  fprintf( stdout, "Xinerama active\n");
+  info = XineramaQueryScreens(nwm.dpy, &nn);
+
+  fprintf( stdout, "Monitors known %d, monitors found %d\n", nwm.total_monitors, nn);
+  /* only consider unique geometries as separate screens */
+  if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
+    fprintf( stdout, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
+    exit( -1 );
+  }
+  for(i = 0, j = 0; i < nn; i++)
+    if(isuniquegeom(unique, j, &info[i]))
+      memcpy(&unique[j++], &info[i], sizeof(XineramaScreenInfo));
+  XFree(info);
+  nn = j;
+  if(nwm.total_monitors <= nn) {
+    // update monitor dimensions
+    //  We just emit the monitors and don't track the dimensions in the binding at all.
+    for(i = 0; i < nn; i++) {
+      nwm_monitor event_data;
+
+      event_data.type = nwm_Monitor;
+      event_data.id = i;
+      event_data.x = unique[i].x_org;
+      event_data.y = unique[i].y_org;
+      event_data.width = unique[i].width;
+      event_data.height = unique[i].height;
+
+      fprintf( stdout, "Emit monitor %d\n", i);
+      if(i >= nwm.total_monitors) {
+        nwm_emit(onAddMonitor, event_data);
         nwm.total_monitors++;
-      }
-      // update monitor dimensions
-      //  We just emit the monitors and don't track the dimensions in the binding at all.
-      for(i = 0; i < nn; i++) {
-        // emit ADD MONITOR or UPDATE MONITOR here
-        argv[0] = NodeWM::makeMonitor(i, unique[i].x_org, unique[i].y_org, unique[i].width, unique[i].height);
-        fprintf( stdout, "Emit monitor %d\n", i);
-        if(i >= n) {
-          nwm.Emit(onAddMonitor, 1, argv);
-        } else {
-          nwm.Emit(onUpdateMonitor, 1, argv);
-        }
-      }
-    } else { // fewer monitors available nn < n
-      fprintf( stdout, "Less monitors available %d %d\n", n, nn);
-      for(i = nn; i < n; i++) {
-        // emit REMOVE MONITOR (i)
-        argv[0] = Integer::New(i);
-        nwm.Emit(onRemoveMonitor, 1, argv);
-        // remove monitor
-        nwm.total_monitors--;
+      } else {
+        nwm_emit(onUpdateMonitor, event_data);
       }
     }
-    free(unique);
-  } else {
-    if(nwm.total_monitors == 0) {
-      nwm.total_monitors++;
-      // emit ADD MONITOR
-      argv[0] = NodeWM::makeMonitor(0, 0, 0, nwm.screen_width, nwm.screen_height);
-      nwm.Emit(onAddMonitor, 1, argv);
-    }
-  }
-  // update the selected monitor on Node.js side
-  int x, y;
-  if(nwm.getrootptr(&x, &y)) {
-    fprintf(stdout, "EmitEnterNotify wid = %li \n", nwm.root);
-    Local<Object> result = Object::New();
-    result->Set(String::NewSymbol("id"), Integer::New(nwm.root));
-    result->Set(String::NewSymbol("x"), Integer::New(x));
-    result->Set(String::NewSymbol("y"), Integer::New(y));
-    argv[0] = result;
-    nwm.Emit(onEnterNotify, 1, argv);
-  }
+  } else { // fewer monitors available nn < n
+    fprintf( stdout, "Fewer monitors available %d %d\n", nwm.total_monitors, nn);
+    for(i = nn; i < nwm.total_monitors; i++) {
+      // emit REMOVE MONITOR (i)
+      nwm_monitor event_data;
 
-  fprintf( stdout, "Done with updategeom\n");
+      event_data.type = nwm_Monitor;
+      event_data.id = i;
+      nwm_emit(onRemoveMonitor, event_data);
+      // remove monitor
+      nwm.total_monitors--;
+    }
+  }
+  free(unique);
+  nwm_update_selected_monitor();
 }
 
 
-  static void GrabMouseRelease(Window id) {
-    // disabled for now
-    return;
-/*
-    XEvent ev;
-    int x, y;
-    Local<Value> argv[1];
+// update the selected monitor on Node.js side
+// NOTE: We can probably get rid of this altogether, since it isn't essential.
+// Node will keep the focused monitor as the first one, but that should be OK.
+void nwm_update_selected_monitor() {
+  int x, y;
+  if(getrootptr(nwm.dpy, nwm.root, &x, &y)) {
+    fprintf(stdout, "EmitEnterNotify wid = %li \n", nwm.root);
+    nwm_monitor event_data;
 
-    if(XGrabPointer(nwm.dpy, nwm.root, False,
-      ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync,
-      GrabModeAsync, None, XCreateFontCursor(nwm.dpy, XC_fleur), CurrentTime) != GrabSuccess) {
-      return;
-    }
-    if(!nwm.getrootptr(&x, &y)) {
-      return;
-    }
-    do{
-      XMaskEvent(nwm.dpy, ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|SubstructureRedirectMask, &ev);
-      switch(ev.type) {
-        case ConfigureRequest:
-          // handle normally
-          break;
-        case Expose:
-          // handle normally
-          break;
-        case MapRequest:
-          // handle normally
-          break;
-        case MotionNotify:
-          {
-            argv[0] = NodeWM::makeMouseDrag(id, x, y, ev.xmotion.x, ev.xmotion.y); // , ev.state);
-            nwm.Emit(onMouseDrag, 1, argv);
-          }
-          break;
-      }
-    } while(ev.type != ButtonRelease);
+    event_data.type = nwm_EnterNotify;
+    event_data.id = nwm.root;
+    event_data.x = x;
+    event_data.y = y;
 
-    XUngrabPointer(nwm.dpy, CurrentTime); */
+    nwm_emit(onEnterNotify, event_data);
   }
+}
 
 static void event_buttonpress(XEvent *e) {
   fprintf(stdout, "Handle(mouse)ButtonPress\n");
-  // fetch root_x,root_y
+  nwm_emit(onMouseDown, e);
+  GrabMouseRelease(e->xbutton.window);
+}
+
+void GrabMouseRelease(Window id) {
+  // disabled for now
+  return;
+/*
+  XEvent ev;
+  int x, y;
   Local<Value> argv[1];
-  argv[0] = NodeWM::eventToNode(e);
-  // call the callback in Node.js, passing the window object...
-  nwm.Emit(onMouseDown, 1, argv);
-  fprintf(stdout, "Call cbButtonPress\n");
-  // now emit the drag events
-  GrabMouseRelease(hw, e->xbutton.window);
+
+  if(XGrabPointer(nwm.dpy, nwm.root, False,
+    ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync,
+    GrabModeAsync, None, XCreateFontCursor(nwm.dpy, XC_fleur), CurrentTime) != GrabSuccess) {
+    return;
+  }
+  if(!nwm.getrootptr(&x, &y)) {
+    return;
+  }
+  do{
+    XMaskEvent(nwm.dpy, ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|SubstructureRedirectMask, &ev);
+    switch(ev.type) {
+      case ConfigureRequest:
+        // handle normally
+        break;
+      case Expose:
+        // handle normally
+        break;
+      case MapRequest:
+        // handle normally
+        break;
+      case MotionNotify:
+        {
+          argv[0] = NodeWM::makeMouseDrag(id, x, y, ev.xmotion.x, ev.xmotion.y); // , ev.state);
+          nwm.Emit(onMouseDrag, 1, argv);
+        }
+        break;
+    }
+  } while(ev.type != ButtonRelease);
+
+  XUngrabPointer(nwm.dpy, CurrentTime); */
 }
 
 static void event_clientmessage(XEvent *e) {
   XClientMessageEvent *cme = &e->xclient;
   Atom NetWMState = XInternAtom(nwm.dpy, "_NET_WM_STATE", False);
   Atom NetWMFullscreen = XInternAtom(nwm.dpy, "_NET_WM_STATE_FULLSCREEN", False);
-  Local<Value> argv[2];
+  nwm_window_fullscreen event_data;
 
   if(cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen) {
-    argv[0] = Integer::New(cme->window);
+    event_data.type = nwm_Window;
+    event_data.id = cme->window;
     if(cme->data.l[0]) {
       XChangeProperty(nwm.dpy, cme->window, NetWMState, XA_ATOM, 32,
                       PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
-      argv[1] = Integer::New(1);
       XRaiseWindow(nwm.dpy, cme->window);
+      event_data.fullscreen = 1;
     }
     else {
       XChangeProperty(nwm.dpy, cme->window, NetWMState, XA_ATOM, 32,
                       PropModeReplace, (unsigned char*)0, 0);
-      argv[1] = Integer::New(0);
+      event_data.fullscreen = 0;
     }
-    nwm.Emit(onFullscreen, 2, argv);
+    nwm_emit(onFullscreen, event_data);
   }
 }
 
 static void event_configurerequest(XEvent *e) {
   // dwm checks for whether the window is known,
   // only unknown windows are allowed to configure themselves.
-  Local<Value> argv[1];
-  argv[0] = NodeWM::eventToNode(&event);
   // Node should call AllowReconfigure()or ConfigureNotify() + Move/Resize etc.
-  nwm.Emit(onConfigureRequest, 1, argv);
+  nwm_emit(onConfigureRequest, e);
 }
 
 static void event_configurenotify(XEvent *e) {
@@ -574,29 +596,26 @@ static void event_configurenotify(XEvent *e) {
     nwm.screen_width = ev->width;
     nwm.screen_height = ev->height;
     // update monitor structures
-    nwm_scan_monitors(hw);
-    nwm.Emit(onRearrange, 0, 0);
+    nwm_scan_monitors();
+    nwm_emit(onRearrange, NULL);
   }
 }
 
 static void event_destroynotify(XEvent *e) {
-  nwm_remove_window(hw, event.xdestroywindow.window, True);
+  nwm_remove_window(e->xdestroywindow.window, True);
 }
 
 static void event_enternotify(XEvent *e) {
-  Local<Value> argv[1];
   fprintf(stdout, "HandleEnterNotify wid = %li \n", e->xcrossing.window);
-  argv[0] = NodeWM::eventToNode(e);
-  // call the callback in Node.js, passing the window object...
-  // Note that this also called for the root window (focus monitor)
-  nwm.Emit(onEnterNotify, 1, argv);
+  nwm_emit(onEnterNotify, e);
 }
 
 static void event_focusin(XEvent *e) {
   XFocusChangeEvent *ev = &e->xfocus;
   fprintf(stdout, "HandleFocusIn for window id %li\n", ev->window);
   if(nwm.selected && ev->window != nwm.selected){
-    bool found = (std::find(nwm.seen_windows.begin(), nwm.seen_windows.end(), ev->window) != nwm.seen_windows.end());
+    Bool found = True;
+    // TODO TODO TODO  FIXME (std::find(nwm.seen_windows.begin(), nwm.seen_windows.end(), ev->window) != nwm.seen_windows.end());
     // Preventing focus stealing
     // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
     // We will always revert the focus to whatever was last set by Node (e.g. enterNotify).
@@ -605,7 +624,7 @@ static void event_focusin(XEvent *e) {
       // only revert if the change was to a top-level window that we manage
       // For instance, FF menus would otherwise get reverted..
       fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, nwm.selected);
-      RealFocus(hw, nwm.selected);
+      nwm_focus_window(nwm.selected);
     }
   }
 }
@@ -616,17 +635,24 @@ static void event_keypress(XEvent *e) {
 
   ev = &e->xkey;
   keysym = XKeycodeToKeysym(nwm.dpy, (KeyCode)ev->keycode, 0);
-  Local<Value> argv[1];
+
+  nwm_keypress event_data;
   // we always unset numlock and LockMask since those should not matter
-  argv[0] = NodeWM::makeKeyPress(ev->x, ev->y, ev->keycode, keysym, (ev->state & ~(nwm.numlockmask|LockMask)));
+  event_data.type = nwm_Keypress;
+  event_data.x = ev->x;
+  event_data.y = ev->y;
+  event_data.keycode = ev->keycode;
+  event_data.keysym = keysym;
+  event_data.modifier = (ev->state & ~(nwm.numlockmask|LockMask));
+
   // call the callback in Node.js, passing the window object...
-  nwm.Emit(onKeyPress, 1, argv);
+  nwm_emit(onKeyPress, event_data);
 }
 
 static void event_maprequest(XEvent *e) {
   // read the window attrs, then add it to the managed windows...
   XWindowAttributes wa;
-  XMapRequestEvent *ev = &event.xmaprequest;
+  XMapRequestEvent *ev = &e->xmaprequest;
   if(!XGetWindowAttributes(nwm.dpy, ev->window, &wa)) {
     fprintf(stdout, "XGetWindowAttributes failed\n");
     return;
@@ -634,12 +660,13 @@ static void event_maprequest(XEvent *e) {
   if(wa.override_redirect)
     return;
   fprintf(stdout, "MapRequest\n");
-  bool found = (std::find(nwm.seen_windows.begin(), nwm.seen_windows.end(), ev->window) != nwm.seen_windows.end());
+  Bool found = True;
+  // TODO TODO TODO FIXME (std::find(nwm.seen_windows.begin(), nwm.seen_windows.end(), ev->window) != nwm.seen_windows.end());
   if(!found) {
     // only map new windows
-    NodeWM::HandleAdd(hw, ev->window, &wa);
+    nwm_add_window(ev->window, &wa);
     // emit a rearrange
-    nwm.Emit(onRearrange, 0, 0);
+    nwm_emit(onRearrange, NULL);
   } else {
     fprintf(stdout, "Window is known\n");
   }
@@ -655,11 +682,11 @@ static void event_propertynotify(XEvent *e) {
   } else {
     Atom NetWMName = XInternAtom(nwm.dpy, "_NET_WM_NAME", False);
     if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
-      nwm.updateWindowStr(ev->window); // update title and class
+      nwm_update_window(ev->window); // update title and class
     }
   }
 }
 
 static void event_unmapnotify(XEvent *e) {
-  nwm_remove_window(hw, event.xunmap.window, False);
+  nwm_remove_window(e->xunmap.window, False);
 }

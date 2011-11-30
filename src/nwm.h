@@ -131,10 +131,25 @@ typedef struct {
   int type;
   // window
   int id;
+  int fullscreen;
+} nwm_window_fullscreen;
+
+typedef struct {
+  int type;
+  // window
+  int id;
   char* title;
   char* instance;
   char* klass;
 } nwm_window_title;
+
+typedef struct {
+  int type;
+  // window
+  int id;
+  int x;
+  int y;
+} nwm_enternotify;
 
 typedef union _nwm_event {
   int type;
@@ -143,6 +158,7 @@ typedef union _nwm_event {
   nwm_monitor monitor;
   nwm_window window;
   nwm_window_title window_title;
+  nwm_enternotify enternotify;
   XEvent xev;
 } nwm_event;
 

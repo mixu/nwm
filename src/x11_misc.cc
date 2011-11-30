@@ -1,39 +1,14 @@
-static const char *event_names[] = {
-"",
-"",
-"KeyPress",
-"KeyRelease",
-"ButtonPress",
-"ButtonRelease",
-"MotionNotify",
-"EnterNotify",
-"LeaveNotify",
-"FocusIn",
-"FocusOut",
-"KeymapNotify",
-"Expose",
-"GraphicsExpose",
-"NoExpose",
-"VisibilityNotify",
-"CreateNotify",
-"DestroyNotify",
-"UnmapNotify",
-"MapNotify",
-"MapRequest",
-"ReparentNotify",
-"ConfigureNotify",
-"ConfigureRequest",
-"GravityNotify",
-"ResizeRequest",
-"CirculateNotify",
-"CirculateRequest",
-"PropertyNotify",
-"SelectionClear",
-"SelectionRequest",
-"SelectionNotify",
-"ColormapNotify",
-"ClientMessage",
-"MappingNotify" };
+static const char *event_names[] = { "", "", "KeyPress", "KeyRelease",
+  "ButtonPress", "ButtonRelease", "MotionNotify", "EnterNotify",
+  "LeaveNotify", "FocusIn", "FocusOut", "KeymapNotify",
+  "Expose", "GraphicsExpose", "NoExpose", "VisibilityNotify",
+  "CreateNotify", "DestroyNotify", "UnmapNotify",
+  "MapNotify", "MapRequest", "ReparentNotify", "ConfigureNotify",
+  "ConfigureRequest", "GravityNotify", "ResizeRequest",
+  "CirculateNotify", "CirculateRequest", "PropertyNotify",
+  "SelectionClear", "SelectionRequest", "SelectionNotify",
+  "ColormapNotify", "ClientMessage", "MappingNotify"
+};
 
 static Bool isuniquegeom(XineramaScreenInfo *unique, size_t len, XineramaScreenInfo *info) {
   unsigned int i;
@@ -154,8 +129,9 @@ Bool getrootptr(Display* dpy, Window root, int *x, int *y) {
   return XQueryPointer(dpy, root, &dummy, &dummy, x, y, &di, &di, &dui);
 }
 
-  int grabButtons(Window wnd, Bool focused) {
-    //return updatenumlockmask();
+void grabButtons(Window wnd, Bool focused) {
+  return; // TODO TODO
+  // updatenumlockmask();
 //    {
 //      unsigned int i;
 //      unsigned int modifiers[] = { 0, LockMask, this->numlockmask, this->numlockmask|LockMask };
@@ -175,4 +151,4 @@ Bool getrootptr(Display* dpy, Window root, int *x, int *y) {
 //                    (ButtonPressMask|ButtonReleaseMask), GrabModeAsync, GrabModeSync, None, None);
 //      }
 //    }
-  }
+}
