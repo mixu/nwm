@@ -7,7 +7,7 @@
 // -------
 
 // Native extension
-var X11wm = require('./build/default/nwm.node').NodeWM;
+var X11wm = require('./build/Release/nwm.node').NodeWM;
 var Collection = require('./lib/collection.js');
 var Monitor = require('./lib/monitor.js');
 var Window = require('./lib/window.js');
@@ -295,61 +295,6 @@ NWM.prototype.start = function(callback) {
 
 NWM.prototype.currentMonitor = function() {
   return this.monitors.get(this.monitors.current);
-};
-
-// Load, and watch a single file for changes.
-NWM.prototype.hotLoad = function(filename) {
-  var self = this;
-  // Load all files in the directory
-  self.require(filename);
-  // Watch the directory
-  console.log('watch', filename)
-  require('fs').watchFile(filename, function (curr, prev) {
-    if (curr.mtime.toString() !== prev.mtime.toString()) {
-      self.require(filename);
-    }
-  });
-};
-
-// Non-caching version of Node's default require()
-NWM.prototype.require = function(filename) {
-  // From lib/module.js in the Node.js core (v.0.5.3)
-  function stripBOM(content) {
-    // Remove byte order marker. This catches EF BB BF (the UTF-8 BOM)
-    // because the buffer-to-string conversion in `fs.readFileSync()`
-    // translates it to FEFF, the UTF-16 BOM.
-    if (content.charCodeAt(0) === 0xFEFF) {
-      content = content.slice(1);
-    }
-    return content;
-  }
-  function isFunction(obj) {
-    return !!(obj && obj.constructor && obj.call && obj.apply);
-  };
-  var fullname = require.resolve(filename);
-  console.log('readfile', filename, fullname)
-  // remove shebang
-  var content = stripBOM(require('fs').readFileSync(fullname, 'utf8')).replace(/^\#\!.*/, '');
-  var sandbox = { };
-  // emulate require()
-  for (var k in global) {
-    sandbox[k] = global[k];
-  }
-  sandbox.require = require;
-  sandbox.__filename = fullname;
-  sandbox.__dirname = require('path').dirname(filename);
-  sandbox.exports = {};
-  sandbox.module = sandbox;
-  sandbox.global = sandbox;
-  try {
-    require('vm').runInNewContext(content, sandbox);
-    if(sandbox.exports && isFunction(sandbox.exports)) {
-      sandbox.exports(this);
-    }
-  } catch(err) {
-    console.log('Error: running hot loaded file ', fullname, 'failed. Probably a syntax error.');
-    return;
-  }
 };
 
 if (module == require.main) {

@@ -6,11 +6,9 @@ var Xh = require('./lib/x.js');
 // instantiate nwm and configure it
 var nwm = new NWM();
 
-// LAYOUTS: add layouts from external hash/object
-nwm.hotLoad(__dirname+'/lib/layouts/tile.js');
-nwm.hotLoad(__dirname+'/lib/layouts/monocle.js');
-nwm.hotLoad(__dirname+'/lib/layouts/wide.js');
-nwm.hotLoad(__dirname+'/lib/layouts/grid.js');
+// load layouts
+var layouts = require('./lib/layouts');
+layouts.defineLayouts(nwm);
 
 // KEYBOARD SHORTCUTS
 // Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
