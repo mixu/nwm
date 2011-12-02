@@ -1,159 +1,182 @@
 // modules
-var NWM = require('./nwm.js');
-var XK = require('./lib/keysymdef.js');
-var Xh = require('./lib/x.js');
+var NWM = require('./nwm.js'),
+    XK = require('./lib/keysymdef.js'),
+    Xh = require('./lib/x.js'),
+    child_process = require('child_process');
 
 // instantiate nwm and configure it
 var nwm = new NWM();
 
 // load layouts
 var layouts = require('./lib/layouts');
-layouts.defineLayouts(nwm);
+nwm.addLayout('tile', layouts.tile);
+nwm.addLayout('monocle', layouts.monocle);
+nwm.addLayout('wide', layouts.wide);
+
+// convinience functions for writing the keyboard shortcuts
+function currentMonitor() {
+  return nwm.monitors.get(nwm.monitors.current);
+}
+
+function moveToMonitor(window, currentMonitor, otherMonitor) {
+  if (window) {
+    window.monitor = otherMonitor;
+    // set the workspace to the current workspace on that monitor
+    var other_monitor = nwm.monitors.get(window.monitor);
+    window.workspace = other_monitor.workspaces.current;
+    // rearrange both monitors
+    monitor.workspaces.get(monitor.workspaces.current).rearrange();
+    other_monitor.workspaces.get(other_monitor.workspaces.current).rearrange();
+  }
+}
+
+function resizeWorkspace(increment) {
+  var workspace = currentMonitor().currentWorkspace();
+  workspace.setMainWindowScale(workspace.getMainWindowScale() + increment);
+  workspace.rearrange();
+}
 
 // KEYBOARD SHORTCUTS
 // Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
-var baseModifier = ( process.env.DISPLAY && process.env.DISPLAY == ':1' ? Xh.Mod4Mask|Xh.ControlMask : Xh.Mod4Mask); // to make it easier to reassign the "base" modifier combination
+var baseModifier = Xh.Mod4Mask; // Win key
 
-// Workspace management keys (OK)
-[1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(function(num) {
-  var key = XK[num]; // Can't use XK.1 because it is not a valid JS expression, must use XK['1'].
-  // number keys are used to move between screens
-  nwm.addKey({ key: key, modifier: baseModifier }, function(event) {
-    var monitor = nwm.monitors.get(nwm.monitors.current);
-    monitor.go(String.fromCharCode(event.keysym));
-  });
-  // moving windows between workspaces
-  nwm.addKey({ key: key, modifier: baseModifier|Xh.ShiftMask }, function(event) {
-    var monitor = nwm.monitors.get(nwm.monitors.current);
-    monitor.focused_window && monitor.windowTo(monitor.focused_window, String.fromCharCode(event.keysym));
-  });
-});
+if ( process.env.DISPLAY && process.env.DISPLAY == ':1' ) {
+  baseModifier = Xh.Mod4Mask|Xh.ControlMask; // Win + Ctrl
+}
 
-var rainbow_index = -1;
-var rainbow_bg = [ 'DarkRed', 'salmon', 'yellow1', 'green3', 'LightSkyBlue', 'MidnightBlue', 'purple4'];
-var rainbow_fg = [ 'snow1', 'grey0', 'grey0', 'grey0', 'grey0', 'snow1', 'snow1'];
-
-// enter key is used to launch xterm (OK)
-nwm.addKey({ key: XK.Return, modifier: baseModifier|Xh.ShiftMask }, function(event) {
-  // run using the same env as the current process.
-  // Also, use the colors of the rainbow...
-  rainbow_index++;
-  if(!rainbow_bg[rainbow_index]) {
-    rainbow_index = 0;
+var keyboard_shortcuts = [
+  {
+    key: [1, 2, 3, 4, 5, 6, 7, 8, 9], // number keys are used to move between screens
+    callback: function(event) {
+      currentMonitor().go(String.fromCharCode(event.keysym));
+    }
+  },
+  {
+    key: [1, 2, 3, 4, 5, 6, 7, 8, 9], // with shift, move windows between workspaces
+    modifier: [ 'shift' ],
+    callback: function(event) {
+      var monitor = currentMonitor();
+      monitor.windowTo(monitor.focused_window, String.fromCharCode(event.keysym));
+    }
+  },
+  {
+    key: 'Return', // enter key launches xterm
+    modifier: [ 'shift' ],
+    callback: function(event) {
+      child_process.spawn('xterm', ['-lc'], { env: process.env });
+    }
+  },
+  {
+    key: 'c', // c key closes the current window
+    modifier: [ 'shift' ],
+    callback: function(event) {
+      var monitor = currentMonitor();
+      monitor.focused_window && nwm.wm.killWindow(monitor.focused_window);
+    }
+  },
+  {
+    key: 'space', // space switches between layout modes
+    callback: function(event) {
+      var monitor = currentMonitor();
+      var workspace = monitor.currentWorkspace();
+      workspace.layout = nwm.nextLayout(workspace.layout);
+      // monocle hides windows in the current workspace, so unhide them
+      monitor.go(monitor.workspaces.current);
+      workspace.rearrange();
+    }
+  },
+  {
+    key: ['h', 'F10'], // shrink master area
+    callback: function(event) {
+      resizeWorkspace(-5);
+    }
+  },
+  {
+    key: ['l', 'F11'], // grow master area
+    callback: function(event) {
+      resizeWorkspace(+5);
+    }
+  },
+  {
+    key: 'Tab', // tab makes the current window the main window
+    callback: function(event) {
+      var monitor = currentMonitor();
+      var workspace = monitor.currentWorkspace();
+      workspace.mainWindow = monitor.focused_window;
+      workspace.rearrange();
+    }
+  },
+  {
+    key: 'comma', // moving windows between monitors
+    modifier: [ 'shift' ],
+    callback: function(event) {
+      var monitor = currentMonitor();
+      var window = nwm.windows.get(monitor.focused_window);
+      moveToMonitor(window, monitor, nwm.monitors.next(window.monitor));
+    }
+  },
+  {
+    key: 'period', // moving windows between monitors
+    modifier: [ 'shift' ],
+    callback: function(event) {
+      var monitor = currentMonitor();
+      var window = nwm.windows.get(monitor.focused_window);
+      moveToMonitor(window, monitor, nwm.monitors.prev(window.monitor));
+    }
+  },
+  {
+    key: 'j', // moving focus
+    callback: function() {
+      var monitor = currentMonitor();
+      if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+        var previous = nwm.windows.prev(monitor.focused_window);
+        var window = nwm.windows.get(previous);
+        console.log('Current', monitor.focused_window, 'previous', window.id);
+        monitor.focused_window = window.id;
+        nwm.wm.focusWindow(window.id);
+      }
+    }
+  },
+  {
+    key: 'k', // moving focus
+    callback: function() {
+      var monitor = currentMonitor();
+      if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+        var next = nwm.windows.next(monitor.focused_window);
+        var window = nwm.windows.get(next);
+        console.log('Current', monitor.focused_window, 'next', window.id);
+        monitor.focused_window = window.id;
+        nwm.wm.focusWindow(monitor.focused_window);
+      }
+    }
+  },
+  {
+    key: 'q', // quit
+    modifier: [ 'shift' ],
+    callback: function() {
+      process.exit();
+    }
   }
-  var term = require('child_process').spawn('xterm', ['-lc',
-    '-fg', rainbow_fg[rainbow_index],
-    '-bg', rainbow_bg[rainbow_index]], { env: process.env });
-  term.on('exit', function (code) {
-    console.log('child process exited with code ', code);
-  });
-});
+];
 
-// c key is used to close a window (OK)
-nwm.addKey({ key: XK.c, modifier: baseModifier|Xh.ShiftMask }, function(event) {
-  var monitor = nwm.monitors.get(nwm.monitors.current);
-  monitor.focused_window && nwm.wm.killWindow(monitor.focused_window);
-});
-
-// space switches between layout modes (OK)
-nwm.addKey({ key: XK.space, modifier: baseModifier }, function(event) {
-  var monitor = nwm.monitors.get(nwm.monitors.current);
-  var workspace = monitor.workspaces.get(monitor.workspaces.current);
-  workspace.layout = nwm.nextLayout(workspace.layout);
-  // monocle hides windows in the current workspace, so unhide them
-  monitor.go(monitor.workspaces.current);
-  workspace.rearrange();
-});
-
-// h increases the main window size (OK)
-[XK.h, XK.F10].forEach(function(key) {
-  nwm.addKey({ key: key, modifier: baseModifier }, function(event) {
-    var monitor = nwm.monitors.get(nwm.monitors.current);
-    var workspace = monitor.workspaces.get(monitor.workspaces.current);
-    workspace.setMainWindowScale(workspace.getMainWindowScale() - 5);
-    console.log('Set main window scale', workspace.getMainWindowScale());
-    workspace.rearrange();
-  });
-});
-
-// l decreases the main window size (OK)
-[XK.l, XK.F11].forEach(function(key) {
-  nwm.addKey({ key: key, modifier: baseModifier }, function(event) {
-    var monitor = nwm.monitors.get(nwm.monitors.current);
-    var workspace = monitor.workspaces.get(monitor.workspaces.current);
-    workspace.setMainWindowScale(workspace.getMainWindowScale() + 5);
-    console.log('Set main window scale', workspace.getMainWindowScale());
-    workspace.rearrange();
-  });
-});
-
-// tab makes the current window the main window
-nwm.addKey({ key: XK.Tab, modifier: baseModifier }, function(event) {
-  var monitor = nwm.monitors.get(nwm.monitors.current);
-  var workspace = monitor.workspaces.get(monitor.workspaces.current);
-  console.log('Set main window', monitor.focused_window);
-  workspace.mainWindow = monitor.focused_window;
-  workspace.rearrange();
-});
-
-// moving windows between monitors
-nwm.addKey({ key: XK.comma, modifier: baseModifier|Xh.ShiftMask }, function(event) {
-  console.log('Current monitor is', nwm.monitors.current);
-  var monitor = nwm.monitors.get(nwm.monitors.current);
-  if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
-    var window = nwm.windows.get(monitor.focused_window);
-    console.log('Set window monitor from', window.monitor, 'to', nwm.monitors.next(window.monitor));
-    window.monitor = nwm.monitors.next(window.monitor);
-    // set the workspace to the current workspace on that monitor
-    var other_monitor = nwm.monitors.get(window.monitor);
-    window.workspace = other_monitor.workspaces.current;
-    // rearrange both monitors
-    monitor.workspaces.get(monitor.workspaces.current).rearrange();
-    other_monitor.workspaces.get(other_monitor.workspaces.current).rearrange();
+// take each of the keyboard shortcuts above and make add a key using nwm.addKey
+keyboard_shortcuts.forEach(function(shortcut) {
+  var callback = shortcut.callback;
+  var modifier = baseModifier;
+  // translate the modifier array to a X11 modifier
+  if(shortcut.modifier) {
+    (shortcut.modifier.indexOf('shift') > -1) && (modifier = modifier|Xh.ShiftMask);
+    (shortcut.modifier.indexOf('ctrl') > -1) && (modifier = modifier|Xh.ControlMask);
+  }
+  // add shortcuts
+  if(Array.isArray(shortcut.key)) {
+    shortcut.key.forEach(function(key) {
+      nwm.addKey({ key: XK[key], modifier: modifier }, callback);
+    });
+  } else {
+    nwm.addKey({ key: XK[shortcut.key], modifier: modifier }, callback);
   }
 });
-
-// moving windows between monitors
-nwm.addKey({ key: XK.period, modifier: baseModifier|Xh.ShiftMask }, function(event) {
-  console.log('Current monitor is', nwm.monitors.current);
-  var monitor = nwm.monitors.get(nwm.monitors.current);
-  if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
-    var window = nwm.windows.get(monitor.focused_window);
-    console.log('Set window monitor from', window.monitor, 'to', nwm.monitors.next(window.monitor));
-    window.monitor = nwm.monitors.prev(window.monitor);
-    // set the workspace to the current workspace on that monitor
-    var other_monitor = nwm.monitors.get(window.monitor);
-    window.workspace = other_monitor.workspaces.current;
-    // rearrange both monitors
-    monitor.workspaces.get(monitor.workspaces.current).rearrange();
-    other_monitor.workspaces.get(other_monitor.workspaces.current).rearrange();
-  }
-});
-
-// moving focus
-nwm.addKey({ key: XK.j, modifier: baseModifier }, function() {
-  var monitor = nwm.monitors.get(nwm.monitors.current);
-  if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
-    var previous = nwm.windows.prev(monitor.focused_window);
-    var window = nwm.windows.get(previous);
-    console.log('Current', monitor.focused_window, 'previous', window.id);
-    monitor.focused_window = window.id;
-    nwm.wm.focusWindow(window.id);
-  }
-});
-nwm.addKey({ key: XK.k, modifier: baseModifier }, function() {
-  var monitor = nwm.monitors.get(nwm.monitors.current);
-  if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
-    var next = nwm.windows.next(monitor.focused_window);
-    var window = nwm.windows.get(next);
-    console.log('Current', monitor.focused_window, 'next', window.id);
-    monitor.focused_window = window.id;
-    nwm.wm.focusWindow(monitor.focused_window);
-  }
-});
-
-// TODO: graceful shutdown
-nwm.addKey({ key: XK.q, modifier: baseModifier|Xh.ShiftMask }, function() {});
 
 // START
 nwm.start(function() {
