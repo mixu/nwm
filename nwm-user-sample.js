@@ -18,15 +18,15 @@ function currentMonitor() {
   return nwm.monitors.get(nwm.monitors.current);
 }
 
-function moveToMonitor(window, currentMonitor, otherMonitor) {
+function moveToMonitor(window, currentMonitor, otherMonitorId) {
   if (window) {
-    window.monitor = otherMonitor;
+    window.monitor = otherMonitorId;
     // set the workspace to the current workspace on that monitor
-    var other_monitor = nwm.monitors.get(window.monitor);
-    window.workspace = other_monitor.workspaces.current;
+    var otherMonitor = nwm.monitors.get(otherMonitorId);
+    window.workspace = otherMonitor.workspaces.current;
     // rearrange both monitors
-    monitor.workspaces.get(monitor.workspaces.current).rearrange();
-    other_monitor.workspaces.get(other_monitor.workspaces.current).rearrange();
+    currentMonitor.workspaces.get(currentMonitor.workspaces.current).rearrange();
+    otherMonitor.workspaces.get(otherMonitor.workspaces.current).rearrange();
   }
 }
 
@@ -112,7 +112,9 @@ var keyboard_shortcuts = [
     callback: function(event) {
       var monitor = currentMonitor();
       var window = nwm.windows.get(monitor.focused_window);
-      moveToMonitor(window, monitor, nwm.monitors.next(window.monitor));
+      if(window) { // empty if no windows
+        moveToMonitor(window, monitor, nwm.monitors.next(window.monitor));
+      }
     }
   },
   {
@@ -121,7 +123,9 @@ var keyboard_shortcuts = [
     callback: function(event) {
       var monitor = currentMonitor();
       var window = nwm.windows.get(monitor.focused_window);
-      moveToMonitor(window, monitor, nwm.monitors.prev(window.monitor));
+      if(window) { // empty if no windows
+        moveToMonitor(window, monitor, nwm.monitors.prev(window.monitor));
+      }
     }
   },
   {
