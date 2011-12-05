@@ -327,7 +327,7 @@ public:
     isfloating = (trans != None);
 
     // emit onAddWindow in Node.js
-    hw->addWindow(win, wa->x, wa->y, wa->height, wa->width, isfloating);
+    hw->addWindow(win, wa->x, wa->y, wa->width, wa->height, isfloating);
     hw->updateWindowStr(win); // update title and class, emit onUpdateWindow
 
     // configure the window

@@ -64,28 +64,36 @@ NWM.prototype.events = {
   // A new window is added
   addWindow: function(window) {
     if(window.id) {
-      var monitor = this.monitors.get(this.monitors.current);
-      window.workspace = monitor.workspaces.current;
+      var current_monitor = this.monitors.get(this.monitors.current);
+      window.workspace = current_monitor.workspaces.current;
       // ignore monitor number from binding as windows should open on the focused monitor
       window.monitor = this.monitors.current;
 
-      var current_monitor = this.monitors.get(this.monitors.current);
       if(current_monitor.focused_window == null) {
         current_monitor.focused_window = window.id;
       }
       // do not add floating windows
-      if(window.isfloating) {
+      if(window.isfloating
+        // do not add windows that are sized to fullscreen when created (Flash fullscreen popups..)
+        || (window.width == current_monitor.width && window.height == current_monitor.height)
+        ) {
         console.log('Ignoring floating window: ', window);
         this.floaters.push(window.id);
         return;
       }
-      var window = new Window(this, window);
+      var win = new Window(this, window);
       // windows might be placed outside the screen if the wm was terminated
-      if(window.x > monitor.width || window.y > monitor.height) {
-        window.move(1, 1);
+      if(win.x > current_monitor.width || win.y > current_monitor.height) {
+        win.move(1, 1);
       }
-      console.log('Add window', window);
-      this.windows.add(window);
+      console.log('Add window', {
+        window: window,
+        current_monitor: {
+          width: current_monitor.width,
+          height: current_monitor.height
+        }
+      });
+      this.windows.add(win);
     }
   },
 
