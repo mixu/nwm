@@ -346,6 +346,10 @@ public:
     fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
 
     XSendEvent(hw->dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
+
+    // check for fullscreen status
+    updatewindowtype(hw, win);
+
     // subscribe to window events
     XSelectInput(hw->dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
     hw->GrabButtons(win, False);
@@ -880,33 +884,78 @@ public:
       return; // ignore property deletes
     } else {
       Atom NetWMName = XInternAtom(hw->dpy, "_NET_WM_NAME", False);
+      Atom NetWMWindowType = XInternAtom(hw->dpy, "_NET_WM_WINDOW_TYPE", False);
       if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
         hw->updateWindowStr(ev->window); // update title and class
       }
+      if(ev->atom == NetWMWindowType)
+        updatewindowtype(hw, ev->window);
     }
+  }
+
+  static Atom getatomprop(NodeWM* hw, Window win, Atom prop) {
+    int di;
+    unsigned long dl;
+    unsigned char *p = NULL;
+    Atom da, atom = None;
+
+    if(XGetWindowProperty(hw->dpy, win, prop, 0L, sizeof atom, False, XA_ATOM,
+                          &da, &di, &dl, &dl, &p) == Success && p) {
+      atom = *(Atom *)p;
+      XFree(p);
+    }
+    return atom;
+  }
+
+  static void updatewindowtype(NodeWM* hw, Window win) {
+    Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
+//    Atom NetWMWindowType = XInternAtom(hw->dpy, "_NET_WM_WINDOW_TYPE", False);
+    Atom NetWMFullscreen = XInternAtom(hw->dpy, "_NET_WM_STATE_FULLSCREEN", False);
+    Atom state = getatomprop(hw, win, NetWMState);
+//    Atom wtype = getatomprop(hw, win, NetWMWindowType);
+
+    if(state == NetWMFullscreen)
+      setfullscreen(hw, win, True);
+
+// not supported yet
+//    if(wtype == netatom[NetWMWindowTypeDialog])
+//      c->isfloating = True;
   }
 
   static void HandleClientMessage(NodeWM* hw, XEvent *e) {
     XClientMessageEvent *cme = &e->xclient;
     Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
     Atom NetWMFullscreen = XInternAtom(hw->dpy, "_NET_WM_STATE_FULLSCREEN", False);
-    Local<Value> argv[2];
 
-    if(cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen) {
-      argv[0] = Integer::New(cme->window);
-      if(cme->data.l[0]) {
-        XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
-                        PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
-        argv[1] = Integer::New(1);
-        XRaiseWindow(hw->dpy, cme->window);
+    fprintf( stdout, "ClientMessage - id = %li, atom = %li, l1 = %li l2= %li netWMFS= %li\n", cme->window, cme->message_type, cme->data.l[1], cme->data.l[2], NetWMFullscreen);
+
+
+    if(cme->message_type == NetWMState) {
+      if(cme->data.l[1] == NetWMFullscreen || cme->data.l[2] == NetWMFullscreen) {
+          setfullscreen(hw, cme->window, (cme->data.l[0] == 1 /* _NET_WM_STATE_ADD    */
+                        || (cme->data.l[0] == 2 /* _NET_WM_STATE_TOGGLE */ )));
+
       }
-      else {
-        XChangeProperty(hw->dpy, cme->window, NetWMState, XA_ATOM, 32,
-                        PropModeReplace, (unsigned char*)0, 0);
-        argv[1] = Integer::New(0);
-      }
-      hw->Emit(onFullscreen, 2, argv);
     }
+  }
+
+  static void setfullscreen(NodeWM* hw, Window win, Bool isfullscreen) {
+    Atom NetWMState = XInternAtom(hw->dpy, "_NET_WM_STATE", False);
+    Atom NetWMFullscreen = XInternAtom(hw->dpy, "_NET_WM_STATE_FULLSCREEN", False);
+    Local<Value> argv[2];
+    argv[0] = Integer::New(win);
+    if(isfullscreen) {
+      XChangeProperty(hw->dpy, win, NetWMState, XA_ATOM, 32,
+                      PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
+      XRaiseWindow(hw->dpy, win);
+      argv[1] = Integer::New(1);
+    } else {
+      XChangeProperty(hw->dpy, win, NetWMState, XA_ATOM, 32,
+                      PropModeReplace, (unsigned char*)0, 0);
+      argv[1] = Integer::New(0);
+    }
+    fprintf( stdout, "Client Fullscreen- id = %li, %i \n", win, isfullscreen);
+    hw->Emit(onFullscreen, 2, argv);
   }
 
   static void HandleRemove(NodeWM* hw, Window win, Bool destroyed) {

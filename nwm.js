@@ -74,8 +74,9 @@ NWM.prototype.events = {
       }
       // do not add floating windows
       if(window.isfloating
-        // do not add windows that are sized to fullscreen when created (Flash fullscreen popups..)
-        || (window.width == current_monitor.width && window.height == current_monitor.height)
+        // do not add windows that are fixed ( min_width = max_width and min_height = max_height)
+        // We need the size info from updatesizehins to do this
+        // || (window.width == current_monitor.width && window.height == current_monitor.height)
         ) {
         console.log('Ignoring floating window: ', window);
         this.floaters.push(window.id);
@@ -120,8 +121,11 @@ NWM.prototype.events = {
 
   // When a window requests full screen mode
   fullscreen: function(id, status) {
+    console.log('Client Fullscreen', id, status);
+    console.log(id, '!! exists? ', this.windows.exists(id));
     if(this.windows.exists(id)) {
       var window = this.windows.get(id);
+      console.log(window.monitor, '!! monit exists? ', this.monitors.exists(window.monitor));
       if(!this.monitors.exists(window.monitor)) {
         // TODO handle this error, which occurs when a win was in fullscren and then the monitor was removed, then fullscreen is toggled back
         return;
@@ -130,9 +134,15 @@ NWM.prototype.events = {
       var monitor = this.monitors.get(window.monitor);
       var workspace = monitor.workspaces.get(monitor.workspaces.current);
       if(status) {
+        console.log('!! resize', { id: id, x: monitor.x, y: monitor.y, width: monitor.width, height: monitor.height });
         this.wm.moveWindow(id, monitor.x, monitor.y);
         this.wm.resizeWindow(id, monitor.width, monitor.height);
+        // we should also protect the window from being disturbed by rearranges
+        if(this.layouts['monocle']) {
+          workspace.layout = 'monocle';
+        }
       } else {
+        console.log('!! rearrange');
         workspace.rearrange();
       }
     }
