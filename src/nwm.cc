@@ -917,6 +917,7 @@ public:
     if(state == NetWMFullscreen)
       setfullscreen(hw, win, True);
 
+// also should check for _NET_WM_WINDOW_TYPE_NOTIFICATION (e.g. xfce4-notifyd windows)
 // not supported yet
 //    if(wtype == netatom[NetWMWindowTypeDialog])
 //      c->isfloating = True;

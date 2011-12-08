@@ -31,15 +31,60 @@ You may need the libev-dev packages (e.g. "/usr/bin/ld: cannot find -lev"):
 - On Fedora: sudo yum install libev-devel
 - On Ubuntu: apt-get install libev-dev libev3
 - On Arch: pacman -S libev
-- On OSX:
-    - Install XQuartz
-    - brew install libev
-    - sudo brew link libev
-    - Edit ~/.xinitrc to: "/usr/bin/login -fp $USER /usr/X11/bin/xterm". This will start X11 without a window manager.
-    - Run node nwm-user-sample.js manually. You get the REPL, but no update events are triggered.
-    - NOTE: Does not work yet on OSX. I'm trying to figure out what's going wrong. So far, it seems to be related to libev.
+- On OSX: install XQuartz, then read the section below
 
-# Installing as a primary window manager
+# Installing on OSX
+
+Set nwm as the X11 window manager:
+
+- Edit ~/.xinitrc to: "~/nwm/nwm.sh" (assuming that's where nwm is).
+- Check/fix the paths in nwm.sh and start XQartz from Applications / Utilities.
+- Check the settings under X11 / Preferences (these are just my recommendations)
+  - Input:
+    - [X] Emulate three button mouse
+    - [ ] Follow system keyboard layout
+    - [ ] Enable key equivalents under X11
+    - [X] Option keys send Alt_L and Alt_R
+  - Windows:
+    - [ ] Click through inactive windows
+    - [X] Focus follows mouse
+    - [X] Focus on new windows
+
+Fix the key bindings:
+
+Unlike on other OS's, Apple has a ton of stuff bound to the Command (infinite loop thingy) key and removing those bindings is basically impossible (e.g. Command + Shift + q is a system key combination that cannot be altered). More discussion: http://www.emacswiki.org/emacs/MetaKeyProblems
+
+To work around this, map something else to Mod4, the default modifier key used by nwm. You can either edit the baseModifier variable in nwm-user-sample.js, or:
+
+- Run xmodmap, which will show what physical keys are bound to which modifier keys. nwm uses Mod4 by default.
+- Edit ~/.xmodmap:
+
+    clear Mod1
+    clear Mod4
+    keycode 66 = Alt_L
+    keycode 69 = Alt_R
+    add Mod1 = Alt_R
+    add Mod4 = Alt_L
+
+Here, I first cleared Mod1 (which by default had both Alt keys mapped to it, then changed Mod4 to left Alt and Mod1 to right Alt). You can run xev to interactively find out what keycodes are associated with what keys.
+
+- Finally, run xmodmap ~/.xmodmap to change the keybindings (or close XQuartz and restart it). Alt + Shift + Enter now starts a new xterm instead of Meta + Shift + Enter - see the full keybindings further below.
+
+Some extras (these just make the terminal a bit better):
+
+~/.bashrc (color ls output, better prompt, import .profile):
+
+    alias ls="ls -G"
+    export PS1="[\w]$ "
+    source ~/.profile
+    cd ~
+
+~/.Xresources (colors):
+
+    XTerm*foreground: gray
+    XTerm*background: black
+
+# Installing as a primary window manager under Linux
 
 Find out what your login manager is:
 
