@@ -17,7 +17,7 @@ var Window = require('./lib/window.js');
 var NWM = function(binding) {
   // A reference to the nwm C++ X11 binding
   this.wm = (binding ? binding : new X11wm());
-  // Known layous
+  // Known layouts
   this.layouts = {};
   // Keyboard shortcut lookup
   this.shortcuts = [];

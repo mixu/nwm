@@ -1,0 +1,247 @@
+<!doctype html>
+<html>
+  <head>
+    <title>nwm - the Node Window Manager for X11</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  </head>
+  <body>
+<style>
+.win {
+  border: 1px solid gray;
+  position: absolute;
+  background-color: white;
+}
+.focus {
+  background-color: #CDE9F5;
+}
+
+</style>
+
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+<script src="../lib/layouts/tile.js"></script>
+<script src="../lib/layouts/wide.js"></script>
+<script src="../lib/layouts/grid.js"></script>
+<script src="../lib/layouts/monocle.js"></script>
+<script src="window.js"></script>
+<script src="workspace.js"></script>
+<script src="monitor.js"></script>
+<script src="nwm.js"></script>
+<script>
+
+
+
+var nwm = new NWM();
+
+$(document).ready(function() {
+
+  nwm.addMonitor({ x: 0, y: 0, width: 600, height: 400 });
+  nwm.addWindow();
+  nwm.addWindow();
+  nwm.addWindow();
+  nwm.focusWindow(nwm.windows[Math.min.apply(Math, Object.keys(nwm.windows))].id);
+  nwm.rearrange();
+});
+
+function spawn() {
+  nwm.addWindow();
+  nwm.rearrange();
+}
+
+function removeWindow() {
+  nwm.removeWindow(nwm.monitors[0].focused_window);
+  nwm.rearrange();
+}
+
+function resizeWorkspace(increment) {
+  var workspace = nwm.monitors[0].workspaces[0];
+  workspace.setMainWindowScale(workspace.getMainWindowScale() + increment);
+  workspace.rearrange();
+}
+
+function changeLayout() {
+  var workspace = nwm.monitors[0].workspaces[0];
+  workspace.layout = nwm.nextLayout(workspace.layout);
+  // monocle hides windows in the current workspace, so unhide them
+//  monitor.go(monitor.workspaces.current);
+  workspace.rearrange();
+}
+
+function focusNext() {
+  var monitor = nwm.monitors[0];
+  var current = monitor.focused_window;
+
+  var keys = Object.keys(nwm.windows);
+  var pos = keys.indexOf(current);
+  pos = (pos == -1 ? keys.indexOf(''+current) : pos);
+  // Wrap around the array
+  var next = (keys[pos+1] ? keys[pos+1] : keys[0] );
+
+  monitor.focused_window = next;
+  nwm.focusWindow(nwm.windows[next].id);
+}
+
+function focusPrev() {
+  var monitor = nwm.monitors[0];
+  var current = monitor.focused_window;
+
+  var keys = Object.keys(nwm.windows);
+  var pos = keys.indexOf(current);
+  pos = (pos == -1 ? keys.indexOf(''+current) : pos);
+  // Wrap around the array
+  var prev = (keys[pos-1] ? keys[pos-1] : keys[keys.length-1] );
+
+  monitor.focused_window = prev;
+  nwm.focusWindow(nwm.windows[prev].id);
+}
+
+function setCurrent(){
+  var monitor = nwm.monitors[0];
+  var workspace = monitor.workspaces[0];
+  workspace.mainWindow = monitor.focused_window;
+  workspace.rearrange();
+}
+
+</script>
+
+
+<div id="monitor" style="width: 601px; height: 401px;  position:relative;">
+</div>
+
+
+<table>
+  <tr>
+    <td colspan="2">
+      # Launching programs
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + Shift + Enter
+    </td>
+    <td>
+      <input type="button" value="Start xterm" onclick="spawn();">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      # Main window
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + h or Meta + F10
+    </td>
+    <td>
+      <input type="button" value="Decrease master area size" onclick="resizeWorkspace(-5);">
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + l or Meta + F11
+    </td>
+    <td>
+      <input type="button" value="Increase master area size" onclick="resizeWorkspace(+5);">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      # Switching between layouts
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + Space
+    </td>
+    <td>
+      <input type="button" value="Switch between tile, monocle, wide and grid layouts" onclick="changeLayout();">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+    # Focus
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + j
+    </td>
+    <td>
+      <input type="button" value="Focus previous window" onclick="focusPrev();">
+
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + k
+    </td>
+    <td>
+      <input type="button" value="Focus next window" onclick="focusNext();">
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + Tab
+    </td>
+    <td>
+      <input type="button" value="Sets currently focused window as main window" onclick="setCurrent();">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      # Closing windows
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + Shift + c
+    </td>
+    <td>
+      <input type="button" value="Close focused window" onclick="removeWindow();">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      # Workspaces
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + [1..n]
+    </td>
+    <td>
+      Switch to workspace n
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + Shift + [1..n]
+    </td>
+    <td>
+      Move window to workspace n
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      # Multi-monitor keys
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + Shift + ,
+    </td>
+    <td>
+      Send focused window to previous screen
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Meta + Shift + .
+    </td>
+    <td>
+      Send focused window to next screen
+    </td>
+  </tr>
+</table>
+
+  </body>
+</html>
