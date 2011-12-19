@@ -25,7 +25,7 @@ def build(bld):
     nwmnodetask.linkflags=[ '-L/usr/X11/lib']
   else:
      nwmnodetask = bld.new_task_gen('cxx', 'shlib', 'node_addon', framework=['X11'])
-  nwmnodetask.lib=['X11', 'ev']
+  nwmnodetask.lib=['X11']
   nwmnodetask.cxxflags = ["-g", "-static", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
   nwmnodetask.target = "nwm"
   nwmnodetask.source = "./src/nwm_node.cc"
