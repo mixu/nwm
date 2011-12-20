@@ -3,49 +3,56 @@
 #include "minunit.h"
 
 int tests_run = 0;
+List* items;
+const char *a = "A";
 
-int foo = 7;
+/*
+  There are two types of items we want to store:
+    - integers (Windows)
+    - structs (key codes)
 
-static char * test_foo() {
-  mu_assert("error, foo != 7", foo == 7);
-  return 0;
-}
+  We also want to:
+    - add items
+    - find items (windows by value)
+    - remove items (windows by value)
+    - iterate through the items (keycodes)
+ */
 
-static char * test_bar() {
-  const char *a = "A";
+ List* windows;
+ List* keys;
 
-  List* items = List_list((void*) a);
+static char * test_list_create() {
+  items = List_list((void*) a);
 
   mu_assert("Length is 1", List_length(items) == 1);
-
-  List *second = List_push(items, (void*) "B");
-
-  mu_assert("Length is 2", List_length(items) == 3);
-
-  List_remove(items, second);
-
-  mu_assert("Length is 1", List_length(items) == 1);
-
 
   List_free(items);
-
   return 0;
 }
 
+static char * test_list_push_remove() {
+  items = List_list((void*) a);
+
+  List *second = List_push(items, (void*) "B");
+  mu_assert("Length is 2", List_length(items) == 2);
+  List_remove(items, second);
+  mu_assert("Length is 1", List_length(items) == 1);
+
+  List_free(items);
+  return 0;
+}
 
 static char * all_tests() {
-  mu_run_test(test_foo);
-  mu_run_test(test_bar);
+  mu_run_test(test_list_create);
+  mu_run_test(test_list_push_remove);
   return 0;
 }
 
 int main(int argc, char **argv) {
   char *result = all_tests();
   if (result != 0) {
-    /* printf("\033[31mFAIL:\033[m %s\n", result); */
     printf("\033[41m\t\tFAIL:\033[m %s\n", result);
   } else {
-    /* printf("\033[32mPASS\033[m\n"); */
     printf("\033[42m\t\tPASS\t\t\033[m\n");
   }
   printf("%d tests\n", tests_run);
