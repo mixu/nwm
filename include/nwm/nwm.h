@@ -39,7 +39,7 @@ typedef enum callback_map callback_map;
 
 
 // initialize the function that gets called when events are emitted
-extern void nwm_set_emit_function(void (*callback)(int));
+extern void nwm_set_emit_function(void (*callback)(callback_map event, void *ev));
 
 // this should be called each time we want to process events/
 // that might be because of libev or manually

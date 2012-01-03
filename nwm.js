@@ -77,15 +77,17 @@ NWM.prototype.events = {
       if(window.x > monitor.width || window.y > monitor.height) {
         window.move(1, 1);
       }
-      console.log('Add window', window);
       this.windows.add(window);
     }
   },
 
   // When a window is removed
-  removeWindow: function(id) {
-    this.windows.remove(function(window) { return (window.id != id); });
-    var pos = this.floaters.indexOf(id);
+  removeWindow: function(window) {
+    this.windows.remove(function(item) {
+      console.log(item.id, window.id, 'equal?', (item.id == window.id ? 'yes' : 'no'));
+      return (item.id != window.id);
+    });
+    var pos = this.floaters.indexOf(window.id);
     if(pos > -1) {
       this.floaters = this.floaters.splice(pos, 1);
     }

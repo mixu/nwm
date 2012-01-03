@@ -10,11 +10,13 @@ extern "C" {
 using namespace node;
 using namespace v8;
 
+
+Persistent<Function>* callbacks[onLast];
+
 class NodeWM: ObjectWrap {
 public:
   ev_io watcher;
   // callback storage
-  Persistent<Function>* callbacks[onLast];
 
   static Persistent<FunctionTemplate> s_ct;
   static void Init(Handle<Object> target) {
@@ -54,7 +56,7 @@ public:
     HandleScope scope;
     NodeWM* hw = new NodeWM();
     for(int i = 0; i < onLast; i++) {
-      hw->callbacks[i] = NULL;
+      callbacks[i] = NULL;
     }
     // use ObjectWrap.Wrap to store hw in this
     hw->Wrap(args.This());
@@ -65,8 +67,6 @@ public:
   // EVENTS
   static Handle<Value> OnCallback(const Arguments& args) {
     HandleScope scope;
-    // extract from args.this
-    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
     v8::Local<v8::String> map[onLast+1] = {
         v8::String::New("addMonitor"),
@@ -96,19 +96,19 @@ public:
       return Undefined();
     }
     // store function
-    hw->callbacks[selected] = cb_persist(args[1]);
+    callbacks[selected] = cb_persist(args[1]);
 
     return Undefined();
   }
 
-  void Emit(callback_map event, void *ev) {
+  static void Emit(callback_map event, void *ev) {
 
     // instead of Handle<Value> argument, we will pass a single struct that
     // represents the various event types that nwm generates
 
     TryCatch try_catch;
-    if(this->callbacks[event] != NULL) {
-      Handle<Function> *callback = cb_unwrap(this->callbacks[event]);
+    if(callbacks[event] != NULL) {
+      Handle<Function> *callback = cb_unwrap(callbacks[event]);
       (*callback)->Call(Context::GetCurrent()->Global(), 1, ToNode(event, ev));
       if (try_catch.HasCaught()) {
         FatalException(try_catch);
@@ -135,7 +135,6 @@ public:
         }
         break;
       case onAddWindow:
-      case onRemoveWindow:
       case onFullscreen:
         {
           nwm_window* e = (nwm_window*) ev;
@@ -145,6 +144,12 @@ public:
           INT_FIELD(width, e->width);
           INT_FIELD(height, e->height);
           INT_FIELD(isfloating, e->isfloating);
+        }
+        break;
+      case onRemoveWindow:
+        {
+          nwm_window* e = (nwm_window*) ev;
+          INT_FIELD(id, e->id);
         }
         break;
       case onUpdateWindow:
@@ -244,6 +249,8 @@ public:
     HandleScope scope;
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
+    nwm_set_emit_function(Emit);
+
     fprintf( stdout, "EIO INIT\n");
     int fd = nwm_init();
     ev_io_init(&hw->watcher, EIO_RealLoop, fd, EV_READ);
@@ -261,24 +268,28 @@ public:
   static Handle<Value> ResizeWindow(const Arguments& args) {
     HandleScope scope;
     nwm_resize_window(args[0]->Uint32Value(), args[1]->IntegerValue(), args[2]->IntegerValue());
+    nwm_loop();
     return Undefined();
   }
 
   static Handle<Value> MoveWindow(const Arguments& args) {
     HandleScope scope;
     nwm_move_window(args[0]->Uint32Value(), args[1]->IntegerValue(), args[2]->IntegerValue());
+    nwm_loop();
     return Undefined();
   }
 
   static Handle<Value> FocusWindow(const Arguments& args) {
     HandleScope scope;
     nwm_focus_window(args[0]->Uint32Value());
+    nwm_loop();
     return Undefined();
   }
 
   static Handle<Value> KillWindow(const Arguments& args) {
     HandleScope scope;
     nwm_kill_window(args[0]->Uint32Value());
+    nwm_loop();
     return Undefined();
   }
 
@@ -288,6 +299,7 @@ public:
       args[2]->IntegerValue(), args[3]->IntegerValue(), args[4]->IntegerValue(),
       args[5]->IntegerValue(), args[6]->IntegerValue(), args[7]->IntegerValue(),
       args[8]->IntegerValue());
+    nwm_loop();
     return Undefined();
   }
 
@@ -298,6 +310,7 @@ public:
       args[2]->IntegerValue(), args[3]->IntegerValue(), args[4]->IntegerValue(),
       args[5]->IntegerValue(), args[6]->IntegerValue(), args[7]->IntegerValue(),
       args[8]->IntegerValue());
+    nwm_loop();
     return Undefined();
   }
 

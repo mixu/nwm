@@ -3,23 +3,30 @@ var NWM = require('./nwm.js'),
     XK = require('./lib/keysymdef.js'),
     Xh = require('./lib/x.js'),
     child_process = require('child_process');
+
 // instantiate nwm and configure it
 var nwm = new NWM();
 
-// convinience functions
+// load layouts
+var layouts = require('./lib/layouts');
+nwm.addLayout('tile', layouts.tile);
+nwm.addLayout('monocle', layouts.monocle);
+nwm.addLayout('wide', layouts.wide);
+
+// convinience functions for writing the keyboard shortcuts
 function currentMonitor() {
   return nwm.monitors.get(nwm.monitors.current);
 }
 
-function moveToMonitor(window, currentMonitor, otherMonitor) {
+function moveToMonitor(window, currentMonitor, otherMonitorId) {
   if (window) {
-    window.monitor = otherMonitor;
+    window.monitor = otherMonitorId;
     // set the workspace to the current workspace on that monitor
-    var other_monitor = nwm.monitors.get(window.monitor);
-    window.workspace = other_monitor.workspaces.current;
+    var otherMonitor = nwm.monitors.get(otherMonitorId);
+    window.workspace = otherMonitor.workspaces.current;
     // rearrange both monitors
-    monitor.workspaces.get(monitor.workspaces.current).rearrange();
-    other_monitor.workspaces.get(other_monitor.workspaces.current).rearrange();
+    currentMonitor.workspaces.get(currentMonitor.workspaces.current).rearrange();
+    otherMonitor.workspaces.get(otherMonitor.workspaces.current).rearrange();
   }
 }
 
@@ -77,7 +84,7 @@ var keyboard_shortcuts = [
       monitor.go(monitor.workspaces.current);
       workspace.rearrange();
     }
-  }
+  },
   {
     key: ['h', 'F10'], // shrink master area
     callback: function(event) {
@@ -105,7 +112,9 @@ var keyboard_shortcuts = [
     callback: function(event) {
       var monitor = currentMonitor();
       var window = nwm.windows.get(monitor.focused_window);
-      moveToMonitor(window, monitor, nwm.monitors.next(window.monitor));
+      if(window) { // empty if no windows
+        moveToMonitor(window, monitor, nwm.monitors.next(window.monitor));
+      }
     }
   },
   {
@@ -114,7 +123,9 @@ var keyboard_shortcuts = [
     callback: function(event) {
       var monitor = currentMonitor();
       var window = nwm.windows.get(monitor.focused_window);
-      moveToMonitor(window, monitor, nwm.monitors.prev(window.monitor));
+      if(window) { // empty if no windows
+        moveToMonitor(window, monitor, nwm.monitors.prev(window.monitor));
+      }
     }
   },
   {
@@ -133,13 +144,14 @@ var keyboard_shortcuts = [
   {
     key: 'k', // moving focus
     callback: function() {
-    var monitor = currentMonitor();
-    if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
-      var next = nwm.windows.next(monitor.focused_window);
-      var window = nwm.windows.get(next);
-      console.log('Current', monitor.focused_window, 'next', window.id);
-      monitor.focused_window = window.id;
-      nwm.wm.focusWindow(monitor.focused_window);
+      var monitor = currentMonitor();
+      if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+        var next = nwm.windows.next(monitor.focused_window);
+        var window = nwm.windows.get(next);
+        console.log('Current', monitor.focused_window, 'next', window.id);
+        monitor.focused_window = window.id;
+        nwm.wm.focusWindow(monitor.focused_window);
+      }
     }
   },
   {
@@ -151,18 +163,14 @@ var keyboard_shortcuts = [
   }
 ];
 
-
+// take each of the keyboard shortcuts above and make add a key using nwm.addKey
 keyboard_shortcuts.forEach(function(shortcut) {
   var callback = shortcut.callback;
   var modifier = baseModifier;
-  // make the modifier
+  // translate the modifier array to a X11 modifier
   if(shortcut.modifier) {
-    if(shortcut.modifier.indexOf('shift') > -1) {
-      modifier = modifier|Xh.ShiftMask;
-    }
-    if(shortcut.modifier.indexOf('ctrl') > -1) {
-      modifier = modifier|Xh.ControlMask;
-    }
+    (shortcut.modifier.indexOf('shift') > -1) && (modifier = modifier|Xh.ShiftMask);
+    (shortcut.modifier.indexOf('ctrl') > -1) && (modifier = modifier|Xh.ControlMask);
   }
   // add shortcuts
   if(Array.isArray(shortcut.key)) {
@@ -174,16 +182,18 @@ keyboard_shortcuts.forEach(function(shortcut) {
   }
 });
 
-// LAYOUTS: add layouts from external hash/object
-nwm.hotLoad(__dirname+'/lib/layouts/tile.js');
-nwm.hotLoad(__dirname+'/lib/layouts/monocle.js');
-nwm.hotLoad(__dirname+'/lib/layouts/wide.js');
-nwm.hotLoad(__dirname+'/lib/layouts/grid.js');
-
 // START
 nwm.start(function() {
   // Expose via stdout
   var repl_stdout = require('repl').start();
   repl_stdout.context.nwm = nwm;
   repl_stdout.context.Xh = Xh;
+  repl_stdout.context.XK = XK;
+  repl_stdout.context.keypress = function(name) {
+    nwm.shortcuts.forEach(function(s) {
+      if(s.key == XK[name]) {
+        s.callback();
+      }
+    });
+  }
 });

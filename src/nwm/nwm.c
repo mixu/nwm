@@ -18,13 +18,10 @@
 
 #include "list.h"
 #include "nwm.h"
-#include "x11_misc.cc"
+#include "x11_misc.c"
 
 
 // INTERNAL API
-
-// the nwm struct can be static, since it's not like you can
-// run multiple instances of a window manager anyway
 
 static void nwm_scan_windows();
 static void nwm_add_window(Window win, XWindowAttributes *wa);
@@ -38,7 +35,7 @@ void nwm_update_selected_monitor();
 
 static void nwm_emit(callback_map event, void *ev);
 
-// these should go into a function dispach table indexed by the Xevent type
+// these go into a function dispach table indexed by the Xevent type
 static void event_buttonpress(XEvent *e);
 static void event_clientmessage(XEvent *e);
 static void event_configurerequest(XEvent *e);
@@ -52,12 +49,6 @@ static void event_propertynotify(XEvent *e);
 static void event_unmapnotify(XEvent *e);
 
 void GrabMouseRelease(Window id);
-
-
-// then we need another set piece, which binds Node to the nwm library
-
-// just like X11, we should have a single event type which is
-// a union of the different kinds of events.
 
 static const char broken[] = "broken";
 
@@ -81,9 +72,9 @@ typedef struct {
   GC gc;
   Window root;
   Window selected;
-  // We only track the number of monitors: that allows us to tell if a monitor has been removed or added.
+  // The number of monitors is sufficient to tell if a monitor has been removed or added.
   unsigned int total_monitors;
-  // We only track the window ids of windows, nothing else
+  // The only thing we care about is whether we have seen a monitor or not
   List *windows;
   // grabbed keys
   List *keys;
@@ -92,11 +83,10 @@ typedef struct {
   // num lock mask
   unsigned int numlockmask;
   // callback
-  void (*emit_func)(int);
+  void (*emit_func)(callback_map event, void *ev);
 } NodeWinMan;
 
 static NodeWinMan nwm;
-
 
 int nwm_init() {
   int screen;
@@ -174,7 +164,12 @@ static void nwm_scan_windows() {
 }
 
 void nwm_empty_keys() {
-  // todo free the memory
+  List *item = NULL;
+  // free the key structs
+  List_for_each(item, nwm.keys) {
+    free(item->data);
+  }
+  List_free(nwm.keys);
   nwm.keys = NULL;
 }
 
@@ -211,15 +206,15 @@ void nwm_grab_keys(Display* dpy, Window root) {
   }
 }
 
-void nwm_set_emit_function(void (*callback)(int)) {
-  // This function should store the emit function in nwm.
-  // That function then gets called from nwm_emit
+void nwm_set_emit_function(void (*callback)(callback_map event, void *ev)) {
   nwm.emit_func = callback;
 }
 
 static void nwm_emit(callback_map event, void *ev) {
   fprintf(stdout, "nwm_emit called with payload %d.\n", event);
-  nwm.emit_func(event);
+  if(nwm.emit_func) {
+    nwm.emit_func(event, ev);
+  }
 }
 
 void nwm_loop() {
@@ -239,19 +234,19 @@ void nwm_loop() {
 }
 
 void nwm_move_window(Window win, int x, int y) {
-  fprintf( stdout, "MoveWindow: id=%li x=%d y=%d \n", win, x, y);
+//  fprintf( stdout, "MoveWindow: id=%li x=%d y=%d \n", win, x, y);
   XMoveWindow(nwm.dpy, win, x, y);
   XFlush(nwm.dpy);
 }
 
 void nwm_resize_window(Window win, int width, int height) {
-  fprintf( stdout, "ResizeWindow: id=%li width=%d height=%d \n", win, width, height);
+//  fprintf( stdout, "ResizeWindow: id=%li width=%d height=%d \n", win, width, height);
   XResizeWindow(nwm.dpy, win, width, height);
   XFlush(nwm.dpy);
 }
 
 void nwm_focus_window(Window win){
-  fprintf( stdout, "FocusWindow: id=%li\n", win);
+//  fprintf( stdout, "FocusWindow: id=%li\n", win);
   grabButtons(win, True);
   XSetInputFocus(nwm.dpy, win, RevertToPointerRoot, CurrentTime);
   Atom atom = XInternAtom(nwm.dpy, "WM_TAKE_FOCUS", False);
@@ -334,7 +329,7 @@ void nwm_add_window(Window win, XWindowAttributes *wa) {
   nwm_emit(onAddWindow, (void *)&event_data);
 
   // push the window id so we know what windows we've seen
-// TODO TODO TODO    this->seen_windows.push_back(win);
+  List_push(&nwm.windows, (void *)win);
 
   nwm_update_window(win); // update title and class, emit onUpdateWindow
 
@@ -423,9 +418,11 @@ void nwm_remove_window(Window win, Bool destroyed) {
     XUngrabServer(nwm.dpy);
   }
   // remove from seen list of windows
-  // TODO TODO TODO std::vector<Window>& vec = nwm.seen_windows; // use shorter name
-  // TODO TODO TODO std::vector<Window>::iterator newEnd = std::remove(vec.begin(), vec.end(), win);
-  // TODO TODO TODO vec.erase(newEnd, vec.end());
+  List *item = NULL;
+  List_search(nwm.windows, item, (void*) win);
+  if(item) {
+    List_remove(&nwm.windows, item);
+  }
 
   fprintf( stdout, "Focusing to root window\n");
   nwm_focus_window(nwm.root);
@@ -595,7 +592,6 @@ static void event_clientmessage(XEvent *e) {
 }
 
 static void event_configurerequest(XEvent *e) {
-  // dwm checks for whether the window is known,
   // only unknown windows are allowed to configure themselves.
   // Node should call AllowReconfigure()or ConfigureNotify() + Move/Resize etc.
   nwm_emit(onConfigureRequest, e);
@@ -626,8 +622,8 @@ static void event_focusin(XEvent *e) {
   XFocusChangeEvent *ev = &e->xfocus;
   fprintf(stdout, "HandleFocusIn for window id %li\n", ev->window);
   if(nwm.selected && ev->window != nwm.selected){
-    Bool found = True;
-    // TODO TODO TODO  FIXME (std::find(nwm.seen_windows.begin(), nwm.seen_windows.end(), ev->window) != nwm.seen_windows.end());
+    List* found = NULL;
+    List_search(nwm.windows, found, (void*) ev->window);
     // Preventing focus stealing
     // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
     // We will always revert the focus to whatever was last set by Node (e.g. enterNotify).
@@ -671,8 +667,8 @@ static void event_maprequest(XEvent *e) {
   if(wa.override_redirect)
     return;
   fprintf(stdout, "MapRequest\n");
-  Bool found = True;
-  // TODO TODO TODO FIXME (std::find(nwm.seen_windows.begin(), nwm.seen_windows.end(), ev->window) != nwm.seen_windows.end());
+  List* found = NULL;
+  List_search(nwm.windows, found, (void*) ev->window);
   if(!found) {
     // only map new windows
     nwm_add_window(ev->window, &wa);
