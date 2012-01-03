@@ -18,7 +18,6 @@
 
 #include "list.h"
 #include "nwm.h"
-#include "x11_misc.c"
 
 
 // INTERNAL API
@@ -45,6 +44,7 @@ static void event_configurenotify(XEvent *e);
 static void event_destroynotify(XEvent *e);
 static void event_enternotify(XEvent *e);
 static void event_focusin(XEvent *e);
+static void event_focusout(XEvent *e);
 static void event_keypress(XEvent *e);
 static void event_maprequest(XEvent *e);
 static void event_propertynotify(XEvent *e);
@@ -62,6 +62,7 @@ static void (*handler[LASTEvent]) (XEvent *) = {
   [DestroyNotify] = event_destroynotify,
   [EnterNotify] = event_enternotify,
   [FocusIn] = event_focusin,
+  [FocusOut] = event_focusout,
   [KeyPress] = event_keypress,
   [MapRequest] = event_maprequest,
   [PropertyNotify] = event_propertynotify,
@@ -71,6 +72,7 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 // NWM DATA
 typedef struct {
   Display *dpy;
+  int screen;
   GC gc;
   Window root;
   Window selected;
@@ -80,6 +82,11 @@ typedef struct {
   List *windows;
   // grabbed keys
   List *keys;
+  // colors
+  char normal_bg[8];
+  char active_bg[8];
+  // border width
+  int border_width;
   // screen dimensions
   int screen_width, screen_height;
   // num lock mask
@@ -90,10 +97,15 @@ typedef struct {
 
 static NodeWinMan nwm;
 
+#include "x11_misc.c"
+
 int nwm_init() {
-  int screen;
   XSetWindowAttributes wa;
 
+  // defaults
+  nwm.border_width = 2;
+  strcpy(nwm.active_bg, "#7DAA1C");
+  strcpy(nwm.normal_bg, "#666666");
   nwm.total_monitors = 0;
   nwm.windows = NULL;
   // note: keys are not initialized here, since they are set before init()
@@ -109,11 +121,11 @@ int nwm_init() {
   XSync(nwm.dpy, False);
 
   // take the default screen
-  screen = DefaultScreen(nwm.dpy);
+  nwm.screen = DefaultScreen(nwm.dpy);
   // get the root window and screen geometry
-  nwm.root = RootWindow(nwm.dpy, screen);
-  nwm.screen_width = DisplayWidth(nwm.dpy, screen);
-  nwm.screen_height = DisplayHeight(nwm.dpy, screen);
+  nwm.root = RootWindow(nwm.dpy, nwm.screen);
+  nwm.screen_width = DisplayWidth(nwm.dpy, nwm.screen);
+  nwm.screen_height = DisplayHeight(nwm.dpy, nwm.screen);
   // update monitor geometry (and create nwm.monitor)
   nwm_scan_monitors();
 
@@ -240,16 +252,19 @@ void nwm_move_window(Window win, int x, int y) {
 
 void nwm_resize_window(Window win, int width, int height) {
 //  fprintf( stdout, "ResizeWindow: id=%li width=%d height=%d \n", win, width, height);
-  XResizeWindow(nwm.dpy, win, width, height);
+  XResizeWindow(nwm.dpy, win, width - nwm.border_width * 2, height - nwm.border_width * 2);
   XFlush(nwm.dpy);
 }
 
 void nwm_focus_window(Window win){
 //  fprintf( stdout, "FocusWindow: id=%li\n", win);
   grabButtons(win, True);
+  XSetWindowBorder(nwm.dpy, win, getcolor(nwm.active_bg));
   XSetInputFocus(nwm.dpy, win, RevertToPointerRoot, CurrentTime);
   Atom atom = XInternAtom(nwm.dpy, "WM_TAKE_FOCUS", False);
   SendEvent(nwm.dpy, win, atom);
+  // also, raise the window so that the bg is shown
+//  XRaiseWindow(nwm.dpy, win);
   XFlush(nwm.dpy);
   nwm.selected = win;
 }
@@ -283,7 +298,7 @@ void nwm_configure_window(Window win, int x, int y, int width, int height,
   wc.y = y;
   wc.width = width;
   wc.height = height;
-  wc.border_width = border_width;
+  wc.border_width = nwm.border_width; // border_width;
   wc.sibling = above;
   wc.stack_mode = detail;
   XConfigureWindow(nwm.dpy, win, value_mask, &wc);
@@ -301,7 +316,7 @@ void nwm_notify_window(Window win, int x, int y, int width, int height,
   ce.y = y;
   ce.width = width;
   ce.height = height;
-  ce.border_width = border_width;
+  ce.border_width = nwm.border_width;//border_width;
   ce.above = None;
   ce.override_redirect = False;
   XSendEvent(nwm.dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
@@ -312,6 +327,7 @@ void nwm_add_window(Window win, XWindowAttributes *wa) {
   Bool isfloating = False;
   XConfigureEvent ce;
   nwm_window event_data;
+  XWindowChanges wc;
 
   // check whether the window is transient
   XGetTransientForHint(nwm.dpy, win, &trans);
@@ -341,11 +357,16 @@ void nwm_add_window(Window win, XWindowAttributes *wa) {
   ce.y = wa->y;
   ce.width = wa->width;
   ce.height = wa->height;
-  ce.border_width = wa->border_width;
+  ce.border_width = nwm.border_width;// wa->border_width;
   ce.above = None;
   ce.override_redirect = False;
 
   fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
+
+  wc.border_width = nwm.border_width;
+  XConfigureWindow(nwm.dpy, win, CWBorderWidth, &wc);
+
+  XSetWindowBorder(nwm.dpy, win, getcolor(nwm.normal_bg));
 
   XSendEvent(nwm.dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
   // subscribe to window events
@@ -634,6 +655,11 @@ static void event_focusin(XEvent *e) {
       nwm_focus_window(nwm.selected);
     }
   }
+}
+
+static void event_focusout(XEvent *e) {
+  XFocusChangeEvent *ev = &e->xfocus;
+  XSetWindowBorder(nwm.dpy, ev->window, getcolor(nwm.normal_bg));
 }
 
 static void event_keypress(XEvent *e) {

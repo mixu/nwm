@@ -152,3 +152,14 @@ void grabButtons(Window wnd, Bool focused) {
 //      }
 //    }
 }
+
+unsigned long getcolor(const char *colstr) {
+  Colormap cmap = DefaultColormap(nwm.dpy, nwm.screen);
+  XColor color;
+
+  if(!XAllocNamedColor(nwm.dpy, cmap, colstr, &color, &color)) {
+    fprintf( stdout, "error, cannot allocate color '%s'\n", colstr);
+    exit( -1 );
+  }
+  return color.pixel;
+}

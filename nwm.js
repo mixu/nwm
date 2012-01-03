@@ -82,7 +82,6 @@ NWM.prototype.events = {
   // When a window is removed
   removeWindow: function(window) {
     this.windows.remove(function(item) {
-      console.log(item.id, window.id, 'equal?', (item.id == window.id ? 'yes' : 'no'));
       return (item.id != window.id);
     });
     var pos = this.floaters.indexOf(window.id);
