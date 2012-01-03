@@ -62,7 +62,10 @@ Find out what your login manager is:
 
 If it is GDM:
 
-1: Fix the paths in nwm.sh to match your configuration. You have to specify full paths, as GDM is picky about what it will launch successfully.
+1: Create nwm.sh (and chmod +x it):
+
+    #!/bin/sh
+    /usr/local/bin/node /path/to/nwm-user-sample.js 2> ~/nwm.err.log 1> ~/nwm.log
 
 2: add the following as nwm.desktop to /usr/share/xsessions:
 
@@ -70,7 +73,7 @@ If it is GDM:
     Encoding=UTF-8
     Name=nwm
     Comment=This session starts nwm
-    Exec=/PATH/TO/REPOSITORY/nwm.sh
+    Exec=/PATH/TO/nwm.sh
     Type=Application
 
 Select "nwm" from the Sessions menu when logging in.

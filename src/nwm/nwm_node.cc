@@ -2,7 +2,10 @@
 #include <node.h>
 #include <ev.h>
 #include <string.h>
-#include "nwm.h"
+
+extern "C" {
+  #include "nwm.h"
+}
 
 using namespace node;
 using namespace v8;
@@ -98,7 +101,7 @@ public:
     return Undefined();
   }
 
-  void Emit(callback_map event, nwm_emit *ev) {
+  void Emit(callback_map event, void *ev) {
 
     // instead of Handle<Value> argument, we will pass a single struct that
     // represents the various event types that nwm generates
@@ -106,7 +109,7 @@ public:
     TryCatch try_catch;
     if(this->callbacks[event] != NULL) {
       Handle<Function> *callback = cb_unwrap(this->callbacks[event]);
-      (*callback)->Call(Context::GetCurrent()->Global(), 1, ToNode(ev));
+      (*callback)->Call(Context::GetCurrent()->Global(), 1, ToNode(event, ev));
       if (try_catch.HasCaught()) {
         FatalException(try_catch);
       }
@@ -116,72 +119,106 @@ public:
   #define INT_FIELD(name, value) \
       o->Set(String::NewSymbol(#name), Integer::New(value))
 
-  static Handle<Value>* ToNode(nwm_emit *ev) {
+  static Handle<Value>* ToNode(callback_map type, void *ev) {
     Local<Object> o = Object::New();
-    switch(ev->type) {
-      case nwm_Window:
-        o->Set(String::NewSymbol("id"), Integer::New(win));
-        o->Set(String::NewSymbol("x"), Integer::New(x));
-        o->Set(String::NewSymbol("y"), Integer::New(y));
-        o->Set(String::NewSymbol("height"), Integer::New(height));
-        o->Set(String::NewSymbol("width"), Integer::New(width));
-        o->Set(String::NewSymbol("isfloating"), Integer::New(isfloating));
-
-      case nwm_Windowtitle:
-        o->Set(String::NewSymbol("id"), Integer::New(win));
-        o->Set(String::NewSymbol("title"), String::New(name));
-        o->Set(String::NewSymbol("instance"), String::New(instance));
-        o->Set(String::NewSymbol("class"), String::New(klass));
-
-      case nwm_Monitor:
-        INT_FIELD(id, ev->monitor.id);
-        INT_FIELD(x, ev->monitor.x);
-        INT_FIELD(y, ev->monitor.y);
-        INT_FIELD(width, ev->monitor.width);
-        INT_FIELD(height, ev->monitor.height);
+    switch(type) {
+      case onAddMonitor:
+      case onUpdateMonitor:
+      case onRemoveMonitor:
+        {
+          nwm_monitor* e = (nwm_monitor*) ev;
+          INT_FIELD(id, e->id);
+          INT_FIELD(x, e->x);
+          INT_FIELD(y, e->y);
+          INT_FIELD(width, e->width);
+          INT_FIELD(height, e->height);
+        }
         break;
-      case nwm_Keypress:
-        INT_FIELD(x, ev->keypress.x);
-        INT_FIELD(y, ev->keypress.y);
-        INT_FIELD(keysym, ev->keypress.keysym);
-        INT_FIELD(keycode, ev->keypress.keycode);
-        INT_FIELD(modifier, ev->keypress.modifier);
+      case onAddWindow:
+      case onRemoveWindow:
+      case onFullscreen:
+        {
+          nwm_window* e = (nwm_window*) ev;
+          INT_FIELD(id, e->id);
+          INT_FIELD(x, e->x);
+          INT_FIELD(y, e->y);
+          INT_FIELD(width, e->width);
+          INT_FIELD(height, e->height);
+          INT_FIELD(isfloating, e->isfloating);
+        }
         break;
-      case nwm_Mousedrag:
-        INT_FIELD(id, ev->mousedrag.id);
-        INT_FIELD(x, ev->mousedrag.x);
-        INT_FIELD(y, ev->mousedrag.y);
-        INT_FIELD(move_y, ev->mousedrag.move_y);
-        INT_FIELD(move_x, ev->mousedrag.move_x);
+      case onUpdateWindow:
+        {
+          nwm_window_title* e = (nwm_window_title*) ev;
+          INT_FIELD(id, e->id);
+          o->Set(String::NewSymbol("title"), String::New(e->title));
+          o->Set(String::NewSymbol("instance"), String::New(e->instance));
+          o->Set(String::NewSymbol("class"), String::New(e->klass));
+        }
         break;
-      case nwm_ButtonPress:
-        INT_FIELD(id, ev->xev.xbutton.window);
-        INT_FIELD(x, ev->xev.xbutton.x);
-        INT_FIELD(y, ev->xev.xbutton.y);
-        INT_FIELD(button, ev->xev.xbutton.button);
-        INT_FIELD(state, ev->xev.xbutton.state);
+      case onRearrange:
+      case onLast:
+        // no data
         break;
-      case nwm_EnterNotify:
+      case onMouseDown:
+        {
+          XButtonEvent* e = (XButtonEvent *) ev;
+          INT_FIELD(id, e->window);
+          INT_FIELD(x, e->x);
+          INT_FIELD(y, e->y);
+          INT_FIELD(button, e->button);
+          INT_FIELD(state, e->state);
+        }
+        break;
+      case onMouseDrag:
+        {
+          nwm_mousedrag* e = (nwm_mousedrag*) ev;
+          INT_FIELD(id, e->id);
+          INT_FIELD(x, e->x);
+          INT_FIELD(y, e->y);
+          INT_FIELD(move_y, e->move_y);
+          INT_FIELD(move_x, e->move_x);
+        }
+        break;
+      case onConfigureRequest:
+        {
+          XConfigureRequestEvent* e = (XConfigureRequestEvent*) ev;
+          o->Set(String::NewSymbol("id"), Integer::New(e->window));
+          o->Set(String::NewSymbol("x"), Integer::New(e->x));
+          o->Set(String::NewSymbol("y"), Integer::New(e->y));
+          o->Set(String::NewSymbol("width"), Integer::New(e->width));
+          o->Set(String::NewSymbol("height"), Integer::New(e->height));
+          o->Set(String::NewSymbol("above"), Integer::New(e->above));
+          o->Set(String::NewSymbol("detail"), Integer::New(e->detail));
+          o->Set(String::NewSymbol("value_mask"), Integer::New(e->value_mask));
+        }
+        break;
+      case onKeyPress:
+        {
+          nwm_keypress* e = (nwm_keypress*) ev;
+          INT_FIELD(x, e->x);
+          INT_FIELD(y, e->y);
+          INT_FIELD(keysym, e->keysym);
+          INT_FIELD(keycode, e->keycode);
+          INT_FIELD(modifier, e->modifier);
+        }
+        break;
+      case onEnterNotify:
        // NOTE: the enternotify structure is also used with only x and y when the selected monitor is updated..
        // that might not be needed, however, since it is not really essential to the Node WM..
-        o->Set(String::NewSymbol("id"), Integer::New(ev->xev.xcrossing.window));
-        o->Set(String::NewSymbol("x"), Integer::New(ev->xev.xcrossing.x));
-        o->Set(String::NewSymbol("y"), Integer::New(ev->xev.xcrossing.y));
-        o->Set(String::NewSymbol("x_root"), Integer::New(ev->xev.xcrossing.x_root));
-        o->Set(String::NewSymbol("y_root"), Integer::New(ev->xev.xcrossing.y_root));
-        break;
-      case nwm_ConfigureRequest:
-        o->Set(String::NewSymbol("id"), Integer::New(ev->xev.xconfigurerequest.window));
-        o->Set(String::NewSymbol("x"), Integer::New(ev->xev.xconfigurerequest.x));
-        o->Set(String::NewSymbol("y"), Integer::New(ev->xev.xconfigurerequest.y));
-        o->Set(String::NewSymbol("width"), Integer::New(ev->xev.xconfigurerequest.width));
-        o->Set(String::NewSymbol("height"), Integer::New(ev->xev.xconfigurerequest.height));
-        o->Set(String::NewSymbol("above"), Integer::New(ev->xev.xconfigurerequest.above));
-        o->Set(String::NewSymbol("detail"), Integer::New(ev->xev.xconfigurerequest.detail));
-        o->Set(String::NewSymbol("value_mask"), Integer::New(ev->xev.xconfigurerequest.value_mask));
+        {
+          XCrossingEvent* e = (XCrossingEvent*) ev;
+          o->Set(String::NewSymbol("id"), Integer::New(e->window));
+          o->Set(String::NewSymbol("x"), Integer::New(e->x));
+          o->Set(String::NewSymbol("y"), Integer::New(e->y));
+          o->Set(String::NewSymbol("x_root"), Integer::New(e->x_root));
+          o->Set(String::NewSymbol("y_root"), Integer::New(e->y_root));
+        }
         break;
     }
-    return o;
+    Local<Value> argv[1];
+    argv[0] = o;
+    return argv;
   }
 
   static Handle<Value> SetGrabKeys(const Arguments& args) {
@@ -189,7 +226,7 @@ public:
     unsigned int i;
     v8::Handle<v8::Value> keysym, modifier;
     // extract from args.this
-    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
+//    NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
     v8::Local<v8::Array> arr = Local<v8::Array>::Cast(args[0]);
 
     nwm_empty_keys();
@@ -198,7 +235,7 @@ public:
       v8::Local<v8::Object> obj = Local<v8::Object>::Cast(arr->Get(i));
       keysym = obj->Get(String::NewSymbol("key"));
       modifier = obj->Get(String::NewSymbol("modifier"));
-      nwm_add_key(&hw->keys, keysym->IntegerValue(), modifier->IntegerValue());
+      nwm_add_key(keysym->IntegerValue(), modifier->IntegerValue());
     }
     return Undefined();
   }
@@ -207,7 +244,6 @@ public:
     HandleScope scope;
     NodeWM* hw = ObjectWrap::Unwrap<NodeWM>(args.This());
 
-    // DO NOT REMOVE THIS. For some reason, OSX will segfault without it. Not sure why.
     fprintf( stdout, "EIO INIT\n");
     int fd = nwm_init();
     ev_io_init(&hw->watcher, EIO_RealLoop, fd, EV_READ);

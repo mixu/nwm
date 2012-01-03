@@ -16,6 +16,7 @@
 #include <X11/Xutil.h>
 #include <X11/extensions/Xinerama.h>
 
+#include "list.h"
 #include "nwm.h"
 #include "x11_misc.cc"
 
@@ -35,7 +36,7 @@ void nwm_add_monitor();
 void nwm_remove_monitor();
 void nwm_update_selected_monitor();
 
-static void nwm_emit(callback_map event, nwm_event *ev);
+static void nwm_emit(callback_map event, void *ev);
 
 // these should go into a function dispach table indexed by the Xevent type
 static void event_buttonpress(XEvent *e);
@@ -74,11 +75,35 @@ static void (*handler[LASTEvent]) (XEvent *) = {
   [UnmapNotify] = event_unmapnotify
 };
 
+// NWM DATA
+typedef struct {
+  Display *dpy;
+  GC gc;
+  Window root;
+  Window selected;
+  // We only track the number of monitors: that allows us to tell if a monitor has been removed or added.
+  unsigned int total_monitors;
+  // We only track the window ids of windows, nothing else
+  List *windows;
+  // grabbed keys
+  List *keys;
+  // screen dimensions
+  int screen_width, screen_height;
+  // num lock mask
+  unsigned int numlockmask;
+  // callback
+  void (*emit_func)(int);
+} NodeWinMan;
+
+static NodeWinMan nwm;
+
+
 int nwm_init() {
   int screen;
   XSetWindowAttributes wa;
 
   nwm.total_monitors = 0;
+  nwm.windows = NULL;
   nwm.keys = NULL;
   nwm.numlockmask = 0;
 
@@ -148,33 +173,23 @@ static void nwm_scan_windows() {
   }
 }
 
-// replace this with a linked list implementation
-// The linked list should provide:
-// add(item)
-// some(callback) --> for writing a find function
-// remove(index)
-
-
 void nwm_empty_keys() {
-  Key* curr = nwm.keys;
-  Key* next;
-  while(curr != NULL) {
-    next = curr->next;
-    free(curr);
-    curr = next;
-  }
+  // todo free the memory
+  nwm.keys = NULL;
 }
 
-void nwm_add_key(Key** keys, KeySym keysym, unsigned int mod) {
+void nwm_add_key(KeySym keysym, unsigned int mod) {
   Key* curr;
   if(!(curr = (Key*)calloc(1, sizeof(Key)))) {
     fprintf( stdout, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
     exit( -1 );
   }
+
   curr->keysym = keysym;
   curr->mod = mod;
-  curr->next = *keys;
-  *keys = curr;
+
+  fprintf( stdout, "add key -- key: %d modifier %d  %p \n", (int)curr->keysym, curr->mod,  (void*) curr);
+  List_push(&nwm.keys, (void*) curr);
 }
 
 void nwm_grab_keys(Display* dpy, Window root) {
@@ -183,7 +198,10 @@ void nwm_grab_keys(Display* dpy, Window root) {
     unsigned int i;
     unsigned int modifiers[] = { 0, LockMask, nwm.numlockmask, nwm.numlockmask|LockMask };
     XUngrabKey(nwm.dpy, AnyKey, AnyModifier, nwm.root);
-    for(Key* curr = nwm.keys; curr != NULL; curr = curr->next) {
+
+    List *item = NULL;
+    List_for_each(item, nwm.keys) {
+      Key* curr = (Key *)item->data;
       fprintf( stdout, "grab key -- key: %li modifier %d \n", curr->keysym, curr->mod);
       // also grab the combinations of screen lock and num lock (as those should not matter)
       for(i = 0; i < 4; i++) {
@@ -193,13 +211,15 @@ void nwm_grab_keys(Display* dpy, Window root) {
   }
 }
 
-void nwm_emit_function() {
+void nwm_set_emit_function(void (*callback)(int)) {
   // This function should store the emit function in nwm.
   // That function then gets called from nwm_emit
+  nwm.emit_func = callback;
 }
 
-void nwm_emit(callback_map event, nwm_event *ev) {
-  // NOP until I figure out how to call Node from here...
+static void nwm_emit(callback_map event, void *ev) {
+  fprintf(stdout, "nwm_emit called with payload %d.\n", event);
+  nwm.emit_func(event);
 }
 
 void nwm_loop() {
@@ -297,7 +317,7 @@ void nwm_add_window(Window win, XWindowAttributes *wa) {
   Window trans = None;
   Bool isfloating = False;
   XConfigureEvent ce;
-  nwm_event event_data;
+  nwm_window event_data;
 
   // check whether the window is transient
   XGetTransientForHint(nwm.dpy, win, &trans);
@@ -305,14 +325,13 @@ void nwm_add_window(Window win, XWindowAttributes *wa) {
 
   fprintf( stderr, "Create client %li (x %d, y %d, w %d, h %d, float %d)\n", win, wa->x, wa->y, wa->width, wa->height, isfloating);
   // emit onAddWindow in Node.js
-  event_data.type = nwm_Window;
-  event_data.window.id = win;
-  event_data.window.x = wa->x;
-  event_data.window.y = wa->y;
-  event_data.window.height = wa->height;
-  event_data.window.width = wa->width;
-  event_data.window.isfloating = isfloating;
-  nwm_emit(onAddWindow, event_data);
+  event_data.id = win;
+  event_data.x = wa->x;
+  event_data.y = wa->y;
+  event_data.height = wa->height;
+  event_data.width = wa->width;
+  event_data.isfloating = isfloating;
+  nwm_emit(onAddWindow, (void *)&event_data);
 
   // push the window id so we know what windows we've seen
 // TODO TODO TODO    this->seen_windows.push_back(win);
@@ -381,24 +400,22 @@ void nwm_update_window(Window win) {
 
   nwm_window_title event_data;
 
-  event_data.type = nwm_Windowtitle;
   event_data.id = win;
   event_data.title = name;
   event_data.instance = instance;
   event_data.klass = klass;
 
   // emit onUpdateWindow
-  nwm_emit(onUpdateWindow, event_data);
+  nwm_emit(onUpdateWindow, (void *)&event_data);
 }
 
 void nwm_remove_window(Window win, Bool destroyed) {
   fprintf( stdout, "HandleRemove - emit onRemovewindow, %li\n", win);
   nwm_window event_data;
-  event_data.type = nwm_Window;
   event_data.id = win;
 
   // emit a remove
-  nwm_emit(onRemoveWindow, event_data);
+  nwm_emit(onRemoveWindow, (void *)&event_data);
   if(!destroyed) {
     XGrabServer(nwm.dpy);
     XUngrabButton(nwm.dpy, AnyButton, AnyModifier, win);
@@ -428,14 +445,13 @@ static void nwm_scan_monitors() {
     // emit ADD MONITOR
     nwm_monitor event_data;
 
-    event_data.type = nwm_Monitor;
     event_data.id = 0;
     event_data.x = 0;
     event_data.y = 0;
     event_data.width = nwm.screen_width;
     event_data.height = nwm.screen_height;
 
-    nwm_emit(onAddMonitor, event_data);
+    nwm_emit(onAddMonitor, (void *)&event_data);
     nwm_update_selected_monitor();
     return;
   }
@@ -461,7 +477,6 @@ static void nwm_scan_monitors() {
     for(i = 0; i < nn; i++) {
       nwm_monitor event_data;
 
-      event_data.type = nwm_Monitor;
       event_data.id = i;
       event_data.x = unique[i].x_org;
       event_data.y = unique[i].y_org;
@@ -470,10 +485,10 @@ static void nwm_scan_monitors() {
 
       fprintf( stdout, "Emit monitor %d\n", i);
       if(i >= nwm.total_monitors) {
-        nwm_emit(onAddMonitor, event_data);
+        nwm_emit(onAddMonitor, (void *)&event_data);
         nwm.total_monitors++;
       } else {
-        nwm_emit(onUpdateMonitor, event_data);
+        nwm_emit(onUpdateMonitor, (void *)&event_data);
       }
     }
   } else { // fewer monitors available nn < n
@@ -482,9 +497,8 @@ static void nwm_scan_monitors() {
       // emit REMOVE MONITOR (i)
       nwm_monitor event_data;
 
-      event_data.type = nwm_Monitor;
       event_data.id = i;
-      nwm_emit(onRemoveMonitor, event_data);
+      nwm_emit(onRemoveMonitor, (void *)&event_data);
       // remove monitor
       nwm.total_monitors--;
     }
@@ -503,12 +517,11 @@ void nwm_update_selected_monitor() {
     fprintf(stdout, "EmitEnterNotify wid = %li \n", nwm.root);
     nwm_monitor event_data;
 
-    event_data.type = nwm_EnterNotify;
     event_data.id = nwm.root;
     event_data.x = x;
     event_data.y = y;
 
-    nwm_emit(onEnterNotify, event_data);
+    nwm_emit(onEnterNotify, (void *)&event_data);
   }
 }
 
@@ -565,7 +578,6 @@ static void event_clientmessage(XEvent *e) {
   nwm_window_fullscreen event_data;
 
   if(cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen) {
-    event_data.type = nwm_Window;
     event_data.id = cme->window;
     if(cme->data.l[0]) {
       XChangeProperty(nwm.dpy, cme->window, NetWMState, XA_ATOM, 32,
@@ -578,7 +590,7 @@ static void event_clientmessage(XEvent *e) {
                       PropModeReplace, (unsigned char*)0, 0);
       event_data.fullscreen = 0;
     }
-    nwm_emit(onFullscreen, event_data);
+    nwm_emit(onFullscreen, (void *)&event_data);
   }
 }
 
@@ -638,7 +650,6 @@ static void event_keypress(XEvent *e) {
 
   nwm_keypress event_data;
   // we always unset numlock and LockMask since those should not matter
-  event_data.type = nwm_Keypress;
   event_data.x = ev->x;
   event_data.y = ev->y;
   event_data.keycode = ev->keycode;
@@ -646,7 +657,7 @@ static void event_keypress(XEvent *e) {
   event_data.modifier = (ev->state & ~(nwm.numlockmask|LockMask));
 
   // call the callback in Node.js, passing the window object...
-  nwm_emit(onKeyPress, event_data);
+  nwm_emit(onKeyPress, (void *)&event_data);
 }
 
 static void event_maprequest(XEvent *e) {

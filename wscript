@@ -2,30 +2,34 @@ import sys
 
 def set_options(opt):
   opt.tool_options("compiler_cxx")
+  opt.tool_options('compiler_cc')
 
 def configure(conf):
   conf.check_tool("compiler_cxx")
   conf.check_tool("node_addon")
+  conf.check_tool("compiler_cc")
 
 def build(bld):
-  # nwm.cc
+  # nwm.c
+  nwmlib = bld.new_task_gen('cc')
+  nwmlib.source = 'src/nwm/nwm.c'
+  nwmlib.includes = [ './include/nwm', './include/list' ]
+  nwmlib.cflags = ['-std=c99', '-pedantic', '-Wall', '-fPIC']
   if sys.platform.startswith("darwin"):
-    obj = bld.new_task_gen('cxx', 'shlib')
-    obj.linkflags=[ '-L/usr/X11/lib']
+    nwmlib.linkflags=[ '-L/usr/X11/lib']
   else:
-     obj = bld.new_task_gen('cxx', 'shlib', framework=['X11','Xinerama'])
-  obj.lib=['X11', 'Xinerama']
-  obj.cxxflags = ["-g", "-static", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
-  obj.target = "nwm_base"
-  obj.source = "./src/nwm.cc"
+    nwmlib.framework=['X11','Xinerama']
+  nwmlib.lib=['X11', 'Xinerama']
 
   # nwm_node.cc
   if sys.platform.startswith("darwin"):
-    nwmnodetask = bld.new_task_gen('cxx', 'shlib', 'node_addon')
-    nwmnodetask.linkflags=[ '-L/usr/X11/lib']
+    nwm = bld.new_task_gen('cxx', 'shlib', 'node_addon')
+    nwm.linkflags=[ '-L/usr/X11/lib']
   else:
-     nwmnodetask = bld.new_task_gen('cxx', 'shlib', 'node_addon', framework=['X11'])
-  nwmnodetask.lib=['X11']
-  nwmnodetask.cxxflags = ["-g", "-static", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
-  nwmnodetask.target = "nwm"
-  nwmnodetask.source = "./src/nwm_node.cc"
+    nwm = bld.new_task_gen('cxx', 'shlib', 'node_addon', framework=['X11'])
+  nwm.lib=['X11']
+  nwm.cxxflags = ["-g", "-static", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
+  nwm.includes = './include/nwm'
+  nwm.target = "nwm"
+  nwm.source = "src/nwm/nwm_node.cc"
+  bld.env.append_value('LINKFLAGS', [ bld.srcnode.abspath()+'/build/default/src/nwm/nwm_1.o'])
