@@ -35,6 +35,8 @@ void nwm_update_selected_monitor();
 
 static void nwm_emit(callback_map event, void *ev);
 
+void nwm_grab_keys();
+
 // these go into a function dispach table indexed by the Xevent type
 static void event_buttonpress(XEvent *e);
 static void event_clientmessage(XEvent *e);
@@ -94,7 +96,7 @@ int nwm_init() {
 
   nwm.total_monitors = 0;
   nwm.windows = NULL;
-  nwm.keys = NULL;
+  // note: keys are not initialized here, since they are set before init()
   nwm.numlockmask = 0;
 
   // open the display
@@ -120,7 +122,7 @@ int nwm_init() {
                   |EnterWindowMask|LeaveWindowMask|StructureNotifyMask
                   |PropertyChangeMask;
   XSelectInput(nwm.dpy, nwm.root, wa.event_mask);
-  nwm_grab_keys(nwm.dpy, nwm.root);
+  nwm_grab_keys();
 
   nwm_scan_windows();
 
@@ -179,16 +181,13 @@ void nwm_add_key(KeySym keysym, unsigned int mod) {
     fprintf( stdout, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
     exit( -1 );
   }
-
   curr->keysym = keysym;
   curr->mod = mod;
-
-  fprintf( stdout, "add key -- key: %d modifier %d  %p \n", (int)curr->keysym, curr->mod,  (void*) curr);
   List_push(&nwm.keys, (void*) curr);
 }
 
-void nwm_grab_keys(Display* dpy, Window root) {
-  nwm.numlockmask = updatenumlockmask(dpy);
+void nwm_grab_keys() {
+  nwm.numlockmask = updatenumlockmask(nwm.dpy);
   { // update numlockmask first!
     unsigned int i;
     unsigned int modifiers[] = { 0, LockMask, nwm.numlockmask, nwm.numlockmask|LockMask };

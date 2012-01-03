@@ -50,11 +50,7 @@ int List_remove(List **list, List *node){
 int List_length(List *node) {
   int i = 0;
   for ( ; node; node = node->next) {
-   // fprintf(stdout, "%i (%p) ", (int) node->data, node->data);
     i++;
-  }
-  if(i > 0) {
-    fprintf(stdout, "\n");
   }
   fprintf(stdout, "list length %d.\n", i);
   return i;

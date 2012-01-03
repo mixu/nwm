@@ -16,7 +16,6 @@ struct Key {
 // initialize keys
 extern void nwm_empty_keys();
 extern void nwm_add_key(KeySym keysym, unsigned int mod);
-extern void nwm_grab_keys();
 
 // known callbacks
 enum callback_map {
