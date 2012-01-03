@@ -14,7 +14,13 @@ var Window = require('./lib/window.js');
 // -------------------
 var NWM = function() {
   // A reference to the nwm C++ X11 binding
-  this.wm = require('./build/default/nwm.node');
+  if(process.version.indexOf('v0.6') != -1) {
+    console.log(process.version);
+    // the right way would be to fix the wscript, but waf makes me cry for help
+    this.wm = require('./build/Release/nwm.node');
+  } else {
+    this.wm = require('./build/default/nwm.node');
+  }
   // Known layous
   this.layouts = {};
   // Keyboard shortcut lookup

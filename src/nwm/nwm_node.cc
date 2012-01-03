@@ -1,6 +1,5 @@
 #include <v8.h>
 #include <node.h>
-#include <ev.h>
 #include <string.h>
 
 extern "C" {
@@ -263,22 +262,26 @@ static Handle<Value> NotifyWindow(const Arguments& args) {
   return Undefined();
 }
 
-extern "C" void init(Handle<Object> target) {
-  HandleScope scope;
+extern "C" {
+  void init(Handle<Object> target) {
+    HandleScope scope;
 
-  for(int i = 0; i < onLast; i++) {
-    callbacks[i] = NULL;
+    for(int i = 0; i < onLast; i++) {
+      callbacks[i] = NULL;
+    }
+    // Callbacks
+    target->Set(String::New("on"), FunctionTemplate::New(OnCallback)->GetFunction());
+    // API
+    target->Set(String::New("moveWindow"), FunctionTemplate::New(MoveWindow)->GetFunction());
+    target->Set(String::New("resizeWindow"), FunctionTemplate::New(ResizeWindow)->GetFunction());
+    target->Set(String::New("focusWindow"), FunctionTemplate::New(FocusWindow)->GetFunction());
+    target->Set(String::New("killWindow"), FunctionTemplate::New(KillWindow)->GetFunction());
+    target->Set(String::New("configureWindow"), FunctionTemplate::New(ConfigureWindow)->GetFunction());
+    target->Set(String::New("notifyWindow"), FunctionTemplate::New(NotifyWindow)->GetFunction());
+    // Setting up
+    target->Set(String::New("start"), FunctionTemplate::New(Start)->GetFunction());
+    target->Set(String::New("keys"), FunctionTemplate::New(SetGrabKeys)->GetFunction());
   }
-  // Callbacks
-  target->Set(String::New("on"), FunctionTemplate::New(OnCallback)->GetFunction());
-  // API
-  target->Set(String::New("moveWindow"), FunctionTemplate::New(MoveWindow)->GetFunction());
-  target->Set(String::New("resizeWindow"), FunctionTemplate::New(ResizeWindow)->GetFunction());
-  target->Set(String::New("focusWindow"), FunctionTemplate::New(FocusWindow)->GetFunction());
-  target->Set(String::New("killWindow"), FunctionTemplate::New(KillWindow)->GetFunction());
-  target->Set(String::New("configureWindow"), FunctionTemplate::New(ConfigureWindow)->GetFunction());
-  target->Set(String::New("notifyWindow"), FunctionTemplate::New(NotifyWindow)->GetFunction());
-  // Setting up
-  target->Set(String::New("start"), FunctionTemplate::New(Start)->GetFunction());
-  target->Set(String::New("keys"), FunctionTemplate::New(SetGrabKeys)->GetFunction());
+
+  NODE_MODULE(nwm, init);
 }

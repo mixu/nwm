@@ -1,5 +1,9 @@
 import sys
 
+srcdir = '.'
+blddir = 'build'
+VERSION = '0.0.1'
+
 def set_options(opt):
   opt.tool_options("compiler_cxx")
   opt.tool_options('compiler_cc')
@@ -10,6 +14,8 @@ def configure(conf):
   conf.check_tool("compiler_cc")
 
 def build(bld):
+  # I don't really understand the waf build system, but this works :p
+  # bld.all_envs['default'] = bld.all_envs['Release']
   # list.c
   listlib = bld.new_task_gen('cc')
   listlib.source = 'src/list/list.c'
@@ -32,13 +38,14 @@ def build(bld):
     nwm = bld.new_task_gen('cxx', 'shlib', 'node_addon')
     nwm.linkflags=[ '-L/usr/X11/lib']
   else:
-    nwm = bld.new_task_gen('cxx', 'shlib', 'node_addon', framework=['X11', 'Xinerama'])
+    nwm = bld.new_task_gen('cxx', 'shlib', 'node_addon')
+    nwm.framework = ['X11', 'Xinerama']
   nwm.lib=['X11', 'Xinerama']
   nwm.cxxflags = ["-g", "-static", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-Wall"]
   nwm.includes = [ './include/nwm', './include/list' ]
   nwm.target = "nwm"
   nwm.source = "src/nwm/nwm_node.cc"
   bld.env.append_value('LINKFLAGS', [
-    bld.srcnode.abspath()+'/build/default/src/list/list_1.o',
-    bld.srcnode.abspath()+'/build/default/src/nwm/nwm_2.o',
+    bld.srcnode.abspath(bld.env)+'src/list/list_1.o',
+    bld.srcnode.abspath(bld.env)+'src/nwm/nwm_2.o',
   ])
