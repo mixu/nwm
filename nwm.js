@@ -6,17 +6,15 @@
 // Modules
 // -------
 
-// Native extension
-var X11wm = require('./build/default/nwm.node').NodeWM;
 var Collection = require('./lib/collection.js');
 var Monitor = require('./lib/monitor.js');
 var Window = require('./lib/window.js');
 
 // Node Window Manager
 // -------------------
-var NWM = function(binding) {
+var NWM = function() {
   // A reference to the nwm C++ X11 binding
-  this.wm = (binding ? binding : new X11wm());
+  this.wm = require('./build/default/nwm.node');
   // Known layous
   this.layouts = {};
   // Keyboard shortcut lookup
