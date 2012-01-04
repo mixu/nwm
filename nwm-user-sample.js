@@ -188,4 +188,12 @@ nwm.start(function() {
   var repl_stdout = require('repl').start();
   repl_stdout.context.nwm = nwm;
   repl_stdout.context.Xh = Xh;
+  repl_stdout.context.XK = XK;
+  repl_stdout.context.keypress = function(name) {
+    nwm.shortcuts.forEach(function(s) {
+      if(s.key == XK[name]) {
+        s.callback();
+      }
+    });
+  }
 });

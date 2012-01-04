@@ -6,17 +6,21 @@
 // Modules
 // -------
 
-// Native extension
-var X11wm = require('./build/default/nwm.node').NodeWM;
 var Collection = require('./lib/collection.js');
 var Monitor = require('./lib/monitor.js');
 var Window = require('./lib/window.js');
 
 // Node Window Manager
 // -------------------
-var NWM = function(binding) {
+var NWM = function() {
   // A reference to the nwm C++ X11 binding
-  this.wm = (binding ? binding : new X11wm());
+  if(process.version.indexOf('v0.6') != -1) {
+    console.log(process.version);
+    // the right way would be to fix the wscript, but waf makes me cry for help
+    this.wm = require('./build/Release/nwm.node');
+  } else {
+    this.wm = require('./build/default/nwm.node');
+  }
   // Known layouts
   this.layouts = {};
   // Keyboard shortcut lookup
@@ -39,13 +43,6 @@ NWM.prototype.events = {
   addMonitor: function(monitor) {
     this.monitors.add(new Monitor(this, monitor));
     this.monitors.current = monitor.id;
-
-    // TODO:
-    // When a monitor is added, check that the x coordinates
-    // represent a continuous space.
-    // Virtualbox incorrectly reports the starting
-    // x position even when it correctly detects the w/h of the monitor
-
   },
 
   // A monitor is updated
@@ -99,9 +96,11 @@ NWM.prototype.events = {
   },
 
   // When a window is removed
-  removeWindow: function(id) {
-    this.windows.remove(function(window) { return (window.id != id); });
-    var pos = this.floaters.indexOf(id);
+  removeWindow: function(window) {
+    this.windows.remove(function(item) {
+      return (item.id != window.id);
+    });
+    var pos = this.floaters.indexOf(window.id);
     if(pos > -1) {
       this.floaters = this.floaters.splice(pos, 1);
     }
@@ -168,7 +167,7 @@ NWM.prototype.events = {
         // If the window is floating, it should be moved and resized
         // The size should be modifiable, but the floating window should be centered
         // on the current monitor (or the monitor the floater is on, but we don't track that now)
-        var monitor = this.currentMonitor();
+        var monitor = this.monitors.get(this.monitors.current);
         ev.x = monitor.x + ev.x;
         ev.y = monitor.y + ev.y;
         if ( (ev.x + ev.width) > monitor.x + monitor.width) {
@@ -309,10 +308,6 @@ NWM.prototype.start = function(callback) {
   if(callback) {
     callback();
   }
-};
-
-NWM.prototype.currentMonitor = function() {
-  return this.monitors.get(this.monitors.current);
 };
 
 if (module == require.main) {

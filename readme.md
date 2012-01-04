@@ -6,21 +6,34 @@ nwm is a dynamic window manager for X written at NodeKO 2011. It uses libev to i
 
 The underlying X11 bindings are written as a Node native extension in C++/C.
 
-I'm now actively using this as my primary window manager, as multi-monitor support is finally OK. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr. I'm looking for co-maintainers (e.g. interested in improving the nwm core, including the C++ stuff) and contributors (writing layouts and other JS code). Send pull requests :).
+nwm is my primary window manager. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr.
+
+**News**
+
+I've now completed a fairly large refactoring of the codebase, splitting the window manager into a pure-C window management library which exposes a cleaner API. This library then has a small Node.js native binding in C++. A lot of complexity has been eliminated, leading to a smaller codebase, which makes me happy (~800 lines of C and ~300 lines of C++).
+
+New features include:
+
+- Node 0.6.6 compatibility. You can now build nwm under the newer Node.
+- Window borders now have colors that indicate which window is focused. (Still need to do some work on configurability here.)
+
+The next step is to simplify the JS binding further. I'm not quite satisfied with way monitors and workspaces are managed on the JS side, I think it can be  made simpler. Pull requests are welcome!
 
 # Major features
 
 - Layouts, key bindings, window positions, workspaces - all the major stuff is in Javascript, not C++ (or Haskell, or Lisp :D)
 - 4 built-in layouts (**see screenshots below**)
 - Support for multi-monitor systems (via Xinerama)
-- Support for workspaces (0 - 9 by default), each workspace can have it's own layout
-- Support for a "main window", allowing for dynamic resizing. Each workspace has it's own main window scale setting.
+- Support for workspaces (0 - 9 by default), each workspace can have its own layout
+- Support for a "main window", allowing for dynamic resizing. Each workspace has its own main window scale setting.
 - C++ API abstracts over X11 (w/libev) so you don't need to learn X11 just to customize your layout
 - REPL, so you can issue commands to nwm interactively, or expose and control it over TCP/HTTP/whatever
 
 # Installing
 
-You need to use a 0.4.x branch of Node for now, since the 0.5.x branch does not have libev bundled. For instance v0.4.12 works (git checkout v0.4.12 after cloning Joyent's node.js repo). You also want xterm, since that's the default app launched from nwm.
+You can use a 0.6.x branch, or a 0.4.x of Node. I'm generally using either 0.6.6 or 0.4.12. You should also install xterm via your package manager, since that's the default app launched from nwm.
+
+NOTE: if you are switching from one Node version to another, I recommend deleting the ./build directory first (rm -rf ./build) before recompiling to avoid issues with node-waf.
 
 From github:
 
@@ -92,7 +105,10 @@ Find out what your login manager is:
 
 If it is GDM:
 
-1: Fix the paths in nwm.sh to match your configuration. You have to specify full paths, as GDM is picky about what it will launch successfully.
+1: Create nwm.sh (and chmod +x it):
+
+    #!/bin/sh
+    /usr/local/bin/node /path/to/nwm-user-sample.js 2> ~/nwm.err.log 1> ~/nwm.log
 
 2: add the following as nwm.desktop to /usr/share/xsessions:
 
@@ -100,7 +116,7 @@ If it is GDM:
     Encoding=UTF-8
     Name=nwm
     Comment=This session starts nwm
-    Exec=/PATH/TO/REPOSITORY/nwm.sh
+    Exec=/PATH/TO/nwm.sh
     Type=Application
 
 Select "nwm" from the Sessions menu when logging in.
