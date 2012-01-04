@@ -98,12 +98,20 @@ NWM.prototype.events = {
   // When a window is removed
   removeWindow: function(window) {
     this.windows.remove(function(item) {
-      return (item.id != window.id);
+      if(item && item.id && window.id) {
+        return (item.id != window.id);
+      } else {
+        // multiple windows removed simultaneously - item is undefined
+        return true;
+      }
     });
     var pos = this.floaters.indexOf(window.id);
     if(pos > -1) {
       this.floaters = this.floaters.splice(pos, 1);
     }
+    // moved rearrange here to ensure that it occurs after everything else
+    var current_monitor = this.monitors.get(this.monitors.current);
+    current_monitor.workspaces.get(current_monitor.workspaces.current).rearrange();
   },
 
   // When a window is updated
@@ -141,7 +149,6 @@ NWM.prototype.events = {
           workspace.layout = 'monocle';
         }
       } else {
-        console.log('!! rearrange');
         workspace.rearrange();
       }
     }

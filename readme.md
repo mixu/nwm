@@ -15,7 +15,7 @@ I've now completed a fairly large refactoring of the codebase, splitting the win
 New features include:
 
 - Node 0.6.6 compatibility. You can now build nwm under the newer Node.
-- Window borders now have colors that indicate which window is focused. (Still need to do some work on configurability here.)
+- Window borders now have colors that indicate which window is focused. Still need to do some work on configurability here and note that this does not work with VMWare/VirtualBox because of a X server limitation (see [1](https://www.virtualbox.org/ticket/6479) and [2](https://bugs.launchpad.net/ubuntu/+source/xserver-xorg-video-vmware/+bug/312080)). But it seems that ratpoison has [a workaround](https://github.com/jcs/ratpoison/commit/4afffc9ac0d62b34ebb6bdb2388800043988efaf) which can probably be ported to nwm.
 
 The next step is to simplify the JS binding further. I'm not quite satisfied with way monitors and workspaces are managed on the JS side, I think it can be  made simpler. Pull requests are welcome!
 

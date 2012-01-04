@@ -101,7 +101,7 @@ int nwm_init() {
   XSetWindowAttributes wa;
 
   // defaults
-  nwm.border_width = 2;
+  nwm.border_width = 1;
   strcpy(nwm.active_bg, "#7DAA1C");
   strcpy(nwm.normal_bg, "#666666");
   nwm.total_monitors = 0;
@@ -444,8 +444,8 @@ void nwm_remove_window(Window win, Bool destroyed) {
 
   fprintf( stdout, "Focusing to root window\n");
   nwm_focus_window(nwm.root);
-  fprintf( stdout, "Emitting rearrange\n");
-  nwm_emit(onRearrange, NULL);
+//  fprintf( stdout, "Emitting rearrange\n");
+//  nwm_emit(onRearrange, NULL);
 }
 
 
@@ -628,6 +628,7 @@ static void event_configurenotify(XEvent *e) {
 }
 
 static void event_destroynotify(XEvent *e) {
+  fprintf(stdout, "HandleDestroyNotify wid = %li \n", e->xdestroywindow.window);
   nwm_remove_window(e->xdestroywindow.window, True);
 }
 
@@ -718,5 +719,6 @@ static void event_propertynotify(XEvent *e) {
 }
 
 static void event_unmapnotify(XEvent *e) {
+  fprintf(stdout, "HandleUnmapNotify wid = %li \n", e->xdestroywindow.window);
   nwm_remove_window(e->xunmap.window, False);
 }
