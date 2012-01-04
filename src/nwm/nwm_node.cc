@@ -217,28 +217,24 @@ static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents) {
 static Handle<Value> ResizeWindow(const Arguments& args) {
   HandleScope scope;
   nwm_resize_window(args[0]->Uint32Value(), args[1]->IntegerValue(), args[2]->IntegerValue());
-  nwm_loop();
   return Undefined();
 }
 
 static Handle<Value> MoveWindow(const Arguments& args) {
   HandleScope scope;
   nwm_move_window(args[0]->Uint32Value(), args[1]->IntegerValue(), args[2]->IntegerValue());
-  nwm_loop();
   return Undefined();
 }
 
 static Handle<Value> FocusWindow(const Arguments& args) {
   HandleScope scope;
   nwm_focus_window(args[0]->Uint32Value());
-  nwm_loop();
   return Undefined();
 }
 
 static Handle<Value> KillWindow(const Arguments& args) {
   HandleScope scope;
   nwm_kill_window(args[0]->Uint32Value());
-  nwm_loop();
   return Undefined();
 }
 
@@ -248,7 +244,6 @@ static Handle<Value> ConfigureWindow(const Arguments& args) {
     args[2]->IntegerValue(), args[3]->IntegerValue(), args[4]->IntegerValue(),
     args[5]->IntegerValue(), args[6]->IntegerValue(), args[7]->IntegerValue(),
     args[8]->IntegerValue());
-  nwm_loop();
   return Undefined();
 }
 
@@ -258,7 +253,6 @@ static Handle<Value> NotifyWindow(const Arguments& args) {
     args[2]->IntegerValue(), args[3]->IntegerValue(), args[4]->IntegerValue(),
     args[5]->IntegerValue(), args[6]->IntegerValue(), args[7]->IntegerValue(),
     args[8]->IntegerValue());
-  nwm_loop();
   return Undefined();
 }
 
