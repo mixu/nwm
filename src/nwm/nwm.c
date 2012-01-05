@@ -111,7 +111,7 @@ int nwm_init() {
 
   // open the display
   if ( ( nwm.dpy = XOpenDisplay(NULL) ) == NULL ) {
-    fprintf( stdout, "cannot connect to X server %s\n", XDisplayName(NULL));
+    fprintf( stderr, "cannot connect to X server %s\n", XDisplayName(NULL));
     exit( -1 );
   }
   // set error handler
@@ -188,7 +188,7 @@ void nwm_empty_keys() {
 void nwm_add_key(KeySym keysym, unsigned int mod) {
   Key* curr;
   if(!(curr = (Key*)calloc(1, sizeof(Key)))) {
-    fprintf( stdout, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
+    fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
     exit( -1 );
   }
   curr->keysym = keysym;
@@ -206,7 +206,7 @@ void nwm_grab_keys() {
     List *item = NULL;
     List_for_each(item, nwm.keys) {
       Key* curr = (Key *)item->data;
-      fprintf( stdout, "grab key -- key: %li modifier %d \n", curr->keysym, curr->mod);
+      fprintf( stderr, "grab key -- key: %li modifier %d \n", curr->keysym, curr->mod);
       // also grab the combinations of screen lock and num lock (as those should not matter)
       for(i = 0; i < 4; i++) {
         XGrabKey(nwm.dpy, XKeysymToKeycode(nwm.dpy, curr->keysym), curr->mod | modifiers[i], nwm.root, True, GrabModeAsync, GrabModeAsync);
@@ -220,7 +220,7 @@ void nwm_set_emit_function(void (*callback)(callback_map event, void *ev)) {
 }
 
 static void nwm_emit(callback_map event, void *ev) {
-  fprintf(stdout, "nwm_emit called with payload %d.\n", event);
+  fprintf(stderr, "nwm_emit called with payload %d.\n", event);
   if(nwm.emit_func) {
     nwm.emit_func(event, ev);
   }
@@ -232,30 +232,30 @@ void nwm_loop() {
   // main event loop
   while(XPending(nwm.dpy)) {
     XNextEvent(nwm.dpy, &event);
-    fprintf(stdout, "got event %s (%d).\n", event_names[event.type], event.type);
+    fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);
 
     if(handler[event.type]) {
       handler[event.type](&event); /* call handler */
     } else {
-      fprintf(stdout, "Did nothing with %s (%d)\n", event_names[event.type], event.type);
+      fprintf(stderr, "Did nothing with %s (%d)\n", event_names[event.type], event.type);
     }
   }
 }
 
 void nwm_move_window(Window win, int x, int y) {
-//  fprintf( stdout, "MoveWindow: id=%li x=%d y=%d \n", win, x, y);
+//  fprintf( stderr, "MoveWindow: id=%li x=%d y=%d \n", win, x, y);
   XMoveWindow(nwm.dpy, win, x, y);
   XFlush(nwm.dpy);
 }
 
 void nwm_resize_window(Window win, int width, int height) {
-//  fprintf( stdout, "ResizeWindow: id=%li width=%d height=%d \n", win, width, height);
+//  fprintf( stderr, "ResizeWindow: id=%li width=%d height=%d \n", win, width, height);
   XResizeWindow(nwm.dpy, win, width - nwm.border_width * 2, height - nwm.border_width * 2);
   XFlush(nwm.dpy);
 }
 
 void nwm_focus_window(Window win){
-//  fprintf( stdout, "FocusWindow: id=%li\n", win);
+  fprintf( stderr, "FocusWindow: id=%li\n", win);
   grabButtons(win, True);
   XSetWindowBorder(nwm.dpy, win, getcolor(nwm.active_bg));
   XSetInputFocus(nwm.dpy, win, RevertToPointerRoot, CurrentTime);
@@ -359,7 +359,7 @@ void nwm_add_window(Window win, XWindowAttributes *wa) {
   ce.above = None;
   ce.override_redirect = False;
 
-  fprintf( stdout, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
+  fprintf( stderr, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
 
   wc.border_width = nwm.border_width;
   XConfigureWindow(nwm.dpy, win, CWBorderWidth, &wc);
@@ -423,7 +423,7 @@ void nwm_update_window(Window win) {
 }
 
 void nwm_remove_window(Window win, Bool destroyed) {
-  fprintf( stdout, "HandleRemove - emit onRemovewindow, %li\n", win);
+  fprintf( stderr, "HandleRemove - emit onRemovewindow, %li\n", win);
   nwm_window event_data;
   event_data.id = win;
 
@@ -442,9 +442,9 @@ void nwm_remove_window(Window win, Bool destroyed) {
     List_remove(&nwm.windows, item);
   }
 
-  fprintf( stdout, "Focusing to root window\n");
+  fprintf( stderr, "Focusing to root window\n");
   nwm_focus_window(nwm.root);
-//  fprintf( stdout, "Emitting rearrange\n");
+//  fprintf( stderr, "Emitting rearrange\n");
 //  nwm_emit(onRearrange, NULL);
 }
 
@@ -472,13 +472,13 @@ static void nwm_scan_monitors() {
   }
 
   // with Xinerama
-  fprintf( stdout, "Xinerama active\n");
+  fprintf( stderr, "Xinerama active\n");
   info = XineramaQueryScreens(nwm.dpy, &nn);
 
-  fprintf( stdout, "Monitors known %d, monitors found %d\n", nwm.total_monitors, nn);
+  fprintf( stderr, "Monitors known %d, monitors found %d\n", nwm.total_monitors, nn);
   /* only consider unique geometries as separate screens */
   if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
-    fprintf( stdout, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
+    fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
     exit( -1 );
   }
   for(i = 0, j = 0; i < nn; i++)
@@ -498,7 +498,7 @@ static void nwm_scan_monitors() {
       event_data.width = unique[i].width;
       event_data.height = unique[i].height;
 
-      fprintf( stdout, "Emit monitor %d\n", i);
+      fprintf( stderr, "Emit monitor %d\n", i);
       if(i >= nwm.total_monitors) {
         nwm_emit(onAddMonitor, (void *)&event_data);
         nwm.total_monitors++;
@@ -507,7 +507,7 @@ static void nwm_scan_monitors() {
       }
     }
   } else { // fewer monitors available nn < n
-    fprintf( stdout, "Fewer monitors available %d %d\n", nwm.total_monitors, nn);
+    fprintf( stderr, "Fewer monitors available %d %d\n", nwm.total_monitors, nn);
     for(i = nn; i < nwm.total_monitors; i++) {
       // emit REMOVE MONITOR (i)
       nwm_monitor event_data;
@@ -529,7 +529,7 @@ static void nwm_scan_monitors() {
 void nwm_update_selected_monitor() {
   int x, y;
   if(getrootptr(nwm.dpy, nwm.root, &x, &y)) {
-    fprintf(stdout, "EmitEnterNotify wid = %li \n", nwm.root);
+    fprintf(stderr, "EmitEnterNotify wid = %li \n", nwm.root);
     nwm_monitor event_data;
 
     event_data.id = nwm.root;
@@ -541,7 +541,7 @@ void nwm_update_selected_monitor() {
 }
 
 static void event_buttonpress(XEvent *e) {
-  fprintf(stdout, "Handle(mouse)ButtonPress\n");
+  fprintf(stderr, "Handle(mouse)ButtonPress\n");
   nwm_emit(onMouseDown, e);
   GrabMouseRelease(e->xbutton.window);
 }
@@ -628,18 +628,18 @@ static void event_configurenotify(XEvent *e) {
 }
 
 static void event_destroynotify(XEvent *e) {
-  fprintf(stdout, "HandleDestroyNotify wid = %li \n", e->xdestroywindow.window);
+  fprintf(stderr, "HandleDestroyNotify wid = %li \n", e->xdestroywindow.window);
   nwm_remove_window(e->xdestroywindow.window, True);
 }
 
 static void event_enternotify(XEvent *e) {
-  fprintf(stdout, "HandleEnterNotify wid = %li \n", e->xcrossing.window);
+  fprintf(stderr, "HandleEnterNotify wid = %li \n", e->xcrossing.window);
   nwm_emit(onEnterNotify, e);
 }
 
 static void event_focusin(XEvent *e) {
   XFocusChangeEvent *ev = &e->xfocus;
-  fprintf(stdout, "HandleFocusIn for window id %li\n", ev->window);
+  fprintf(stderr, "HandleFocusIn for window id %li\n", ev->window);
   if(nwm.selected && ev->window != nwm.selected){
     List* found = NULL;
     List_search(nwm.windows, found, (void*) ev->window);
@@ -650,7 +650,7 @@ static void event_focusin(XEvent *e) {
     if(found) {
       // only revert if the change was to a top-level window that we manage
       // For instance, FF menus would otherwise get reverted..
-      fprintf(stdout, "Reverting focus change by window id %li to %li \n", ev->window, nwm.selected);
+      fprintf(stderr, "Reverting focus change by window id %li to %li \n", ev->window, nwm.selected);
       nwm_focus_window(nwm.selected);
     }
   }
@@ -658,7 +658,11 @@ static void event_focusin(XEvent *e) {
 
 static void event_focusout(XEvent *e) {
   XFocusChangeEvent *ev = &e->xfocus;
-  XSetWindowBorder(nwm.dpy, ev->window, getcolor(nwm.normal_bg));
+  fprintf(stderr, "HandleFocusOut wid = %li \n", ev->window);
+  if(nwm.selected && ev->window != nwm.selected){
+    fprintf(stderr, "changing color on FocusOut");
+    XSetWindowBorder(nwm.dpy, ev->window, getcolor(nwm.normal_bg));
+  }
 }
 
 static void event_keypress(XEvent *e) {
@@ -685,12 +689,12 @@ static void event_maprequest(XEvent *e) {
   XWindowAttributes wa;
   XMapRequestEvent *ev = &e->xmaprequest;
   if(!XGetWindowAttributes(nwm.dpy, ev->window, &wa)) {
-    fprintf(stdout, "XGetWindowAttributes failed\n");
+    fprintf(stderr, "XGetWindowAttributes failed\n");
     return;
   }
   if(wa.override_redirect)
     return;
-  fprintf(stdout, "MapRequest\n");
+  fprintf(stderr, "MapRequest\n");
   List* found = NULL;
   List_search(nwm.windows, found, (void*) ev->window);
   if(!found) {
@@ -699,7 +703,7 @@ static void event_maprequest(XEvent *e) {
     // emit a rearrange
     nwm_emit(onRearrange, NULL);
   } else {
-    fprintf(stdout, "Window is known\n");
+    fprintf(stderr, "Window is known\n");
   }
 }
 
@@ -719,6 +723,6 @@ static void event_propertynotify(XEvent *e) {
 }
 
 static void event_unmapnotify(XEvent *e) {
-  fprintf(stdout, "HandleUnmapNotify wid = %li \n", e->xdestroywindow.window);
+  fprintf(stderr, "HandleUnmapNotify wid = %li \n", e->xdestroywindow.window);
   nwm_remove_window(e->xunmap.window, False);
 }
