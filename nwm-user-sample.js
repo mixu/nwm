@@ -12,6 +12,7 @@ var layouts = require('./lib/layouts');
 nwm.addLayout('tile', layouts.tile);
 nwm.addLayout('monocle', layouts.monocle);
 nwm.addLayout('wide', layouts.wide);
+nwm.addLayout('grid', layouts.grid);
 
 // convinience functions for writing the keyboard shortcuts
 function currentMonitor() {
