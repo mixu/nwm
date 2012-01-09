@@ -10,6 +10,8 @@ nwm is my primary window manager. You can give it a try as your primary as well,
 
 **News**
 
+I've recorded a video tutorial / walkthrough on Youtube (HD): http://www.youtube.com/watch?v=sihgPfBj6yE
+
 I've now completed a fairly large refactoring of the codebase, splitting the window manager into a pure-C window management library which exposes a cleaner API. This library then has a small Node.js native binding in C++. A lot of complexity has been eliminated, leading to a smaller codebase, which makes me happy (~800 lines of C and ~300 lines of C++).
 
 New features include:
