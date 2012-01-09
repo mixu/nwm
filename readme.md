@@ -71,8 +71,9 @@ Unlike on other OS's, Apple has a ton of stuff bound to the Command (infinite lo
 
 To work around this, map something else to Mod4, the default modifier key used by nwm. You can either edit the baseModifier variable in nwm-user-sample.js, or:
 
-- Run xmodmap, which will show what physical keys are bound to which modifier keys. nwm uses Mod4 by default.
-- Edit ~/.xmodmap:
+Run xmodmap, which will show what physical keys are bound to which modifier keys. nwm uses Mod4 by default.
+
+Edit ~/.xmodmap:
 
     clear Mod1
     clear Mod4
@@ -83,7 +84,11 @@ To work around this, map something else to Mod4, the default modifier key used b
 
 Here, I first cleared Mod1 (which by default had both Alt keys mapped to it, then changed Mod4 to left Alt and Mod1 to right Alt). You can run xev to interactively find out what keycodes are associated with what keys.
 
-- Finally, run xmodmap ~/.xmodmap to change the keybindings (or close XQuartz and restart it). Alt + Shift + Enter now starts a new xterm instead of Meta + Shift + Enter - see the full keybindings further below.
+Finally, run 
+
+    xmodmap ~/.xmodmap 
+
+to change the keybindings (or close XQuartz and restart it). Alt + Shift + Enter now starts a new xterm instead of Meta + Shift + Enter - see the full keybindings further below.
 
 Some extras (these just make the terminal a bit better):
 
