@@ -43,10 +43,70 @@ From github:
 
 You may need the libev-dev packages (e.g. "/usr/bin/ld: cannot find -lev"):
 
-- On Fedora: sudo yum install libev-devel
-- On Ubuntu: apt-get install libev-dev libev3
-- On Arch: pacman -S libev
-- On OSX: install XQuartz, then read the section below
+On Fedora: sudo yum install libev-devel
+
+On Ubuntu (10.4): 
+
+    sudo apt-get install libx11-dev libxinerama-dev
+
+On Arch: 
+
+    sudo pacman -S xterm
+
+On OSX: install XQuartz, then read the OSX specific instructions.
+
+# Installing as a primary window manager under Linux
+
+Find out what your login manager is:
+
+    cat /etc/X11/default-display-manager
+
+If it is GDM:
+
+1: Create nwm.sh (and chmod +x it):
+
+    #!/bin/sh
+    /usr/local/bin/node /path/to/nwm-user-sample.js 2> ~/nwm.err.log 1> ~/nwm.log
+
+2: add the following as nwm.desktop to /usr/share/xsessions:
+
+    [Desktop Entry]
+    Encoding=UTF-8
+    Name=nwm
+    Comment=This session starts nwm
+    Exec=/PATH/TO/nwm.sh
+    Type=Application
+
+Select "nwm" from the Sessions menu when logging in.
+
+Some tips for running nwm in a VM:
+
+- If you use VMware Workstation, you have to start vmware-user manually for multi-monitor support via Xinerama after starting nwm.
+- If you use VirtualBox, you have to use xrandr manually for multi-monitor support (e.g. xrandr --output VBOX0 --auto --left-of VBOX1).
+
+VirtualBox sometimes gets your virtual screen sizes wrong. If this happens, you need to rerun xrandr, otherwise Xinerama reports the starting index of your second display incorrectly. You can see this by running xrandr:
+
+    VBOX0 connected 1440x900+0+0 0mm x 0mm
+    VBOX1 connected 2560x1440+2560+0 0mm x 0mm
+                              !!!!
+
+The display VBOX1 is marked as starting at x=2560 even though VBOX0 ends at 1440. This was because VirtualBox resized the VBOX0 screen incorrectly when you ran xrandr. This is a VirtualBox bug, not a nwm one.
+
+# Running under a secondary X11 server (Xephyr)
+
+    # start Xephyr
+    Xephyr -screen 1024x768 -nodri -br :1 &
+    # export gedit to the X server on display 1
+    DISPLAY=:1 gedit
+    DISPLAY=:1 gnome-terminal
+    # now start nwm.js on display 1
+    DISPLAY=:1 node nwm-user-sample.js
+
+Some notes:
+
+- Xephyr errors out under VirtualBox. You may need to start Xephyr with -nodri if you use VirtualBox with guest additions.
+- You may have to Chrome start with --explicitly-allowed-ports=6000 for it to connect to some localhost ports.
+
 
 # Installing on OSX
 
@@ -103,58 +163,6 @@ Some extras (these just make the terminal a bit better):
 
     XTerm*foreground: gray
     XTerm*background: black
-
-# Installing as a primary window manager under Linux
-
-Find out what your login manager is:
-
-    cat /etc/X11/default-display-manager
-
-If it is GDM:
-
-1: Create nwm.sh (and chmod +x it):
-
-    #!/bin/sh
-    /usr/local/bin/node /path/to/nwm-user-sample.js 2> ~/nwm.err.log 1> ~/nwm.log
-
-2: add the following as nwm.desktop to /usr/share/xsessions:
-
-    [Desktop Entry]
-    Encoding=UTF-8
-    Name=nwm
-    Comment=This session starts nwm
-    Exec=/PATH/TO/nwm.sh
-    Type=Application
-
-Select "nwm" from the Sessions menu when logging in.
-
-Some tips for running nwm in a VM:
-
-- If you use VMware Workstation, you have to start vmware-user manually for multi-monitor support via Xinerama after starting nwm.
-- If you use VirtualBox, you have to use xrandr manually for multi-monitor support (e.g. xrandr --output VBOX0 --auto --left-of VBOX1).
-
-VirtualBox sometimes gets your virtual screen sizes wrong. If this happens, you need to rerun xrandr, otherwise Xinerama reports the starting index of your second display incorrectly. You can see this by running xrandr:
-
-    VBOX0 connected 1440x900+0+0 0mm x 0mm
-    VBOX1 connected 2560x1440+2560+0 0mm x 0mm
-                              !!!!
-
-The display VBOX1 is marked as starting at x=2560 even though VBOX0 ends at 1440. This was because VirtualBox resized the VBOX0 screen incorrectly when you ran xrandr. This is a VirtualBox bug, not a nwm one.
-
-# Running under a secondary X11 server (Xephyr)
-
-    # start Xephyr
-    Xephyr -screen 1024x768 -nodri -br :1 &
-    # export gedit to the X server on display 1
-    DISPLAY=:1 gedit
-    DISPLAY=:1 gnome-terminal
-    # now start nwm.js on display 1
-    DISPLAY=:1 node nwm-user-sample.js
-
-Some notes:
-
-- Xephyr errors out under VirtualBox. You may need to start Xephyr with -nodri if you use VirtualBox with guest additions.
-- You may have to Chrome start with --explicitly-allowed-ports=6000 for it to connect to some localhost ports.
 
 # Keyboard shortcuts and layouts
 
