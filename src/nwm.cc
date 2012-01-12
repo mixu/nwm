@@ -5,7 +5,6 @@
 
 #include <v8.h>
 #include <node.h>
-#include <ev.h>
 #include <vector>
 #include <algorithm>
 #include <errno.h>

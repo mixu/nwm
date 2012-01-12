@@ -7,7 +7,13 @@
 // -------
 
 // Native extension
-var X11wm = require('./build/default/nwm.node').NodeWM;
+var X11wm;
+if(process.version.indexOf('v0.6') != -1) {
+  console.log(process.version);
+  X11wm = require('./build/Release/nwm.node').NodeWM;
+} else {
+  X11wm = require('./build/default/nwm.node').NodeWM;
+}
 var Collection = require('./lib/collection.js');
 var Monitor = require('./lib/monitor.js');
 var Window = require('./lib/window.js');
