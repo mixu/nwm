@@ -9,7 +9,6 @@ extern "C" {
 using namespace node;
 using namespace v8;
 
-static Handle<Value>* ToNode(callback_map type, void *ev);
 static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents);
 
 // callback storage
@@ -53,27 +52,14 @@ static Handle<Value> OnCallback(const Arguments& args) {
   return Undefined();
 }
 
-static void Emit(callback_map event, void *ev) {
-
-  // instead of Handle<Value> argument, we will pass a single struct that
-  // represents the various event types that nwm generates
-
-  TryCatch try_catch;
-  if(callbacks[event] != NULL) {
-    Handle<Function> *callback = cb_unwrap(callbacks[event]);
-    (*callback)->Call(Context::GetCurrent()->Global(), 1, ToNode(event, ev));
-    if (try_catch.HasCaught()) {
-      FatalException(try_catch);
-    }
-  }
-}
-
 #define INT_FIELD(name, value) \
     o->Set(String::NewSymbol(#name), Integer::New(value))
 
-static Handle<Value>* ToNode(callback_map type, void *ev) {
+static void Emit(callback_map event, void *ev) {
+
+
   Local<Object> o = Object::New();
-  switch(type) {
+  switch(event) {
     case onAddMonitor:
     case onUpdateMonitor:
     case onRemoveMonitor:
@@ -175,7 +161,18 @@ static Handle<Value>* ToNode(callback_map type, void *ev) {
   }
   Local<Value> argv[1];
   argv[0] = o;
-  return argv;
+
+  // instead of Handle<Value> argument, we will pass a single struct that
+  // represents the various event types that nwm generates
+
+  TryCatch try_catch;
+  if(callbacks[event] != NULL) {
+    Handle<Function> *callback = cb_unwrap(callbacks[event]);
+    (*callback)->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+    }
+  }
 }
 
 static Handle<Value> SetGrabKeys(const Arguments& args) {
