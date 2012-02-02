@@ -92,18 +92,59 @@ NWM.prototype.events = {
         }
       });
       this.windows.add(win);
+
+      // TODO MOVED FROM monitor
+      console.log('Monitor add window', window.id);
+      if(window.monitor == self.id) {
+        self.window_ids.push(window.id);
+        // Set the new window as the main window for this workspace so new windows get the primary working area
+        self.workspaces.get(self.workspaces.current).mainWindow = window.id;
+      }
+      Object.keys(self.workspaces.items).forEach(function(ws_id) {
+        self.workspaces.get(ws_id).rearrange();
+      });
+
     }
   },
 
   // When a window is removed
   removeWindow: function(window) {
     this.windows.remove(function(item) {
+      var match = false;
       if(item && item.id && window.id) {
-        return (item.id != window.id);
+        match = (item.id != window.id);
       } else {
         // multiple windows removed simultaneously - item is undefined
-        return true;
+        match = true;
       }
+      // TODO MOVED HERE
+
+      if (match) {
+        // nwm.on('before remove monitor', function(id) {
+        if(id == self.id) {
+          // get a remaining monitor
+          var remaining_id = nwm.monitors.next(self.id);
+          var remaining = nwm.monitors.get(remaining_id);
+          // get all the windows on this monitor
+          self.window_ids.forEach(function(wid){
+            var window = nwm.windows.get(wid);
+            window.monitor = remaining_id;
+            window.workspace = remaining.workspaces.current;
+          });
+          nwm.monitors.current = remaining;
+          remaining.workspaces.get(remaining.workspaces.current).rearrange();
+        }
+
+        //nwm.on('remove window', function(id) {
+        console.log('Monitor remove window', id);
+        var index = inExactIndexOf(self.window_ids, id);
+        if(index != -1) {
+          self.window_ids.splice(index, 1);
+        }
+        self.workspaces.get(self.workspaces.current).rearrange();
+
+      }
+
     });
     var pos = this.floaters.indexOf(window.id);
     if(pos > -1) {
