@@ -25,6 +25,10 @@ static void nwm_add_window(Window win, XWindowAttributes *wa);
 static void nwm_update_window(Window win);
 static void nwm_remove_window(Window win, Bool destroyed);
 
+// Refactor these?
+static void nwm_update_window_type(Window win);
+static void setfullscreen(Window win, Bool isfullscreen);
+
 static void nwm_scan_monitors();
 void nwm_add_monitor();
 void nwm_remove_monitor();
@@ -188,7 +192,7 @@ void nwm_empty_keys() {
 void nwm_add_key(KeySym keysym, unsigned int mod) {
   Key* curr;
   if(!(curr = (Key*)calloc(1, sizeof(Key)))) {
-    fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(Key));
+    fprintf( stderr, "fatal: could not malloc() Key\n");
     exit( -1 );
   }
   curr->keysym = keysym;
@@ -361,10 +365,13 @@ void nwm_add_window(Window win, XWindowAttributes *wa) {
 
   fprintf( stderr, "manage: x=%d y=%d width=%d height=%d \n", ce.x, ce.y, ce.width, ce.height);
 
+  // set window border
   wc.border_width = nwm.border_width;
   XConfigureWindow(nwm.dpy, win, CWBorderWidth, &wc);
-
   XSetWindowBorder(nwm.dpy, win, getcolor(nwm.normal_bg));
+
+  // check for fullscreen status
+  nwm_update_window_type(win);
 
   XSendEvent(nwm.dpy, win, False, StructureNotifyMask, (XEvent *)&ce);
   // subscribe to window events
@@ -422,22 +429,83 @@ void nwm_update_window(Window win) {
   nwm_emit(onUpdateWindow, (void *)&event_data);
 }
 
+Atom getatomprop(Window win, Atom prop) {
+  int di;
+  unsigned long dl;
+  unsigned char *p = NULL;
+  Atom da, atom = None;
+
+  if(XGetWindowProperty(nwm.dpy, win, prop, 0L, sizeof atom, False, XA_ATOM,
+                        &da, &di, &dl, &dl, &p) == Success && p) {
+    atom = *(Atom *)p;
+    XFree(p);
+  }
+  return atom;
+}
+
+void nwm_update_window_type(Window win) {
+  Atom NetWMState = XInternAtom(nwm.dpy, "_NET_WM_STATE", False);
+//    Atom NetWMWindowType = XInternAtom(hw->dpy, "_NET_WM_WINDOW_TYPE", False);
+  Atom NetWMFullscreen = XInternAtom(nwm.dpy, "_NET_WM_STATE_FULLSCREEN", False);
+  Atom state = getatomprop(win, NetWMState);
+//    Atom wtype = getatomprop(win, NetWMWindowType);
+
+  if(state == NetWMFullscreen)
+    setfullscreen(win, True);
+
+// also should check for _NET_WM_WINDOW_TYPE_NOTIFICATION (e.g. xfce4-notifyd windows)
+// not supported yet
+//    if(wtype == netatom[NetWMWindowTypeDialog])
+//      c->isfloating = True;
+
+}
+
+void setfullscreen(Window win, Bool isfullscreen) {
+  nwm_window_fullscreen event_data;
+  Atom NetWMState = XInternAtom(nwm.dpy, "_NET_WM_STATE", False);
+  Atom NetWMFullscreen = XInternAtom(nwm.dpy, "_NET_WM_STATE_FULLSCREEN", False);
+  if(isfullscreen) {
+    XChangeProperty(nwm.dpy, win, NetWMState, XA_ATOM, 32,
+                    PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
+    XRaiseWindow(nwm.dpy, win);
+    event_data.fullscreen = 1;
+  } else {
+    XChangeProperty(nwm.dpy, win, NetWMState, XA_ATOM, 32,
+                    PropModeReplace, (unsigned char*)0, 0);
+    event_data.fullscreen = 0;
+  }
+  fprintf( stdout, "Client Fullscreen- id = %li, %i \n", win, isfullscreen);
+
+  event_data.id = win;
+  nwm_emit(onFullscreen, (void *)&event_data);
+}
+
 void nwm_remove_window(Window win, Bool destroyed) {
   fprintf( stderr, "HandleRemove - emit onRemovewindow, %li\n", win);
   nwm_window event_data;
-  event_data.id = win;
 
-  // emit a remove
-  nwm_emit(onRemoveWindow, (void *)&event_data);
   if(!destroyed) {
     XGrabServer(nwm.dpy);
     XUngrabButton(nwm.dpy, AnyButton, AnyModifier, win);
     XSync(nwm.dpy, False);
     XUngrabServer(nwm.dpy);
   }
-  // remove from seen list of windows
+
+  // we should ignore remove events unrelated to windows we manage!
+  // otherwise stuff like FF menus will trigger rearranges and refocuses
+  // which breaks them.
   List *item = NULL;
   List_search(nwm.windows, item, (void*) win);
+
+  if(!item) {
+    return;
+  }
+
+  // emit a remove
+  event_data.id = win;
+  nwm_emit(onRemoveWindow, (void *)&event_data);
+
+  // remove from seen list of windows
   if(item) {
     List_remove(&nwm.windows, item);
   }
@@ -478,7 +546,7 @@ static void nwm_scan_monitors() {
   fprintf( stderr, "Monitors known %d, monitors found %d\n", nwm.total_monitors, nn);
   /* only consider unique geometries as separate screens */
   if(!(unique = (XineramaScreenInfo *)malloc(sizeof(XineramaScreenInfo) * nn))) {
-    fprintf( stderr, "fatal: could not malloc() %lu bytes\n", sizeof(XineramaScreenInfo) * nn);
+    fprintf( stderr, "fatal: could not malloc() XineramaScreenInfo\n");
     exit( -1 );
   }
   for(i = 0, j = 0; i < nn; i++)
@@ -590,22 +658,16 @@ static void event_clientmessage(XEvent *e) {
   XClientMessageEvent *cme = &e->xclient;
   Atom NetWMState = XInternAtom(nwm.dpy, "_NET_WM_STATE", False);
   Atom NetWMFullscreen = XInternAtom(nwm.dpy, "_NET_WM_STATE_FULLSCREEN", False);
-  nwm_window_fullscreen event_data;
 
-  if(cme->message_type == NetWMState && cme->data.l[1] == NetWMFullscreen) {
-    event_data.id = cme->window;
-    if(cme->data.l[0]) {
-      XChangeProperty(nwm.dpy, cme->window, NetWMState, XA_ATOM, 32,
-                      PropModeReplace, (unsigned char*)&NetWMFullscreen, 1);
-      XRaiseWindow(nwm.dpy, cme->window);
-      event_data.fullscreen = 1;
+  fprintf( stdout, "ClientMessage - id = %li, atom = %li, l1 = %li l2= %li netWMFS= %li\n", cme->window, cme->message_type, cme->data.l[1], cme->data.l[2], NetWMFullscreen);
+
+
+  if(cme->message_type == NetWMState) {
+    if(cme->data.l[1] == NetWMFullscreen || cme->data.l[2] == NetWMFullscreen) {
+        setfullscreen(cme->window, (cme->data.l[0] == 1 /* _NET_WM_STATE_ADD    */
+                      || (cme->data.l[0] == 2 /* _NET_WM_STATE_TOGGLE */ )));
+
     }
-    else {
-      XChangeProperty(nwm.dpy, cme->window, NetWMState, XA_ATOM, 32,
-                      PropModeReplace, (unsigned char*)0, 0);
-      event_data.fullscreen = 0;
-    }
-    nwm_emit(onFullscreen, (void *)&event_data);
   }
 }
 
@@ -633,7 +695,13 @@ static void event_destroynotify(XEvent *e) {
 }
 
 static void event_enternotify(XEvent *e) {
+  XCrossingEvent *ev = &e->xcrossing;
   fprintf(stderr, "HandleEnterNotify wid = %li \n", e->xcrossing.window);
+
+  if((ev->mode != NotifyNormal || ev->detail == NotifyInferior) && ev->window != nwm.root) {
+    fprintf(stderr, "Ignore EnterNotify as it is not relevant \n");
+    return;
+  }
   nwm_emit(onEnterNotify, e);
 }
 
@@ -647,7 +715,7 @@ static void event_focusin(XEvent *e) {
     // http://mail.gnome.org/archives/wm-spec-list/2003-May/msg00013.html
     // We will always revert the focus to whatever was last set by Node (e.g. enterNotify).
     // This prevents naughty applications from stealing the focus permanently.
-    if(found) {
+    if(found && nwm.selected != nwm.root) {
       // only revert if the change was to a top-level window that we manage
       // For instance, FF menus would otherwise get reverted..
       fprintf(stderr, "Reverting focus change by window id %li to %li \n", ev->window, nwm.selected);
@@ -716,9 +784,12 @@ static void event_propertynotify(XEvent *e) {
     return; // ignore property deletes
   } else {
     Atom NetWMName = XInternAtom(nwm.dpy, "_NET_WM_NAME", False);
+    Atom NetWMWindowType = XInternAtom(nwm.dpy, "_NET_WM_WINDOW_TYPE", False);
     if(ev->atom == XA_WM_NAME || ev->atom == NetWMName) {
       nwm_update_window(ev->window); // update title and class
     }
+    if(ev->atom == NetWMWindowType)
+      nwm_update_window_type(ev->window);
   }
 }
 
