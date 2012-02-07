@@ -60,7 +60,5 @@ Hiding() and showing() a window should only affect the current layoutspace. So i
   - Transient windows which are too large to fit the current monitor should be resized (JS)
   - Transient windows should be repositioned to the current screen when they open (JS)
 - Test with conky and dzen, figure out how to make integration w/those easy (JS)
-- Website and tutorial e.g. http://xmonad.org/tour.html
-- Saving state on exit (JS)
 - Floating window mode for Flash fullscreen etc. (JS)
 

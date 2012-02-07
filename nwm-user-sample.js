@@ -1,23 +1,65 @@
 // modules
 var NWM = require('./nwm.js'),
     XK = require('./lib/keysymdef.js'),
-    Xh = require('./lib/x.js'),
     child_process = require('child_process');
 
 // instantiate nwm and configure it
 var nwm = new NWM();
 
-// load layouts
-var layouts = require('./lib/layouts');
-nwm.addLayout('tile', layouts.tile);
-nwm.addLayout('monocle', layouts.monocle);
-nwm.addLayout('wide', layouts.wide);
-nwm.addLayout('grid', layouts.grid);
+// layouts
+var layouts = [
+  require('./lib/layouts/tile.js'),
+  require('./lib/layouts/monocle.js'),
+  require('./lib/layouts/wide.js'),
+  require('./lib/layouts/grid.js')
+];
+// default layout
+var defaultLayout = require('./lib/layouts/tile.js');
+
+// Given the current layout, get the next layout (e.g. for switching layouts via keyboard shortcut)
+function nextLayout(index) {
+  // Wrap around the array
+  return (layouts[index+1] ? layouts[pos+1] : layouts[0] );
+};
+
+// monitors
+var monitors = new Set();
+// windows -- this is the global storage for windows, any other objects just store ids referring to this hash.
+var windows = new Set();
+// layoutspaces
+var workspaces = new Set();
+
+var current = { window: null, monitor: null, workspace: null };
+
+// auto-update those sets, please
+nwm.bind({ current: current, windows: windows, monitors: monitors, workspaces: workspaces });
+
+// draw a workspace
+function go(workspace_id) {
+  var workspace = workspaces.get(workspace_id) || new (defaultLayout)();
+
+  var known = workspace.query();
+  workspace.update({
+    removed: []
+    added: []
+  });
+
+  workspace.rearrange(current.monitor);
+};
+
+
+
+
 
 // convinience functions for writing the keyboard shortcuts
 function currentMonitor() {
   return nwm.monitors.get(nwm.monitors.current);
 }
+
+function currentWorkspace(monitor) {
+  return monitor.workspaces.get(monitor.workspaces.current)
+}
+
 
 function moveToMonitor(window, currentMonitor, otherMonitorId) {
   if (window) {
@@ -32,7 +74,7 @@ function moveToMonitor(window, currentMonitor, otherMonitorId) {
 }
 
 function resizeWorkspace(increment) {
-  var workspace = currentMonitor().currentWorkspace();
+  var workspace = currentWorkspace(currentMonitor());
   workspace.setMainWindowScale(workspace.getMainWindowScale() + increment);
   workspace.rearrange();
 }
@@ -79,7 +121,7 @@ var keyboard_shortcuts = [
     key: 'space', // space switches between layout modes
     callback: function(event) {
       var monitor = currentMonitor();
-      var workspace = monitor.currentWorkspace();
+      var workspace = currentWorkspace(monitor);
       workspace.layout = nwm.nextLayout(workspace.layout);
       // monocle hides windows in the current workspace, so unhide them
       monitor.go(monitor.workspaces.current);
@@ -102,7 +144,7 @@ var keyboard_shortcuts = [
     key: 'Tab', // tab makes the current window the main window
     callback: function(event) {
       var monitor = currentMonitor();
-      var workspace = monitor.currentWorkspace();
+      var workspace = currentWorkspace(monitor);
       workspace.mainWindow = monitor.focused_window;
       workspace.rearrange();
     }

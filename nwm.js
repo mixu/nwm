@@ -6,7 +6,7 @@
 // Modules
 // -------
 
-var Collection = require('./lib/collection.js');
+var Set = require('./lib/set.js');
 var Monitor = require('./lib/monitor.js');
 var Window = require('./lib/window.js');
 
@@ -21,14 +21,12 @@ var NWM = function() {
   } else {
     this.wm = require('./build/default/nwm.node');
   }
-  // Known layouts
-  this.layouts = {};
   // Keyboard shortcut lookup
   this.shortcuts = [];
   // monitors
-  this.monitors = new Collection(this, 'monitor', 0);
+  this.monitors = new Set();
   // windows -- this is the global storage for windows, any other objects just store ids referring to this hash.
-  this.windows = new Collection(this, 'window', 1);
+  this.windows = new Set();
   this.floaters = [];
 }
 
@@ -308,22 +306,6 @@ NWM.prototype.events = {
       };
     });
   }
-};
-
-// Layout operations
-// -----------------
-
-// Register a new layout
-NWM.prototype.addLayout = function(name, callback){
-  this.layouts[name] = callback;
-};
-
-// Given the current layout, get the next layout (e.g. for switching layouts via keyboard shortcut)
-NWM.prototype.nextLayout = function(name) {
-  var keys = Object.keys(this.layouts);
-  var pos = keys.indexOf(name);
-  // Wrap around the array
-  return (keys[pos+1] ? keys[pos+1] : keys[0] );
 };
 
 // Keyboard shortcut operations
