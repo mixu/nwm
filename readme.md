@@ -1,23 +1,18 @@
 # nwm - node window manager
 
-nwm is a dynamic window manager for X written at NodeKO 2011. It uses libev to interface with X11, and allows you to lay out windows in Node. I started writing nwm at Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)), though it was not in the competition itself.
+nwm is a dynamic window manager for X written at NodeKO 2011. It uses libev to interface with X11, and allows you to lay out windows in Node. I started writing nwm at Node Knockout 2011 ([old repo](https://github.com/mixu/nodeko)). The underlying X11 bindings are written as a Node native extension in C++/C.
 
 **This is the repo you should watch/fork for future updates.**
 
-The underlying X11 bindings are written as a Node native extension in C++/C.
-
-nwm is my primary window manager. You can give it a try as your primary as well, and report back bugs -- or nwm in a secondary X server using Xephyr.
+nwm is my primary window manager in Arch and Ubuntu.
 
 **News**
 
-I've recorded a video tutorial / walkthrough on Youtube (HD): http://www.youtube.com/watch?v=sihgPfBj6yE
+Update (April 2012): Fixed a number of minor issues that I noticed over long term use, mostly related to mouse focus in popup/menu windows.
 
-I've now completed a fairly large refactoring of the codebase, splitting the window manager into a pure-C window management library which exposes a cleaner API. This library then has a small Node.js native binding in C++. A lot of complexity has been eliminated, leading to a smaller codebase, which makes me happy (~800 lines of C and ~300 lines of C++).
+Update (Jan 2012): I've recorded a video tutorial / walkthrough on Youtube (HD): http://www.youtube.com/watch?v=sihgPfBj6yE
 
-New features include:
-
-- Node 0.6.6 compatibility. You can now build nwm under the newer Node.
-- Window borders now have colors that indicate which window is focused. Still need to do some work on configurability here and note that this does not work with VMWare/VirtualBox because of a X server limitation (see [1](https://www.virtualbox.org/ticket/6479) and [2](https://bugs.launchpad.net/ubuntu/+source/xserver-xorg-video-vmware/+bug/312080)). But it seems that ratpoison has [a workaround](https://github.com/jcs/ratpoison/commit/4afffc9ac0d62b34ebb6bdb2388800043988efaf) which can probably be ported to nwm.
+Update (Dec 2011): Refactoring the codebase to pure C with a small C++ shim; Node 0.6.x compatibility; window colors (only on native X11 due to X server limitation [1](https://www.virtualbox.org/ticket/6479) and [2](https://bugs.launchpad.net/ubuntu/+source/xserver-xorg-video-vmware/+bug/312080)).
 
 The next step is to simplify the JS binding further. I'm not quite satisfied with way monitors and workspaces are managed on the JS side, I think it can be  made simpler. Pull requests are welcome!
 
@@ -45,11 +40,11 @@ You may need the libev-dev packages (e.g. "/usr/bin/ld: cannot find -lev"):
 
 On Fedora: sudo yum install libev-devel
 
-On Ubuntu (10.4): 
+On Ubuntu (10.4):
 
     sudo apt-get install libx11-dev libxinerama-dev
 
-On Arch: 
+On Arch:
 
     sudo pacman -S xterm
 
@@ -57,16 +52,14 @@ On OSX: install XQuartz, then read the OSX specific instructions.
 
 # Installing as a primary window manager under Linux
 
-Find out what your login manager is:
-
-    cat /etc/X11/default-display-manager
-
-If it is GDM:
+If you are using Gnome (GDM as login manager)
 
 1: Create nwm.sh (and chmod +x it):
 
     #!/bin/sh
     /usr/local/bin/node /path/to/nwm-user-sample.js 2> ~/nwm.err.log 1> ~/nwm.log
+
+Note: run "which node" to find out the path to Node in the script above.
 
 2: add the following as nwm.desktop to /usr/share/xsessions:
 
@@ -78,6 +71,8 @@ If it is GDM:
     Type=Application
 
 Select "nwm" from the Sessions menu when logging in.
+
+Debugging: Have a look at ~/nwm.err.log. Mostly, it's a matter of getting all the paths right.
 
 Some tips for running nwm in a VM:
 
@@ -144,9 +139,9 @@ Edit ~/.xmodmap:
 
 Here, I first cleared Mod1 (which by default had both Alt keys mapped to it, then changed Mod4 to left Alt and Mod1 to right Alt). You can run xev to interactively find out what keycodes are associated with what keys.
 
-Finally, run 
+Finally, run
 
-    xmodmap ~/.xmodmap 
+    xmodmap ~/.xmodmap
 
 to change the keybindings (or close XQuartz and restart it). Alt + Shift + Enter now starts a new xterm instead of Meta + Shift + Enter - see the full keybindings further below.
 
