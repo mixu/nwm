@@ -8,7 +8,7 @@ nwm is my primary window manager in Arch and Ubuntu.
 
 **News**
 
-Update (April 2012): Fixed a number of minor issues that I noticed over long term use, mostly related to mouse focus in popup/menu windows.
+Update (April 2012): Fixed a number of minor issues that I noticed over long term use, mostly related to mouse focus in popup/menu windows. (My last lingering issue turned out to be an issue with the Ubuntu Dust theme setting GtkMenu::*-padding to 0, which had bad interaction with Chromium; e.g. not related to nwm at all.)
 
 Update (Jan 2012): I've recorded a video tutorial / walkthrough on Youtube (HD): http://www.youtube.com/watch?v=sihgPfBj6yE
 
