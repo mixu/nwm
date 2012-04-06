@@ -49,6 +49,7 @@ static void event_propertynotify(XEvent *e);
 static void event_unmapnotify(XEvent *e);
 
 void GrabMouseRelease(Window id);
+void setclientstate(Window win, long state);
 
 static const char broken[] = "broken";
 
@@ -233,8 +234,6 @@ void nwm_loop() {
   // main event loop
   while(XPending(nwm.dpy)) {
     XNextEvent(nwm.dpy, &event);
-    fprintf(stderr, "got event %s (%d).\n", event_names[event.type], event.type);
-
     if(handler[event.type]) {
       handler[event.type](&event); /* call handler */
     } else {
@@ -436,17 +435,17 @@ void nwm_remove_window(Window win, Bool destroyed) {
     // emit a remove
     nwm_emit(onRemoveWindow, (void *)&event_data);
 
+    if(!destroyed) {
+      XGrabServer(nwm.dpy);
+      XUngrabButton(nwm.dpy, AnyButton, AnyModifier, win);
+      XSync(nwm.dpy, False);
+      XUngrabServer(nwm.dpy);
+    }
+
     List_remove(&nwm.windows, item);
     // only refocus if the removed window was managed in the first place
     fprintf( stderr, "Focusing to root window\n");
     nwm_focus_window(nwm.root);
-  }
-
-  if(!destroyed) {
-    XGrabServer(nwm.dpy);
-    XUngrabButton(nwm.dpy, AnyButton, AnyModifier, win);
-    XSync(nwm.dpy, False);
-    XUngrabServer(nwm.dpy);
   }
 //  fprintf( stderr, "Emitting rearrange\n");
 //  nwm_emit(onRearrange, NULL);
@@ -628,6 +627,7 @@ static void event_configurenotify(XEvent *e) {
     nwm.screen_height = ev->height;
     // update monitor structures
     nwm_scan_monitors();
+    fprintf(stderr, "* emit onRearrange\n");
     nwm_emit(onRearrange, NULL);
   }
 }
@@ -639,6 +639,9 @@ static void event_destroynotify(XEvent *e) {
 
 static void event_enternotify(XEvent *e) {
   fprintf(stderr, "** EnterNotify wid = %li \n", e->xcrossing.window);
+  if((e->xcrossing.mode != NotifyNormal || e->xcrossing.detail == NotifyInferior) && e->xcrossing.window != nwm.root)
+    return;
+
   if(e->xcrossing.window == nwm.root || e->xcrossing.window == nwm.last_entered) {
     return;
   }
@@ -744,6 +747,21 @@ static void event_propertynotify(XEvent *e) {
 }
 
 static void event_unmapnotify(XEvent *e) {
-  fprintf(stderr, "** UnmapNotify wid = %li \n", e->xdestroywindow.window);
-  nwm_remove_window(e->xunmap.window, False);
+  fprintf(stderr, "** UnmapNotify wid = %li \n", e->xunmap.window);
+  List *item = NULL;
+  List_search(nwm.windows, item, (void*) e->xunmap.window);
+  if(item) {
+    if(e->xunmap.send_event)
+      setclientstate(e->xunmap.window, WithdrawnState);
+    else
+      nwm_remove_window(e->xunmap.window, False);
+  }
+}
+
+void setclientstate(Window win, long state) {
+  long data[] = { state, None };
+  Atom NetWMState = XInternAtom(nwm.dpy, "_NET_WM_STATE", False);
+
+  XChangeProperty(nwm.dpy, win, NetWMState, NetWMState, 32,
+      PropModeReplace, (unsigned char *)data, 2);
 }
