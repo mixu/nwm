@@ -41,6 +41,6 @@ def build(bld):
   nwm.target = "nwm"
   nwm.source = "src/nwm/nwm_node.cc"
   bld.env.append_value('LINKFLAGS', [
-    bld.srcnode.abspath(bld.env)+'src/list/list_1.o',
+    bld.srcnode.abspath(bld.env)+'src/nwm/list_1.o',
     bld.srcnode.abspath(bld.env)+'src/nwm/nwm_2.o',
   ])
