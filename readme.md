@@ -38,9 +38,11 @@ From github:
 
 You may need the libev-dev packages (e.g. "/usr/bin/ld: cannot find -lev"):
 
-On Fedora: sudo yum install libev-devel
+On Fedora: 
 
-On Ubuntu (10.4):
+    sudo yum install libev-devel
+
+On Ubuntu (10.4) and Debian (6 stable):
 
     sudo apt-get install libx11-dev libxinerama-dev
 
@@ -54,7 +56,7 @@ On OSX: install XQuartz, then read the OSX specific instructions.
 
 If you are using Gnome (GDM as login manager)
 
-1: Create nwm.sh (and chmod +x it):
+1: Create nwm.sh somewhere (and chmod +x it):
 
     #!/bin/sh
     /usr/local/bin/node /path/to/nwm-user-sample.js 2> ~/nwm.err.log 1> ~/nwm.log
