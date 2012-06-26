@@ -1,3 +1,74 @@
+# nwm refactor
+
+## nwm.js
+
+nwm is implemented over the native binding.
+
+It binds event handlers to all the main events:
+
+- addMonitor: a new monitor is added
+- updateMonitor: an existing monitor is changed (e.g. resolution changes)
+- removeMonitor: a monitor is removed (e.g. disconnect external monitor)
+- addWindow: a new window is added
+- updateWindow: the properties of the window change, like the window title
+- removeWindow: the window is closed
+- fullscreen: a window requests full screen mode
+- configureRequest: a window wants to change it's size, stacking order or border width. Generally we only want to allow events that don't screw up the layout.
+- mouseDown / mouseDrag: WIP mouse events
+- enterNotify: mouse enters a new window
+- rearrange: the native binding suggests a rearrange, generally because a monitor or window was removed
+- keyPress: a key combination that we previously registered in the native binding was pressed
+
+and makes changes to the associated items:
+
+- monitors
+- layoutspaces
+- windows
+
+# Global state
+
+monitors: set of monitors
+monitors[n].workspaces[n]: set of workspaces
+monitors[n].workspaces[n]["tile"]: the tile workspace on monitor 1, workspace 2.
+
+currentMonitor: the monitor the focus is on right now
+currentWorkspace: the currently active workspace
+
+# Layout workspaces
+
+Events are only emitted to the active workspace on each monitor.
+
+- addWindow: when a new window is added, or when a window is moved to the workspace
+- removeWindow: when a window is closed, or when a window is moved out of the workspace
+- rearrange( ): move windows into their correct places. All layouting operations should occur here and not during addWindow/removeWindow. Always called after all windows added/removed.
+
+# Keyboard
+
+Key bindings emit intents, which the layouts handle.
+
+# Monitors
+
+The monitor is:
+
+- responsible for knowing which windows have been assigned to which workspaces.
+- responsible for moving windows to new workspaces
+- responsible for triggering rearranges on the workspace
+
+Monitors have:
+
+- a width and height
+- x and y coordinates (within the root X window)
+- a list of workspaces and a list of windows for each workspace
+
+# Layoutspaces / workspaces
+
+Layoutspaces are a combination of workspace and layout.
+
+It makes more sense to combine the two - every workspace has a layout, and more advanced layouts need to store stuff.
+
+
+
+
 # Todo (C++ bindings)
 
 Todo:
