@@ -10,6 +10,15 @@ exports['given a window'] = {
   },
 
   'can get and set width height x y': function(done){
+    var w = this.w;
+    w.x = 100;
+    assert.equal(w.x, 100);
+    w.y = 200;
+    assert.equal(w.y, 200);
+    w.width = 300;
+    assert.equal(w.width, 300);
+    w.height = 400;
+    assert.equal(w.height, 400);
     done();
   },
 
@@ -17,13 +26,12 @@ exports['given a window'] = {
     done();
   },
 
-
   'can get and set visible': function(done) {
-
+    done();
   },
 
-  'can apply pending changes': function(done) {
-
+  'pending changes are only applied on sync() call': function(done) {
+    done();
   }
 
 };
