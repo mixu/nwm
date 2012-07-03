@@ -16,7 +16,7 @@ nwm is what I use for window management in Arch, Debian and Ubuntu.
 
 # Installing
 
-Prerequisites: a 0.6.x branch version of Node and xterm (if not installed). Install the following dev packages:
+Prerequisites: a 0.8.x/0.6.x branch version of Node and xterm (if not installed). Install the following dev packages:
 
 - On Ubuntu (10.4) and Debian (6 stable): ```sudo apt-get install libx11-dev libxinerama-dev```
 - On Arch (after installing X11): ```sudo pacman -S xterm```
@@ -27,12 +27,7 @@ From github:
 
     git clone git://github.com/mixu/nwm.git
     rm -rf ./build
-    node-waf configure build
-
-With node-gyp / 0.8.x:
-
-    rm -rf ./build
-    node-gyp configure build
+    npm install --production
 
 See further below for instructions on how to set up nwm as a desktop session under GDM/Gnome.
 
