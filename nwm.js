@@ -14,7 +14,7 @@ var Collection = require('./lib/collection.js'),
 // -------------------
 var NWM = function() {
   // A reference to the nwm C++ X11 binding
-  this.wm = require('./build/default/nwm.node');
+  this.wm = require('./build/Release/nwm.node');
   // Known layouts
   this.layouts = {};
   // Keyboard shortcut lookup

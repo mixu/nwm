@@ -29,6 +29,11 @@ From github:
     rm -rf ./build
     node-waf configure build
 
+With node-gyp / 0.8.x:
+
+    rm -rf ./build
+    node-gyp configure build
+
 See further below for instructions on how to set up nwm as a desktop session under GDM/Gnome.
 
 # Tutorial
