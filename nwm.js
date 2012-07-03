@@ -6,21 +6,15 @@
 // Modules
 // -------
 
-var Collection = require('./lib/collection.js');
-var Monitor = require('./lib/monitor.js');
-var Window = require('./lib/window.js');
+var Collection = require('./lib/collection.js'),
+    Monitor = require('./lib/monitor.js'),
+    Window = require('./lib/window.js');
 
 // Node Window Manager
 // -------------------
 var NWM = function() {
   // A reference to the nwm C++ X11 binding
-  if(process.version.indexOf('v0.6') != -1) {
-    console.log(process.version);
-    // the right way would be to fix the wscript, but waf makes me cry for help
-    this.wm = require('./build/Release/nwm.node');
-  } else {
-    this.wm = require('./build/default/nwm.node');
-  }
+  this.wm = require('./build/default/nwm.node');
   // Known layouts
   this.layouts = {};
   // Keyboard shortcut lookup

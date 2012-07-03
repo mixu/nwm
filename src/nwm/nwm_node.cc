@@ -9,7 +9,7 @@ extern "C" {
 using namespace node;
 using namespace v8;
 
-static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents);
+static void EIO_Loop(uv_poll_t* handle, int status, int events);
 
 // callback storage
 Persistent<Function>* callbacks[onLast];
@@ -197,17 +197,17 @@ static Handle<Value> Start(const Arguments& args) {
 
   nwm_set_emit_function(Emit);
 
-  fprintf( stdout, "EIO INIT\n");
+
   int fd = nwm_init();
-  ev_io_init(&watcher, EIO_RealLoop, fd, EV_READ);
-  watcher.data = NULL;
-  ev_io_start(EV_DEFAULT_ &watcher);
+
+  uv_poll_t* handle = new uv_poll_t;
+  uv_poll_init(uv_default_loop(), handle, fd);
+  uv_poll_start(handle, UV_READABLE, EIO_Loop);
 
   return Undefined();
 }
 
-static void EIO_RealLoop(EV_P_ struct ev_io* watcher, int revents) {
-  fprintf( stdout, "EIO LOOP\n");
+static void EIO_Loop(uv_poll_t* handle, int status, int events) {
   nwm_loop();
 }
 
