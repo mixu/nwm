@@ -642,7 +642,16 @@ static void event_enternotify(XEvent *e) {
   if((e->xcrossing.mode != NotifyNormal || e->xcrossing.detail == NotifyInferior) && e->xcrossing.window != nwm.root)
     return;
 
-  if(e->xcrossing.window == nwm.root || e->xcrossing.window == nwm.last_entered) {
+  if(e->xcrossing.window == nwm.last_entered) {
+    return;
+  }
+
+  // there are two cases to handle:
+  // 1) switching from a window to the root window (should change monitor, handled here)
+  // 2) moving within a root window from empty monitor to empty monitor
+  if(e->xcrossing.window == nwm.root) {
+    nwm.last_entered = e->xcrossing.window;
+    nwm_emit(onEnterNotify, e);
     return;
   }
 
