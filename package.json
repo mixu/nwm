@@ -16,5 +16,10 @@
   "main": "index.js",
   "devDependencies": {
     "mocha": "~1.2.1"
+  },
+  "bin":"./nwm", 
+  "scripts": {
+    "test": "mocha",
+    "postinstall": "./nwm init; cd ./build; make"
   }
 }
