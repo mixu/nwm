@@ -94,7 +94,7 @@ xephyr () {
 
 console () {
   # connect a console to a running nwm server
-  node $dir/lib/prompt.js client 25171
+  node $dir/lib/console.js client 25171
 }
 
 help () {
