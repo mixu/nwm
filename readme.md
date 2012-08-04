@@ -105,6 +105,9 @@ That's it.
     # Launching programs
     Meta + Shift + Enter -- Start xterm
 
+    # JavaScript Console
+    Meta + Shift + Escape -- start js console, so can interact with `nwm`
+
     # Switching between layouts
     Meta + Space -- Switch between tile, monocle, wide and grid layouts
 
@@ -183,6 +186,14 @@ For more extensive customization, see https://github.com/mixu/nwm-user which has
 (the default size is 800x600)
 
 Under Xephyr, the base key combination is Ctrl+Meta (e.g. Ctrl+Win). When running natively, the base key is Meta (Win). This is so that I can test nwm inside itself, yet have decent shortcuts:
+
+
+Start a console attached to the instance running in xephyr,
+(but start the console in a terminal outside of nwm)
+
+```
+./nwm console
+```
 
 # Tips for running under a VM
 
