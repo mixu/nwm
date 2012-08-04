@@ -2,8 +2,12 @@
 var NWM = require('./nwm.js'),
     XK = require('./lib/keysymdef.js'),
     Xh = require('./lib/x.js'),
-    child_process = require('child_process');
+    child_process = require('child_process'),
+    con = require('./lib/console'),
+    join = require('path').join;
 
+//var path = join(process.env.HOME, '.nwm/repl-socket')
+var port = 25171
 // instantiate nwm and configure it
 var nwm = new NWM();
 
@@ -161,6 +165,30 @@ var keyboard_shortcuts = [
     callback: function() {
       process.exit();
     }
+  },
+  {
+    key: 'Escape',
+    modifier: [ 'shift' ],
+    callback: function () {
+      console.log('opening console')
+      var args = [
+          '-lc', 
+          '-e',
+          'sh -c "' + [
+            process.execPath,
+            join(__dirname, 'lib', 'console.js'), 
+            'client', 
+            port].join(' ') + '"'
+        ]
+      var cp = child_process.spawn('xterm',args, 
+        { env: process.env }); 
+
+      cp.stdout.pipe(process.stdout, {end: false})
+      cp.stderr.pipe(process.stderr, {end: false})
+      cp.on('exit', function () {
+        console.log('console closed')
+      })
+    },
   }
 ];
 
@@ -185,3 +213,8 @@ keyboard_shortcuts.forEach(function(shortcut) {
 
 // START
 nwm.start(function() { });
+
+con.createServer({nwm: nwm, layouts: layouts, XK: XK, Xh: Xh})
+  .listen(port, function () {
+    console.log('connect to nwm repl on:', port)
+  })

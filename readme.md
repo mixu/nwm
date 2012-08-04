@@ -28,6 +28,8 @@ From github:
     git clone git://github.com/mixu/nwm.git
     rm -rf ./build
     npm install --production
+    #add nwm option to login screen!
+    sudo ./nwm install
 
 If you are using Node 0.6.x, you need to checkout src/nwm_node.cc at revision db3545413d:
 
@@ -103,6 +105,9 @@ That's it.
     # Launching programs
     Meta + Shift + Enter -- Start xterm
 
+    # JavaScript Console
+    Meta + Shift + Escape -- start js console, so can interact with `nwm`
+
     # Switching between layouts
     Meta + Space -- Switch between tile, monocle, wide and grid layouts
 
@@ -132,21 +137,9 @@ That's it.
 
 If you are using Gnome (GDM as login manager)
 
-1: Create nwm.sh somewhere (and chmod +x it):
-
-    #!/bin/sh
-    /usr/local/bin/node /path/to/nwm-user-sample.js 2> ~/nwm.err.log 1> ~/nwm.log
-
-Note: run "which node" to find out the path to Node in the script above.
-
-2: add the following as nwm.desktop to /usr/share/xsessions:
-
-    [Desktop Entry]
-    Encoding=UTF-8
-    Name=nwm
-    Comment=This session starts nwm
-    Exec=/PATH/TO/nwm.sh
-    Type=Application
+```
+sudo ./nwm install
+```
 
 Select "nwm" from the Sessions menu when logging in. If you run into issues, have a look at ~/nwm.err.log. Mostly, it's a matter of getting all the paths (to Node, to the nwm files) right.
 
@@ -187,17 +180,20 @@ For more extensive customization, see https://github.com/mixu/nwm-user which has
 
 # Running under a secondary X11 server (Xephyr)
 
-If you want to test or develop nwm, the easiest way is to use Xephyr:
-
-    # start Xephyr
-    Xephyr -screen 1024x768 -nodri -br :1 &
-    # export gedit to the X server on display 1
-    DISPLAY=:1 gedit
-    DISPLAY=:1 gnome-terminal
-    # now start nwm.js on display 1
-    DISPLAY=:1 node nwm-user-sample.js
+```
+./nwm xephyr [WIDTHxHEIGHT]
+```
+(the default size is 800x600)
 
 Under Xephyr, the base key combination is Ctrl+Meta (e.g. Ctrl+Win). When running natively, the base key is Meta (Win). This is so that I can test nwm inside itself, yet have decent shortcuts:
+
+
+Start a console attached to the instance running in xephyr,
+(but start the console in a terminal outside of nwm)
+
+```
+./nwm console
+```
 
 # Tips for running under a VM
 
