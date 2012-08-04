@@ -92,11 +92,16 @@ xephyr () {
   DISPLAY=:1 start --nolog
 }
 
+console () {
+  # connect a console to a running nwm server
+  node $dir/lib/prompt.js client 25171
+}
+
 help () {
   less $dir/readme.md
 }
 
 $@
 
-echo 'USAGE: nwm start|install|uninstall|help'
+echo 'USAGE: nwm start|install|console|uninstall|help'
 exit 1
