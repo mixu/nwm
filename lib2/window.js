@@ -2,6 +2,7 @@ function Window(opts) {
   if(typeof opts == 'undefined') {
     opts = {};
   }
+  this.id = opts.id;
   this._width = opts.width || 0;
   this._height = opts.height || 0 ;
   this._x = opts.x || 0;
@@ -34,9 +35,10 @@ Window.prototype.sync = function() {
       });
   // persist dimension change
   if(changedProperties.indexOf('width') + changedProperties.indexOf('height') > -1) {
-    wm.
+    wm.resizeWindow(this.id, this.pending._width, this.pending._height);
   }
   if(changedProperties.indexOf('x') + changedProperties.indexOf('y') > -1) {
+    wm.moveWindow(this.id, this.pending._x, this.pending._y);
   }
 };
 
