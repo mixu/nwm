@@ -18,10 +18,31 @@ exports['given a window manager'] = {
   },
 
   'can add, update and remove monitors': function(done) {
+    this.n.addMonitor({
+      id: 1,
+      x: 0, y: 0,
+      width: 100, height: 100
+    });
+
+    this.n.updateMonitor({
+      id: 1,
+      x: 0, y: 0,
+      width: 1000, height: 1000
+    });
+
+    this.n.removeMonitor({ id: 1});
+
     done();
   },
 
   'can add, update and remove windows': function(done) {
+
+    this.n.addWindow({
+      id: 1,
+      x: 0, y: 0,
+      width: 100, height: 100,
+      isFloating: true
+    });
     done();
   },
 
