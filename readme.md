@@ -128,7 +128,7 @@ That's it.
     Meta + Shift + , -- Send focused window to previous screen
     Meta + Shift + . -- Send focused window to next screen
 
-# Adding nwm under your logging manager as an alternative under Linux
+# Adding nwm under your login manager as an alternative under Linux
 
 If you are using Gnome (GDM as login manager)
 
