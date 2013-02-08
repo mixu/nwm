@@ -134,8 +134,12 @@ var keyboard_shortcuts = [
     callback: function() {
       var monitor = currentMonitor();
       if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
-        var previous = nwm.windows.prev(monitor.focused_window);
-        var window = nwm.windows.get(previous);
+        var window = nwm.windows.get(monitor.focused_window);
+        do {
+          var previous = nwm.windows.prev(window.id);
+          window = nwm.windows.get(previous);
+          }
+        while(window.workspace != monitor.workspaces.current);
         console.log('Current', monitor.focused_window, 'previous', window.id);
         monitor.focused_window = window.id;
         nwm.wm.focusWindow(window.id);
@@ -147,8 +151,12 @@ var keyboard_shortcuts = [
     callback: function() {
       var monitor = currentMonitor();
       if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
-        var next = nwm.windows.next(monitor.focused_window);
-        var window = nwm.windows.get(next);
+        var window = nwm.windows.get(monitor.focused_window);
+        do {
+          var next = nwm.windows.next(window.id);
+          window = nwm.windows.get(next);
+          }
+        while(window.workspace != monitor.workspaces.current);
         console.log('Current', monitor.focused_window, 'next', window.id);
         monitor.focused_window = window.id;
         nwm.wm.focusWindow(monitor.focused_window);
