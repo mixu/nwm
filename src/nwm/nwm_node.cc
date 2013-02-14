@@ -13,7 +13,6 @@ static void EIO_Loop(uv_poll_t* handle, int status, int events);
 
 // callback storage
 Persistent<Function>* callbacks[onLast];
-ev_io watcher;
 
 // EVENTS
 static Handle<Value> OnCallback(const Arguments& args) {
