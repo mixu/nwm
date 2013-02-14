@@ -16,5 +16,8 @@
   "main": "index.js",
   "devDependencies": {
     "mocha": "~1.2.1"
+  },
+  "dependencies": {
+    "bindings": "~1.0.0"
   }
 }

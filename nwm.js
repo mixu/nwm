@@ -13,8 +13,8 @@ var Collection = require('./lib/collection.js'),
 // Node Window Manager
 // -------------------
 var NWM = function() {
-  // A reference to the nwm C++ X11 binding
-  this.wm = require('./build/Release/nwm.node');
+  // A reference to the nwm C++ X11 binding - require using node-bindings to work around the various changes in paths
+  this.wm = require('bindings')('nwm.node');
   // Known layouts
   this.layouts = {};
   // Keyboard shortcut lookup
