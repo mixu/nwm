@@ -255,7 +255,7 @@ void nwm_resize_window(Window win, int width, int height) {
 }
 
 void nwm_focus_window(Window win){
-  fprintf( stderr, "FocusWindow: id=%li\n", win);
+  fprintf( stderr, "nwm set FocusWindow to: id=%li\n", win);
   grabButtons(win, True);
   XSetWindowBorder(nwm.dpy, win, getcolor(nwm.active_bg));
   XSetInputFocus(nwm.dpy, win, RevertToPointerRoot, CurrentTime);
@@ -680,6 +680,12 @@ static void event_focusin(XEvent *e) {
       // For instance, FF menus would otherwise get reverted..
       fprintf(stderr, "Reverting focus change by window id %li to %li \n", ev->window, nwm.selected);
       nwm_focus_window(nwm.selected);
+    } else {
+      // otherwise, this window is not managed (e.g. is a popup, for example)
+      // and we should just send the focus event to it
+      XSetInputFocus(nwm.dpy, ev->window, RevertToPointerRoot, CurrentTime);
+      Atom atom = XInternAtom(nwm.dpy, "WM_TAKE_FOCUS", False);
+      SendEvent(nwm.dpy, ev->window, atom);
     }
   }
 }

@@ -213,16 +213,16 @@ NWM.prototype.events = {
       this.wm.focusWindow(event.id);
     } else {
       console.log('WARNING got focus event for nonexistent (transient) window', event);
+      this.wm.focusWindow(event.id);
     }
     // This event is also emitted for the root window
     //  so in any case, we want to set the current monitor based on the event coordinates
     var x = event.x_root || event.x;
     var y = event.y_root || event.y;
-    console.log('Focus monitor by coordinates', x, y);
     // go through the monitors and find a matching monitor
     var monitor_ids = Object.keys(this.monitors.items);
     var self = this;
-    monitor_ids.some(function(monid) {
+    var didChangeFocus = monitor_ids.some(function(monid) {
       var monitor = self.monitors.get(monid);
       if(monitor.inside(x, y)) {
         if(monid != self.monitors.current) {
@@ -233,6 +233,9 @@ NWM.prototype.events = {
       }
       return false; // continue iteration
     });
+    if(didChangeFocus) {
+      console.log('Focus monitor by coordinates', x, y);
+    }
   },
 
   // Screen events
