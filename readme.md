@@ -123,6 +123,7 @@ That's it.
     # Workspaces
     Meta + [1..n] -- Switch to workspace n
     Meta + Shift + [1..n] -- Move window to workspace n
+    Meta + BackSpace -- Switch back and forth between the last two workspaces
 
     # Multi-monitor keys
     Meta + Shift + , -- Send focused window to previous screen

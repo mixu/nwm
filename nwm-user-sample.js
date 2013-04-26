@@ -169,6 +169,12 @@ var keyboard_shortcuts = [
     callback: function() {
       process.exit();
     }
+  },
+  {
+    key: 'BackSpace',
+    callback: function() {
+      currentMonitor().goBack();
+    }
   }
 ];
 
