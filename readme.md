@@ -18,8 +18,8 @@ nwm is what I use for window management in Arch, Debian and Ubuntu.
 
 Prerequisites: a 0.10.x/0.8.x/0.6.x branch version of Node and xterm (if not installed). Install the following dev packages:
 
-- On Ubuntu (10.4) and Debian (6 stable): ```sudo apt-get install libx11-dev libxinerama-dev```
-- On Arch (after installing X11): ```sudo pacman -S xterm```
+- On Ubuntu (10.4) and Debian (6 stable): `sudo apt-get install libx11-dev libxinerama-dev`
+- On Arch (after installing X11): `sudo pacman -S xterm libxinerama`; also, you need to [set python to be python2](http://stackoverflow.com/questions/15400985/how-to-completely-replace-python-3-with-python-2-in-arch-linux) for [gyp](http://en.wikipedia.org/wiki/GYP_%28software%29), the build tool that gets invoked by [node-gyp](https://github.com/TooTallNate/node-gyp).
 - On Fedora: (need to update this)
 - On OSX: nwm does unofficially run under X11 in OSX - see osx.md in the repo for instructions
 
