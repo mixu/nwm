@@ -2,10 +2,14 @@
 var NWM = require('./nwm.js'),
     XK = require('./lib/keysymdef.js'),
     Xh = require('./lib/x.js'),
-    child_process = require('child_process');
+    child_process = require('child_process'),
+    which = require('which');
 
 // instantiate nwm and configure it
 var nwm = new NWM();
+
+// resolved using node-which from a preset list, see bottom of the file
+var bestAvailableTerm = 'xterm';
 
 // load layouts
 var layouts = require('./lib/layouts');
@@ -45,6 +49,24 @@ if ( process.env.DISPLAY && process.env.DISPLAY == ':1' ) {
   baseModifier = Xh.Mod4Mask|Xh.ControlMask; // Win + Ctrl
 }
 
+var envWithLang = JSON.parse(JSON.stringify(process.env));
+
+envWithLang.LANGUAGE = 'en_US.utf8';
+envWithLang.LANG = 'en_US.utf8';
+envWithLang.LC_ALL = 'en_US.utf8';
+
+
+function exec(command, onErr) {
+  var term = child_process.spawn(command, [], { env: envWithLang });
+
+  term.stderr.setEncoding('utf8');
+  term.stderr.on('data', function (data) {
+    if (/^execvp\(\)/.test(data)) {
+      onErr && onErr();
+    }
+  });
+}
+
 var keyboard_shortcuts = [
   {
     key: [1, 2, 3, 4, 5, 6, 7, 8, 9], // number keys are used to move between screens
@@ -64,7 +86,7 @@ var keyboard_shortcuts = [
     key: 'Return', // enter key launches xterm
     modifier: [ 'shift' ],
     callback: function(event) {
-      child_process.spawn('xterm', ['-lc'], { env: process.env });
+      exec(bestAvailableTerm);
     }
   },
   {
@@ -198,4 +220,26 @@ keyboard_shortcuts.forEach(function(shortcut) {
 });
 
 // START
-nwm.start(function() { });
+var terms = [
+  'sakura',
+  'rxvt',
+  'urxvt'
+  'xterm'
+];
+
+function findTerm(onDone) {
+  var name = terms.shift();
+  which(name, function(err, filepath) {
+    if (err || !filepath) {
+      findTerm(onDone);
+    } else {
+      onDone(null, name);
+    }
+  }
+}
+
+findTerm(function(err, term) {
+  bestAvailableTerm = term;
+  nwm.start(function() {});
+});
+

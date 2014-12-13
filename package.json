@@ -22,6 +22,7 @@
     "mocha": "~1.2.1"
   },
   "dependencies": {
-    "bindings": "~1.0.0"
+    "bindings": "~1.0.0",
+    "which": "~1.0.8"
   }
 }
