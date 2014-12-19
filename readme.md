@@ -43,7 +43,7 @@ Starting with `v1.1.0`, when nwm is launched via the `nwm` command line tool, it
 
 If this file is not found, then the default `nwm-user-sample.js` is used to launch the window manager.
 
-Note that file should export a single function, which takes one parameter: the hash in nwm's `index.js`. This is done so that your custom configuration doesn't need to know where `nwm` is installed.
+Note that the new mechanism is different from the old one. The custom file should export a single function, which takes one parameter: the hash in nwm's `index.js`. This is done so that your custom configuration doesn't need to know where `nwm` is installed.
 
 To get started, copy `nwm-user-sample.js` and customize it. It contains all the necessary boilerplate. You could also keep your custom config in a git repo, and clone it using something like `git clone https://github.com/mixu/nwm-user.git ~/.nwm-user && cd ~/.nwm-user && npm install`.
 
