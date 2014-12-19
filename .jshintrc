@@ -1,0 +1,7 @@
+{
+  // double !! is allowed
+  "-W018": true,
+  // and I don't care what jshint thinks is better written in dot notation, because using string notation
+  // is nice for things that are configuration options.
+  "-W069": true
+}

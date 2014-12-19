@@ -5,7 +5,7 @@ function Nwm() {}
 
 Nwm.addMonitor = function(monitor) {
   monitors[monitor.id] = new Monitor(monitor);
-  if(!mainMonitor) {
+  if (!mainMonitor) {
     mainMonitor = monitors[monitor.id];
   }
 };
@@ -50,9 +50,9 @@ Nwm.keypress = function(event) {
   console.log('keyPress', event, String.fromCharCode(event.keysym));
   // find the matching callback and emit it
   this.shortcuts.forEach(function(shortcut) {
-    if(event.keysym == shortcut.key && event.modifier == shortcut.modifier ) {
+    if (event.keysym == shortcut.key && event.modifier == shortcut.modifier) {
       shortcut.callback(event);
-    };
+    }
   });
 };
 

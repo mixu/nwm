@@ -9,11 +9,11 @@ var Workspace = require('./workspace.js');
  */
 
 function Monitor(opts) {
-  if(typeof opts == 'undefined') {
+  if (typeof opts == 'undefined') {
     opts = {};
   }
   this.width = opts.width || 0;
-  this.height = opts.height || 0 ;
+  this.height = opts.height || 0;
   this.x = opts.x || 0;
   this.y = opts.y || 0;
   this.currentWorkspace = new Workspace();
@@ -22,12 +22,12 @@ function Monitor(opts) {
 
 }
 
-Monitor.prototype.addWindow = function(window){
+Monitor.prototype.addWindow = function(window) {
   // windows can be located outside the current monitor or be too large
-  if(win.x > this.x || win.y > this.y) {
+  if (win.x > this.x || win.y > this.y) {
     win.move(this.x, this.y);
   }
-  if(win.height > this.height || win.width > this.width) {
+  if (win.height > this.height || win.width > this.width) {
     win.resize(this.width, this.height);
   }
   // set the focused window ?
@@ -36,7 +36,7 @@ Monitor.prototype.addWindow = function(window){
 
   // listen to changes to fullscreen
   window.on('change:fullscreen', function(model, value) {
-    if(value) {
+    if (value) {
       // TODO change the current workspace to use the monocle layout
       // resize
       window.set({ x: this.x, y: this.y, width: this.width, height: this.height }).sync();

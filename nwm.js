@@ -13,7 +13,8 @@ var Collection = require('./lib/collection.js'),
 // Node Window Manager
 // -------------------
 var NWM = function() {
-  // A reference to the nwm C++ X11 binding - require using node-bindings to work around the various changes in paths
+  // A reference to the nwm C++ X11 binding
+  // - require using node-bindings to work around the various changes in paths
   this.wm = require('bindings')('nwm.node');
   // Known layouts
   this.layouts = {};
@@ -24,7 +25,7 @@ var NWM = function() {
   // windows -- this is the global storage for windows, any other objects just store ids referring to this hash.
   this.windows = new Collection(this, 'window', 1);
   this.floaters = [];
-}
+};
 
 require('util').inherits(NWM, require('events').EventEmitter);
 
@@ -47,24 +48,24 @@ NWM.prototype.events = {
   // A monitor is removed
   removeMonitor: function(id) {
     console.log('Remove monitor', id);
-    this.monitors.remove(function(monitor){ return (monitor.id != id); });
+    this.monitors.remove(function(monitor) { return (monitor.id != id); });
   },
 
   // Window events
   // -------------
   // A new window is added
   addWindow: function(window) {
-    if(window.id) {
+    if (window.id) {
       var current_monitor = this.monitors.get(this.monitors.current);
       window.workspace = current_monitor.workspaces.current;
       // ignore monitor number from binding as windows should open on the focused monitor
       window.monitor = this.monitors.current;
 
-      if(current_monitor.focused_window == null) {
+      if (current_monitor.focused_window === null) {
         current_monitor.focused_window = window.id;
       }
       // do not add floating windows
-      if(window.isfloating
+      if (window.isfloating
         // do not add windows that are fixed ( min_width = max_width and min_height = max_height)
         // We need the size info from updatesizehins to do this
         // || (window.width == current_monitor.width && window.height == current_monitor.height)
@@ -75,7 +76,7 @@ NWM.prototype.events = {
       }
       var win = new Window(this, window);
       // windows might be placed outside the screen if the wm was terminated
-      if(win.x > current_monitor.width || win.y > current_monitor.height) {
+      if (win.x > current_monitor.width || win.y > current_monitor.height) {
         win.move(1, 1);
       }
       console.log('Add window', {
@@ -92,7 +93,7 @@ NWM.prototype.events = {
   // When a window is removed
   removeWindow: function(window) {
     this.windows.remove(function(item) {
-      if(item && item.id && window.id) {
+      if (item && item.id && window.id) {
         return (item.id != window.id);
       } else {
         // multiple windows removed simultaneously - item is undefined
@@ -100,7 +101,7 @@ NWM.prototype.events = {
       }
     });
     var pos = this.floaters.indexOf(window.id);
-    if(pos > -1) {
+    if (pos > -1) {
       this.floaters = this.floaters.splice(pos, 1);
     }
     // moved rearrange here to ensure that it occurs after everything else
@@ -111,7 +112,7 @@ NWM.prototype.events = {
   // When a window is updated
   // This is only triggered for title and class updates, never coordinates or monitors.
   updateWindow: function(window) {
-    if(this.windows.exists(window.id)) {
+    if (this.windows.exists(window.id)) {
       var old = this.windows.get(window.id);
       this.windows.update(window.id, {
         title: window.title || old.title || '',
@@ -124,22 +125,29 @@ NWM.prototype.events = {
   fullscreen: function(id, status) {
     console.log('Client Fullscreen', id, status);
     console.log(id, '!! exists? ', this.windows.exists(id));
-    if(this.windows.exists(id)) {
+    if (this.windows.exists(id)) {
       var window = this.windows.get(id);
       console.log(window.monitor, '!! monit exists? ', this.monitors.exists(window.monitor));
-      if(!this.monitors.exists(window.monitor)) {
-        // TODO handle this error, which occurs when a win was in fullscren and then the monitor was removed, then fullscreen is toggled back
+      if (!this.monitors.exists(window.monitor)) {
+        // TODO handle this error, which occurs when a win was in fullscren
+        // and then the monitor was removed, then fullscreen is toggled back
         return;
       }
       // use the monitor dimensions associated with the window
       var monitor = this.monitors.get(window.monitor);
       var workspace = monitor.workspaces.get(monitor.workspaces.current);
-      if(status) {
-        console.log('!! resize', { id: id, x: monitor.x, y: monitor.y, width: monitor.width, height: monitor.height });
+      if (status) {
+        console.log('!! resize', {
+          id: id,
+          x: monitor.x,
+          y: monitor.y,
+          width: monitor.width,
+          height: monitor.height
+        });
         this.wm.moveWindow(id, monitor.x, monitor.y);
         this.wm.resizeWindow(id, monitor.width, monitor.height);
         // we should also protect the window from being disturbed by rearranges
-        if(this.layouts['monocle']) {
+        if (this.layouts['monocle']) {
           workspace.layout = 'monocle';
         }
       } else {
@@ -149,12 +157,13 @@ NWM.prototype.events = {
   },
 
   // ConfigureRequest is generated when a client window wants to change its size, stacking order or border width
-  configureRequest: function(ev){
+  configureRequest: function(ev) {
     console.log('configureRequest', ev);
     this.wm.configureWindow(ev.id, ev.x, ev.y, ev.width, ev.height, ev.border_width,
         ev.above, ev.detail, ev.value_mask);
     return;
-    if(ev.id && this.windows.exists(ev.id)) {
+    /*
+    if (ev.id && this.windows.exists(ev.id)) {
       // Check whether the window is known (e.g. managed and not floating)
       // Known windows should not be allowed to reconfigure themselves.
       // They should just be send back a ConfigureNotify() with the current info
@@ -164,17 +173,17 @@ NWM.prototype.events = {
         ev.above, ev.detail, ev.value_mask);
     } else {
       console.log('allowing configureRequest');
-      if(ev.id && this.floaters.indexOf(ev.id)) {
+      if (ev.id && this.floaters.indexOf(ev.id)) {
         // If the window is floating, it should be moved and resized
         // The size should be modifiable, but the floating window should be centered
         // on the current monitor (or the monitor the floater is on, but we don't track that now)
         var monitor = this.monitors.get(this.monitors.current);
         ev.x = monitor.x + ev.x;
         ev.y = monitor.y + ev.y;
-        if ( (ev.x + ev.width) > monitor.x + monitor.width) {
+        if ((ev.x + ev.width) > monitor.x + monitor.width) {
           ev.x = monitor.x + Math.floor(monitor.width / 2 - ev.width / 2);
         }
-        if ( (ev.y + ev.heigth) > monitor.y + monitor.height) {
+        if ((ev.y + ev.heigth) > monitor.y + monitor.height) {
           ev.y = monitor.y + Math.floor(monitor.height / 2 - ev.height / 2);
         }
       }
@@ -182,6 +191,7 @@ NWM.prototype.events = {
       this.wm.configureWindow(ev.id, ev.x, ev.y, ev.width, ev.height, ev.border_width,
         ev.above, ev.detail, ev.value_mask);
     }
+    */
   },
 
   // Mouse events
@@ -197,17 +207,17 @@ NWM.prototype.events = {
     var change_x = event.move_x - event.x;
     var change_y = event.move_y - event.y;
     var window = this.windows.exists(event.id) && this.windows.get(event.id);
-    if(window) {
-      this.wm.moveWindow(event.id, window.x+change_x, window.y+change_y);
+    if (window) {
+      this.wm.moveWindow(event.id, window.x + change_x, window.y + change_y);
     }
   },
 
   // Mouse enters a window
-  enterNotify: function(event){
-    if(this.windows.exists(event.id)) {
+  enterNotify: function(event) {
+    if (this.windows.exists(event.id)) {
       var window = this.windows.get(event.id);
       console.log('focused monitor is ', this.monitors.current, 'focusing to', window.monitor, window.title);
-      if(this.monitors.exists(window.monitor)) {
+      if (this.monitors.exists(window.monitor)) {
         this.monitors.get(window.monitor).focused_window = event.id;
       }
       this.wm.focusWindow(event.id);
@@ -224,8 +234,8 @@ NWM.prototype.events = {
     var self = this;
     var didChangeFocus = monitor_ids.some(function(monid) {
       var monitor = self.monitors.get(monid);
-      if(monitor.inside(x, y)) {
-        if(monid != self.monitors.current) {
+      if (monitor.inside(x, y)) {
+        if (monid != self.monitors.current) {
           console.log('Change focused monitor from', self.monitors.current, 'to', monid);
         }
         self.monitors.current = monid;
@@ -233,7 +243,7 @@ NWM.prototype.events = {
       }
       return false; // continue iteration
     });
-    if(didChangeFocus) {
+    if (didChangeFocus) {
       console.log('Focus monitor by coordinates', x, y);
     }
   },
@@ -257,9 +267,9 @@ NWM.prototype.events = {
     console.log('keyPress', event, String.fromCharCode(event.keysym));
     // find the matching callback and emit it
     this.shortcuts.forEach(function(shortcut) {
-      if(event.keysym == shortcut.key && event.modifier == shortcut.modifier ) {
+      if (event.keysym == shortcut.key && event.modifier == shortcut.modifier) {
         shortcut.callback(event);
-      };
+      }
     });
   }
 };
@@ -268,7 +278,7 @@ NWM.prototype.events = {
 // -----------------
 
 // Register a new layout
-NWM.prototype.addLayout = function(name, callback){
+NWM.prototype.addLayout = function(name, callback) {
   this.layouts[name] = callback;
 };
 
@@ -277,7 +287,7 @@ NWM.prototype.nextLayout = function(name) {
   var keys = Object.keys(this.layouts);
   var pos = keys.indexOf(name);
   // Wrap around the array
-  return (keys[pos+1] ? keys[pos+1] : keys[0] );
+  return (keys[pos + 1] ? keys[pos + 1] : keys[0]);
 };
 
 // Keyboard shortcut operations
@@ -303,11 +313,11 @@ NWM.prototype.start = function(callback) {
   var grab_keys = [];
   console.log(this.shortcuts);
   this.shortcuts.forEach(function(shortcut) {
-    grab_keys.push( { key: shortcut.key, modifier: shortcut.modifier });
+    grab_keys.push({ key: shortcut.key, modifier: shortcut.modifier });
   });
   this.wm.keys(grab_keys);
   this.wm.start();
-  if(callback) {
+  if (callback) {
     callback();
   }
 };

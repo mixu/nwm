@@ -45,8 +45,8 @@ function resizeWorkspace(increment) {
 // Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
 var baseModifier = Xh.Mod4Mask; // Win key
 
-if ( process.env.DISPLAY && process.env.DISPLAY == ':1' ) {
-  baseModifier = Xh.Mod4Mask|Xh.ControlMask; // Win + Ctrl
+if (process.env.DISPLAY && process.env.DISPLAY == ':1') {
+  baseModifier = Xh.Mod4Mask | Xh.ControlMask; // Win + Ctrl
 }
 
 var envWithLang = JSON.parse(JSON.stringify(process.env));
@@ -60,9 +60,11 @@ function exec(command, onErr) {
   var term = child_process.spawn(command, [], { env: envWithLang });
 
   term.stderr.setEncoding('utf8');
-  term.stderr.on('data', function (data) {
+  term.stderr.on('data', function(data) {
     if (/^execvp\(\)/.test(data)) {
-      onErr && onErr();
+      if (onErr) {
+        onErr();
+      }
     }
   });
 }
@@ -76,7 +78,7 @@ var keyboard_shortcuts = [
   },
   {
     key: [1, 2, 3, 4, 5, 6, 7, 8, 9], // with shift, move windows between workspaces
-    modifier: [ 'shift' ],
+    modifier: ['shift'],
     callback: function(event) {
       var monitor = currentMonitor();
       monitor.windowTo(monitor.focused_window, String.fromCharCode(event.keysym));
@@ -84,17 +86,19 @@ var keyboard_shortcuts = [
   },
   {
     key: 'Return', // enter key launches xterm
-    modifier: [ 'shift' ],
+    modifier: ['shift'],
     callback: function(event) {
       exec(bestAvailableTerm);
     }
   },
   {
     key: 'c', // c key closes the current window
-    modifier: [ 'shift' ],
+    modifier: ['shift'],
     callback: function(event) {
       var monitor = currentMonitor();
-      monitor.focused_window && nwm.wm.killWindow(monitor.focused_window);
+      if (monitor.focused_window) {
+        nwm.wm.killWindow(monitor.focused_window);
+      }
     }
   },
   {
@@ -131,22 +135,22 @@ var keyboard_shortcuts = [
   },
   {
     key: 'comma', // moving windows between monitors
-    modifier: [ 'shift' ],
+    modifier: ['shift'],
     callback: function(event) {
       var monitor = currentMonitor();
       var window = nwm.windows.get(monitor.focused_window);
-      if(window) { // empty if no windows
+      if (window) { // empty if no windows
         moveToMonitor(window, monitor, nwm.monitors.next(window.monitor));
       }
     }
   },
   {
     key: 'period', // moving windows between monitors
-    modifier: [ 'shift' ],
+    modifier: ['shift'],
     callback: function(event) {
       var monitor = currentMonitor();
       var window = nwm.windows.get(monitor.focused_window);
-      if(window) { // empty if no windows
+      if (window) { // empty if no windows
         moveToMonitor(window, monitor, nwm.monitors.prev(window.monitor));
       }
     }
@@ -155,13 +159,13 @@ var keyboard_shortcuts = [
     key: 'j', // moving focus
     callback: function() {
       var monitor = currentMonitor();
-      if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+      if (monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
         var window = nwm.windows.get(monitor.focused_window);
         do {
           var previous = nwm.windows.prev(window.id);
           window = nwm.windows.get(previous);
         }
-        while(window.workspace != monitor.workspaces.current);
+        while (window.workspace != monitor.workspaces.current);
         console.log('Current', monitor.focused_window, 'previous', window.id);
         monitor.focused_window = window.id;
         nwm.wm.focusWindow(window.id);
@@ -172,13 +176,13 @@ var keyboard_shortcuts = [
     key: 'k', // moving focus
     callback: function() {
       var monitor = currentMonitor();
-      if(monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
+      if (monitor.focused_window && nwm.windows.exists(monitor.focused_window)) {
         var window = nwm.windows.get(monitor.focused_window);
         do {
           var next = nwm.windows.next(window.id);
           window = nwm.windows.get(next);
         }
-        while(window.workspace != monitor.workspaces.current);
+        while (window.workspace != monitor.workspaces.current);
         console.log('Current', monitor.focused_window, 'next', window.id);
         monitor.focused_window = window.id;
         nwm.wm.focusWindow(monitor.focused_window);
@@ -187,7 +191,7 @@ var keyboard_shortcuts = [
   },
   {
     key: 'q', // quit
-    modifier: [ 'shift' ],
+    modifier: ['shift'],
     callback: function() {
       process.exit();
     }
@@ -205,12 +209,16 @@ keyboard_shortcuts.forEach(function(shortcut) {
   var callback = shortcut.callback;
   var modifier = baseModifier;
   // translate the modifier array to a X11 modifier
-  if(shortcut.modifier) {
-    (shortcut.modifier.indexOf('shift') > -1) && (modifier = modifier|Xh.ShiftMask);
-    (shortcut.modifier.indexOf('ctrl') > -1) && (modifier = modifier|Xh.ControlMask);
+  if (shortcut.modifier) {
+    if (shortcut.modifier.indexOf('shift') > -1) {
+      modifier = modifier | Xh.ShiftMask;
+    }
+    if (shortcut.modifier.indexOf('ctrl') > -1) {
+      modifier = modifier | Xh.ControlMask;
+    }
   }
   // add shortcuts
-  if(Array.isArray(shortcut.key)) {
+  if (Array.isArray(shortcut.key)) {
     shortcut.key.forEach(function(key) {
       nwm.addKey({ key: XK[key], modifier: modifier }, callback);
     });
@@ -223,7 +231,7 @@ keyboard_shortcuts.forEach(function(shortcut) {
 var terms = [
   'sakura',
   'rxvt',
-  'urxvt'
+  'urxvt',
   'xterm'
 ];
 
@@ -235,7 +243,7 @@ function findTerm(onDone) {
     } else {
       onDone(null, name);
     }
-  }
+  });
 }
 
 findTerm(function(err, term) {
