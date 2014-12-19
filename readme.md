@@ -14,31 +14,34 @@ nwm is what I use for window management in Arch, Debian and Ubuntu.
 - Each workspace can have its own layout
 - Everything is defined/laid out in Javascript; a native X11 binding written in in C++/C emits events to Node.js
 
-# Installing
+*New in 1.1.0*: simplified the installation process by adding a `nwm` command, and simplified customization by introducing a new `~/.nwm-user` loading mechanism.
 
-Prerequisites: a 0.10.x/0.8.x/0.6.x branch version of Node and xterm (if not installed). Install the following dev packages:
+# Installation
+
+Prerequisites: a 0.10.x/0.8.x/0.6.x branch version of Node, xterm and python. Install the following dev packages:
 
 - On Ubuntu (10.4) and Debian (6 stable): `sudo apt-get install libx11-dev libxinerama-dev`
 - On Arch (after installing X11): `sudo pacman -S xterm libxinerama`; also, you need to [set python to be python2](http://stackoverflow.com/questions/15400985/how-to-completely-replace-python-3-with-python-2-in-arch-linux) for [gyp](http://en.wikipedia.org/wiki/GYP_%28software%29), the build tool that gets invoked by [node-gyp](https://github.com/TooTallNate/node-gyp).
 - On Fedora: (need to update this)
-- On OSX: nwm does unofficially run under X11 in OSX - see osx.md in the repo for instructions
 
-From github:
+Next, install nwm via npm with the `-g` flag:
 
-    git clone git://github.com/mixu/nwm.git
-    rm -rf ./build
-    npm install --production
+    npm install -g nwm
 
-If you are using Node 0.6.x, you need to checkout src/nwm_node.cc at revision db3545413d:
+This installs the `nwm` command globally, which can be then used to easily launch the window manager. If you want to install using git, or if you are still using Node 0.6.x, see `appendix.md` for more instructions.
 
-    git clone git://github.com/mixu/nwm.git
-    git checkout db3545413d src/nwm/nwm_node.cc
-    rm -rf ./build
-    npm install --production
+Next, add an entry for nwm using `/usr/share/xsessions` (assuming you are using Gnome / GDM) as a login manager:
 
-This is because - sadly - the uv_poll_* functionality does not exist in the version of libuv bundled with node 0.6.x. But thanks to NOT writing the vast majority of the native binding in C++, this workaround will work for quite a while until you upgrade.
+    nwm --init > /usr/share/xsessions/nwm.desktop
 
-See further below for instructions on how to set up nwm as a desktop session under GDM/Gnome.
+Select "nwm" from the Sessions menu when logging in.
+
+## Customizing nwm
+
+Starting with `v1.1.0`, when nwm is launched via the `nwm` command line tool, it will first look for a file or folder called 
+`~/.nwm-user` (e.g. `~/.nwm-user.js` or `~/.nwm-user/index.js`). This file allows you to customize your nwm keyboard shortcuts and overall behavior. To get started, copy `nwm-user-sample.js` and customize it. You could also keep your custom config in a git repo, and clone it using something like `git clone https://github.com/mixu/nwm-user.git ~/.nwm-user && cd ~/.nwm-user && npm install`.
+
+If this file is not found, then the default `nwm-user-sample.js` is used to launch the window manager.
 
 # Tutorial
 
@@ -64,11 +67,15 @@ Move the mouse on top of the window you want to focus. You can also use ```Win +
 
 The way I use nwm is by dedicating workspaces to different tasks (e.g. different programming projects, managing files, terminal windows). Each monitor has 9 workspaces, numbered from 1 to 9. To change the workspace, press:
 
-```Win + [number key between from 1 to 9]```
+```
+Win + [number key between from 1 to 9]
+```
 
 To move the focused window to a different workspace, press:
 
-```Win + Shift + [number key between from 1 to 9]```
+```
+Win + Shift + [number key between from 1 to 9]
+```
 
 If you have more than one monitor attached, then you will have 9 workspaces on each monitor. You can change the layout on each workspace individually.
 
@@ -128,28 +135,6 @@ That's it.
     # Multi-monitor keys
     Meta + Shift + , -- Send focused window to previous screen
     Meta + Shift + . -- Send focused window to next screen
-
-# Adding nwm under your login manager as an alternative under Linux
-
-If you are using Gnome (GDM as login manager)
-
-1: Create nwm.sh somewhere (and chmod +x it):
-
-    #!/bin/sh
-    /usr/local/bin/node /path/to/nwm-user-sample.js 2> ~/nwm.err.log 1> ~/nwm.log
-
-Note: run "which node" to find out the path to Node in the script above.
-
-2: add the following as nwm.desktop to /usr/share/xsessions:
-
-    [Desktop Entry]
-    Encoding=UTF-8
-    Name=nwm
-    Comment=This session starts nwm
-    Exec=/PATH/TO/nwm.sh
-    Type=Application
-
-Select "nwm" from the Sessions menu when logging in. If you run into issues, have a look at ~/nwm.err.log. Mostly, it's a matter of getting all the paths (to Node, to the nwm files) right.
 
 ## Changing keyboard shortcuts
 

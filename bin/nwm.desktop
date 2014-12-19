@@ -1,0 +1,6 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=nwm
+Comment=This session starts nwm
+Exec=:path-to-nwm
+Type=Application

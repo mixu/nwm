@@ -1,2 +1,52 @@
 #!/usr/bin/env node
+var fs = require('fs'),
+    path = require('path'),
+    which = require('which');
+
+var opts = require('yargs')
+    .boolean('init')
+    .boolean('version'),
+    argv = opts.parse(process.argv);
+
+if (argv['version'] || argv['v']) {
+  console.log(require('../package.json').version);
+  process.exit();
+}
+
+if (argv['help']) {
+  return fs.createReadStream(__dirname + '/usage.txt')
+           .pipe(process.stdout)
+           .on('close', function() { process.exit(1) });
+}
+
+if (argv['init']) {
+  which('nwm', function(err, filepath) {
+    if (err || !filepath) {
+      console.log('Could not find the nwm command using `which`.');
+      console.log('Please create a file named `/usr/share/xsessions/nwm.desktop` ' +
+        'with the following content, and ' +
+        'fill in the correct path `:path-to-nwm` manually.');
+      console.log('This may happen if you didn\'t install nwm with `npm install -g nwm`');
+      console.log();
+      console.log(fs.readFileSync(__dirname + '/nwm.desktop', 'utf8'));
+      return;
+    }
+    var out = fs.readFileSync(__dirname + '/nwm.desktop', 'utf8')
+                .replace(':path-to-nwm', filepath)
+    console.log(out);
+  });
+  return;
+}
+
+var homePath = process.env['HOME'];
+homePath = (typeof homePath === 'string' ? path.normalize(homePath) : process.cwd());
+
+// try ~/.nwm-user
+try {
+  console.log(require(homePath + '/.nwm-user'));
+  return;
+} catch (e) {
+  console.log('Could not find ~/.nwm-user, launching with default nwm-user-sample.js');
+}
+
 require('../nwm-user-sample.js');

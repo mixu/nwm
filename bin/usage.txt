@@ -1,0 +1,19 @@
+
+USAGE
+
+    nwm [options]
+
+By default, this starts the nwm window manager.
+
+OPTIONS
+
+    --init      Generate a nwm.desktop file, e.g. `nwm --init > /usr/share/xsessions/nwm.desktop`
+    --help      Show this help
+    --version   Show version info
+
+STARTUP PATHS
+
+When nwm is launched, it will first look for a file or folder called 
+`~/.nwm-user` (e.g. `~/.nwm-user.js` or `~/.nwm-user/index.js`). This file allows you to customize your nwm keyboard shortcuts and overall behavior.
+
+If this file is not found, then the default `nwm-user-sample.js` is used to launch the window manager.

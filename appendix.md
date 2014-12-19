@@ -1,4 +1,25 @@
+# Installing from github
+
+To install nwm from github:
+
+    git clone git://github.com/mixu/nwm.git
+    rm -rf ./build
+    npm install --production
+
+# Installing on Node 0.6.x
+
+If you are using Node 0.6.x, you need to checkout src/nwm_node.cc at revision db3545413d:
+
+    git clone git://github.com/mixu/nwm.git
+    git checkout db3545413d src/nwm/nwm_node.cc
+    rm -rf ./build
+    npm install --production
+
+This is because - sadly - the uv_poll_* functionality does not exist in the version of libuv bundled with node 0.6.x. But thanks to NOT writing the vast majority of the native binding in C++, this workaround will work for quite a while until you upgrade.
+
 # Installing on OSX
+
+Note: There is no official support for nwm on OSX - nwm can run there but you're on your own for debugging this, as a lack of a sane package manager makes it hard to debug issues with missing dependencies.
 
 Set nwm as the X11 window manager:
 
