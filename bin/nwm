@@ -46,7 +46,9 @@ try {
   console.log(require(homePath + '/.nwm-user'));
   return;
 } catch (e) {
-  console.log('Could not find ~/.nwm-user, launching with default nwm-user-sample.js');
+  console.log('Error finding or executing ~/.nwm-user, launching with default nwm-user-sample.js');
+  console.log('Error was:');
+  console.log(e);
 }
 
 require('../nwm-user-sample.js');

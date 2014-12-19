@@ -45,7 +45,7 @@ function resizeWorkspace(increment) {
 // Change the base modifier to your liking e.g. Xh.Mod4Mask if you just want to use the meta key without Ctrl
 var baseModifier = Xh.Mod4Mask; // Win key
 
-if (process.env.DISPLAY && process.env.DISPLAY == ':1') {
+if (process.argv.indexOf('--xephyr') > -1) {
   baseModifier = Xh.Mod4Mask | Xh.ControlMask; // Win + Ctrl
 }
 

@@ -11,6 +11,7 @@
   "bin": {
     "nwm": "./bin/nwm"
   },
+  "main": "./nwm.js",
   "keywords": [
     "nwm",
     "window manager",
