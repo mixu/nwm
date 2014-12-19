@@ -39,9 +39,13 @@ Select "nwm" from the Sessions menu when logging in.
 ## Customizing nwm
 
 Starting with `v1.1.0`, when nwm is launched via the `nwm` command line tool, it will first look for a file or folder called
-`~/.nwm-user` (e.g. `~/.nwm-user.js` or `~/.nwm-user/index.js`). This file allows you to customize your nwm keyboard shortcuts and overall behavior. To get started, copy `nwm-user-sample.js` and customize it. You could also keep your custom config in a git repo, and clone it using something like `git clone https://github.com/mixu/nwm-user.git ~/.nwm-user && cd ~/.nwm-user && npm install`.
+`~/.nwm-user` (e.g. `~/.nwm-user.js` or `~/.nwm-user/index.js`). This file allows you to customize your nwm keyboard shortcuts and overall behavior.
 
 If this file is not found, then the default `nwm-user-sample.js` is used to launch the window manager.
+
+Note that file should export a single function, which takes one parameter: the hash in nwm's `index.js`. This is done so that your custom configuration doesn't need to know where `nwm` is installed.
+
+To get started, copy `nwm-user-sample.js` and customize it. It contains all the necessary boilerplate. You could also keep your custom config in a git repo, and clone it using something like `git clone https://github.com/mixu/nwm-user.git ~/.nwm-user && cd ~/.nwm-user && npm install`.
 
 # Tutorial
 
@@ -181,7 +185,7 @@ If you want to test or develop nwm, the easiest way is to use Xephyr:
     DISPLAY=:1 gedit
     DISPLAY=:1 gnome-terminal
     # now start nwm.js on display 1
-    DISPLAY=:1 node nwm-user-sample.js --xephyr
+    DISPLAY=:1 node bin/nwm --xephyr
 
 Under Xephyr, the base key combination is Ctrl+Meta (e.g. Ctrl+Win). When running natively, the base key is Meta (Win). This is so that I can test nwm inside itself, yet have decent shortcuts. Note the new `--xephyr` option which controls whether to use Ctrl+Meta or just Meta as the base key combination.
 

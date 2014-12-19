@@ -43,7 +43,7 @@ homePath = (typeof homePath === 'string' ? path.normalize(homePath) : process.cw
 
 // try ~/.nwm-user
 try {
-  console.log(require(homePath + '/.nwm-user'));
+  require(homePath + '/.nwm-user')(require('../index.js'));
   return;
 } catch (e) {
   console.log('Error finding or executing ~/.nwm-user, launching with default nwm-user-sample.js');
@@ -51,4 +51,4 @@ try {
   console.log(e);
 }
 
-require('../nwm-user-sample.js');
+require('../nwm-user-sample.js')(require('../index.js'));
