@@ -5,7 +5,10 @@
       'sources': [
         'src/nwm/nwm_node.cc'
       ],
-      'dependencies': ['listc', 'nwmc']
+      'dependencies': ['listc', 'nwmc'],
+      'include_dirs' : [
+          "<!(node -e \"require('nan')\")"
+      ]
     },
     {
       'target_name': 'listc',
