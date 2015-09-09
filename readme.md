@@ -2,12 +2,12 @@
 
 A dynamic window manager for X11 written with Node.js
 
-nwm is what I use for window management in Arch, Debian and Ubuntu.
+nwm is what I use for window management in ChromeOS, Arch, Debian and Ubuntu.
 
 ### Why?
 
 - **New in 1.3.x**: added support for Node `4.0.x` and `0.12.x`!
-- Supported: Ubuntu, Arch, Fedora, Debian
+- Supported: Ubuntu, ChromeOS, Arch, Fedora, Debian
 - Dynamically tiling window manager with adjustable main window size
 - Multiple monitor support (Xinerama)
 - Workspaces/virtual desktops (0 - 9 by default)
@@ -24,6 +24,7 @@ Starting with `v1.3.0`, nwm works with the following Node versions: `4.0.x`, `0.
 Other prerequisites: `xterm` and `python` (for node-gyp). Also install the following dev packages:
 
 - On Ubuntu (14.04/12.04/10.04) and Debian (6 stable): `sudo apt-get install libx11-dev libxinerama-dev`
+- On ChromeOS, [set up developer mode](https://www.google.com/webhp?#q=chromeos+developer+mode) and then follow the [chromeos.md](/chromeos.md) guide for running my custom [crouton](https://github.com/dnschneid/crouton) deploy target
 - On Arch (after installing X11): `sudo pacman -S xterm libxinerama`; also, you need to [set python to be python2](http://stackoverflow.com/questions/15400985/how-to-completely-replace-python-3-with-python-2-in-arch-linux) for [gyp](http://en.wikipedia.org/wiki/GYP_%28software%29), the build tool that gets invoked by [node-gyp](https://github.com/TooTallNate/node-gyp).
 - On Fedora: (need to update this, please file a readme PR!)
 
