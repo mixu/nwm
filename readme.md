@@ -6,6 +6,7 @@ nwm is what I use for window management in Arch, Debian and Ubuntu.
 
 ### Why?
 
+- *New in 1.3.x*: added support for Node `4.0.x` and `0.12.x`!
 - Supported: Ubuntu, Arch, Fedora, Debian
 - Dynamically tiling window manager with adjustable main window size
 - Multiple monitor support (Xinerama)
@@ -18,17 +19,19 @@ nwm is what I use for window management in Arch, Debian and Ubuntu.
 
 # Installation
 
-Prerequisites: a 0.10.x/0.8.x/0.6.x branch version of Node, xterm and python. Install the following dev packages:
+Starting with `v1.3.0`, nwm works with the following Node versions: `4.0.x`, `0.12.x`, `0.10.x`, `0.8.x`. An old commit works with `0.6.x` as well, see [appendix.md](./appendix.md). For 4.0.x, you may need a newer GCC version, see the section near the bottom of the readme for instructions.
 
-- On Ubuntu (10.4) and Debian (6 stable): `sudo apt-get install libx11-dev libxinerama-dev`
+Other prerequisites: `xterm` and `python` (for node-gyp). Also install the following dev packages:
+
+- On Ubuntu (10.4, 12.4) and Debian (6 stable): `sudo apt-get install libx11-dev libxinerama-dev`
 - On Arch (after installing X11): `sudo pacman -S xterm libxinerama`; also, you need to [set python to be python2](http://stackoverflow.com/questions/15400985/how-to-completely-replace-python-3-with-python-2-in-arch-linux) for [gyp](http://en.wikipedia.org/wiki/GYP_%28software%29), the build tool that gets invoked by [node-gyp](https://github.com/TooTallNate/node-gyp).
-- On Fedora: (need to update this)
+- On Fedora: (need to update this, please file a readme PR!)
 
 Next, install nwm via npm with the `-g` flag:
 
     npm install -g nwm
 
-This installs the `nwm` command globally, which can be then used to easily launch the window manager. If you want to install using git, or if you are still using Node 0.6.x, see `appendix.md` for more instructions.
+This installs the `nwm` command globally, which can be then used to easily launch the window manager. If you want to install using git, see `appendix.md` for more instructions.
 
 Next, add an entry for nwm using `/usr/share/xsessions` (assuming you are using Gnome / GDM) as a login manager:
 
@@ -160,7 +163,6 @@ There are three parts to a basic shortcut:
 
 ## Writing new layouts and reassigning keyboard shortcuts
 
-
 For more extensive customization, see https://github.com/mixu/nwm-user which has a package.json file and hence makes it possible to git clone + npm install your window manager.
 
 ## Vertical Stack Tiling (e.g. DWM's tiling)
@@ -174,6 +176,21 @@ For more extensive customization, see https://github.com/mixu/nwm-user which has
 ## Grid (a.k.a fair)
 
 ![screenshot](https://github.com/mixu/nwm/raw/master/docs/screenshots/grid.png)
+
+# Compiling under Node 4.0.x
+
+To recompile nwm after switching Node version, make sure you install by cloning the repo, then run `rm -rf build && npm install` or reinstall via npm by uninstalling `npm uninstall -g nwm` and then reinstalling `npm install -g nwm`.
+
+In order to compile nwm for Node `4.0.x`, you'll need a GCC version `~4.8`. Older distros - like Ubuntu 12.04 - ship with a GCC `~4.6` which will cause a wall of errors when compiling Node native modules. Here's a recipe for Ubuntu 12.04 (which also allows you to reset back using `update-alternatives --config gcc`:
+
+```sh
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt-get update
+sudo apt-get install gcc-4.8 g++-4.8
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.6 40 --slave /usr/bin/g++ g++ /usr/bin/g++-4.6
+sudo update-alternatives --config gcc
+```
 
 # Running under a secondary X11 server (Xephyr)
 
