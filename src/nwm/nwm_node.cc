@@ -53,6 +53,7 @@ static NAN_METHOD(OnCallback) {
     Nan::Set(o, Nan::New(name).ToLocalChecked(), Nan::New(value));
 
 static void Emit(callback_map event, void *ev) {
+  Nan::HandleScope scope;
 
 
   v8::Local<v8::Object> o = Nan::New<v8::Object>();
