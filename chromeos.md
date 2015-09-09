@@ -1,11 +1,13 @@
 # nwm on ChromeOS
 
-Detailed instructions TODO. I need to test this out on a clean ChromeOS install again. If you end up giving it a try, feel free to file a PR.
+I'll clean up these instructions once I have a chance to do another clean install. Feel free to file a PR to improve these docs meanwhile.
 
-Crouton's capabilities for running external targets are limited, which is why you need a second, unpacked copy of crouton to install nwm at this time. The basic steps are:
+Crouton's capabilities for running external targets are limited, which is why you need a second, unpacked copy of crouton to install nwm at this time.
 
-1. download and unzip Crouton into a folder
-2. add the following files: https://github.com/dnschneid/crouton/compare/master...mixu:master
+The basic steps are:
+
+1. download and unzip Crouton into a folder by clicking the link on https://github.com/dnschneid/crouton and unzipping the file in ChromeOS.
+2. add the following files: https://github.com/dnschneid/crouton/compare/master...mixu:master (view -> raw -> Save as)
 3. run `sudo sh installer/main.sh -r precise -t nwm -n nwm`
 4. run `sudo startnwm` (or `sh host-bin/startnwm`)
 
