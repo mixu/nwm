@@ -6,7 +6,7 @@ nwm is what I use for window management in Arch, Debian and Ubuntu.
 
 ### Why?
 
-- *New in 1.3.x*: added support for Node `4.0.x` and `0.12.x`!
+- **New in 1.3.x**: added support for Node `4.0.x` and `0.12.x`!
 - Supported: Ubuntu, Arch, Fedora, Debian
 - Dynamically tiling window manager with adjustable main window size
 - Multiple monitor support (Xinerama)
@@ -19,11 +19,11 @@ nwm is what I use for window management in Arch, Debian and Ubuntu.
 
 # Installation
 
-Starting with `v1.3.0`, nwm works with the following Node versions: `4.0.x`, `0.12.x`, `0.10.x`, `0.8.x`. An old commit works with `0.6.x` as well, see [appendix.md](./appendix.md). For 4.0.x, you may need a newer GCC version, see the section near the bottom of the readme for instructions.
+Starting with `v1.3.0`, nwm works with the following Node versions: `4.0.x`, `0.12.x`, `0.10.x`, `0.8.x`. An old commit works with `0.6.x` as well, see [appendix.md](./appendix.md). For `4.0.x`, you may need a newer GCC version, see [this section for instructions](#compiling-under-node-40x).
 
 Other prerequisites: `xterm` and `python` (for node-gyp). Also install the following dev packages:
 
-- On Ubuntu (10.4, 12.4) and Debian (6 stable): `sudo apt-get install libx11-dev libxinerama-dev`
+- On Ubuntu (14.04/12.04/10.04) and Debian (6 stable): `sudo apt-get install libx11-dev libxinerama-dev`
 - On Arch (after installing X11): `sudo pacman -S xterm libxinerama`; also, you need to [set python to be python2](http://stackoverflow.com/questions/15400985/how-to-completely-replace-python-3-with-python-2-in-arch-linux) for [gyp](http://en.wikipedia.org/wiki/GYP_%28software%29), the build tool that gets invoked by [node-gyp](https://github.com/TooTallNate/node-gyp).
 - On Fedora: (need to update this, please file a readme PR!)
 
@@ -31,7 +31,7 @@ Next, install nwm via npm with the `-g` flag:
 
     npm install -g nwm
 
-This installs the `nwm` command globally, which can be then used to easily launch the window manager. If you want to install using git, see `appendix.md` for more instructions.
+This installs the `nwm` command globally, which can be then used to easily launch the window manager. If you want to install using git, see [appendix.md](./appendix.md) for more instructions.
 
 Next, add an entry for nwm using `/usr/share/xsessions` (assuming you are using Gnome / GDM) as a login manager:
 
